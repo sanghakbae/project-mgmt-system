@@ -460,6 +460,34 @@ h3 {
   line-height: 1.45;
 }
 
+.workflowGuideStrip {
+  margin-bottom: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.workflowGuideItem {
+  padding: 12px 14px;
+  border: 1px solid #e1e5eb;
+  border-radius: 8px;
+  background: #fbfbfc;
+}
+
+.workflowGuideItem strong {
+  display: block;
+  color: #20242b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.workflowGuideItem p {
+  margin: 6px 0 0;
+  color: #606772;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .dashboardKanban {
   position: relative;
   display: grid;
@@ -1042,9 +1070,18 @@ h3 {
   align-items: end;
 }
 
-.serviceAddForm label {
-  display: grid;
-  gap: 6px;
+.serviceAddForm input {
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid #cfd3da;
+  border-radius: 7px;
+  background: #fff;
+  color: #20242b;
+  font-size: 13px;
+}
+
+.serviceAddForm input::placeholder {
+  color: #8a919b;
 }
 
 .requestIntro {
@@ -1106,6 +1143,38 @@ h3 {
   margin: 0 0 14px;
   color: #606772;
   line-height: 1.55;
+}
+
+.securityReviewEditor {
+  gap: 12px;
+}
+
+.securityReviewEditor label {
+  display: grid;
+  gap: 7px;
+}
+
+.securityReviewEditor label span {
+  color: #555d68;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.securityReviewEditor textarea {
+  min-height: 72px;
+  padding: 10px 11px;
+  border: 1px solid #cfd3da;
+  border-radius: 7px;
+  background: #fff;
+  color: #20242b;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.securityReviewActions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .requestTypeSelector {
@@ -2023,6 +2092,21 @@ h3 {
 .requirementsPanel {
   margin-top: 12px;
   padding: 16px;
+  font-size: 12px;
+}
+
+.requirementsPanel h3 {
+  font-size: 16px;
+}
+
+.requirementsPanel p,
+.requirementsPanel label,
+.requirementsPanel span,
+.requirementsPanel input,
+.requirementsPanel textarea,
+.requirementsPanel select,
+.requirementsPanel button {
+  font-size: 12px;
 }
 
 .requirementsPanel .panelHeader span {
@@ -2057,6 +2141,32 @@ h3 {
   color: #20242b;
   font-size: 13px;
   line-height: 1.55;
+}
+
+.approvalContextSection strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #20242b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.approvalContextSection p,
+.approvalBulletList,
+.approvalTaskList {
+  margin: 0;
+  color: #555d68;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.approvalContextMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 10px;
+  color: #7b818b;
+  font-size: 12px;
 }
 
 .artifactList,
@@ -2136,6 +2246,10 @@ h3 {
   }
 
   .requestFlowGuide {
+    grid-template-columns: 1fr;
+  }
+
+  .workflowGuideStrip {
     grid-template-columns: 1fr;
   }
 

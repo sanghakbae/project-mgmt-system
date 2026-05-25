@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import type { Project } from './types'
+import type { Project, ReviewDocs } from './types'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
@@ -21,6 +21,11 @@ const defaultSecurityReview: Project['securityReview'] = {
   externalExposure: '',
   storagePolicy: '',
   securityNotes: '',
+}
+
+const defaultReviewDocs: ReviewDocs = {
+  srs: '',
+  sds: '',
 }
 
 const fullApprovalRoles: Project['approvalState']['requiredRoles'] = ['pm', 'cem', 'security', 'infra', 'qa', 'patent', 'admin']
@@ -98,11 +103,15 @@ export function mapProjectRow(row: ProjectRow): Project {
   const savedApprovalState = row.logs?.find((log) => log.meta?.approvalState)?.meta?.approvalState
   const securityReview =
     row.logs?.find((log) => log.meta?.securityReview)?.meta?.securityReview ?? defaultSecurityReview
+  const reviewDocs =
+    row.logs?.find((log) => log.meta?.reviewDocs)?.meta?.reviewDocs ?? defaultReviewDocs
   const baselineRoles = approvalRolesByRequestType[requestType]
   const approvalState = {
     requiredRoles: baselineRoles,
     approvedRoles: (savedApprovalState?.approvedRoles ?? []).filter((item) => baselineRoles.includes(item)),
   }
+  const hasReviewDocs = reviewDocs.srs.trim().length > 0 && reviewDocs.sds.trim().length > 0
+  const normalizedStatus = row.status === 'dept_review' && !hasReviewDocs ? 'sds' : row.status
 
   return {
     id: row.id,
@@ -114,7 +123,7 @@ export function mapProjectRow(row: ProjectRow): Project {
     requester: row.requester,
     ownerTeam: row.owner_team,
     priority: row.priority,
-    status: row.status,
+    status: normalizedStatus,
     summary: row.summary,
     currentProblem: row.current_problem,
     desiredOutcome: row.desired_outcome,
@@ -125,11 +134,16 @@ export function mapProjectRow(row: ProjectRow): Project {
     updatedAt: row.updated_at,
     risk: row.risk,
     progress: row.progress,
-    nextAction: row.next_action,
-    assigneeRole: normalizeAssigneeRole(row.assignee_role),
+    nextAction: normalizedStatus === 'sds' && row.status === 'dept_review' && !hasReviewDocs
+      ? 'SRS와 SDS 등록 후 승인 단계로 이동할 수 있습니다.'
+      : row.next_action,
+    assigneeRole: normalizedStatus === 'sds' && row.status === 'dept_review' && !hasReviewDocs
+      ? 'pm'
+      : normalizeAssigneeRole(row.assignee_role),
     workflowConfig,
     approvalState,
     securityReview,
+    reviewDocs,
     tasks: row.tasks ?? [],
     logs: row.logs ?? [],
   }

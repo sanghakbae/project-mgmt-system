@@ -2,9 +2,9 @@ import type { Project, ProjectStatus, Role } from './types'
 
 export const workflow: Array<{ status: ProjectStatus; label: string; owner: string; optional?: boolean }> = [
   { status: 'request', label: '요청', owner: '요청자' },
-  { status: 'dept_review', label: '승인', owner: '승인자' },
   { status: 'srs', label: 'SRS', owner: '기획' },
   { status: 'sds', label: 'SDS', owner: '기획/개발' },
+  { status: 'dept_review', label: '승인', owner: '승인자' },
   { status: 'schedule', label: '개발 준비/일정 확정', owner: 'PM' },
   { status: 'development', label: '개발', owner: '개발' },
   { status: 'qc_security', label: 'QC/보안', owner: '품질/보안', optional: true },

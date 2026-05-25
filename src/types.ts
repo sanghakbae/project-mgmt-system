@@ -57,6 +57,11 @@ export type SecurityReview = {
   securityNotes: string
 }
 
+export type ReviewDocs = {
+  srs: string
+  sds: string
+}
+
 export type ProjectTask = {
   id: string
   key?: string
@@ -86,6 +91,7 @@ export type ActivityLog = {
     workflowConfig?: WorkflowConfig
     approvalState?: ApprovalState
     securityReview?: SecurityReview
+    reviewDocs?: ReviewDocs
   }
 }
 
@@ -115,6 +121,7 @@ export type Project = {
   workflowConfig: WorkflowConfig
   approvalState: ApprovalState
   securityReview: SecurityReview
+  reviewDocs?: ReviewDocs
   tasks: ProjectTask[]
   logs: ActivityLog[]
 }
