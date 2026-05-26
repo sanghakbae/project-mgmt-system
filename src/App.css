@@ -2411,11 +2411,23 @@ h3 {
 .requestForm textarea,
 .requestForm select {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border: 1px solid #cfd3da;
   border-radius: 7px;
   background: #fff;
   color: #20242b;
   outline: 0;
+}
+
+.requestForm input[type="date"] {
+  /* iOS Safari가 date input에 자체 최소 너비를 부여하는 문제 차단 */
+  -webkit-min-logical-width: 0;
+  min-width: 0;
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .requestForm input,
@@ -3806,6 +3818,15 @@ h3 {
   .srsSdsRow {
     grid-template-columns: 1fr;
     gap: 10px;
+  }
+
+  .formGrid,
+  .formGrid.two {
+    grid-template-columns: 1fr !important;
+  }
+
+  .requestForm label {
+    min-width: 0;
   }
 
   /* 액션 배너 모바일 */
