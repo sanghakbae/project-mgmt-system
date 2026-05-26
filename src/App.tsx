@@ -9,7 +9,6 @@ import {
   ClipboardList,
   Database,
   FileText,
-  Filter,
   LayoutDashboard,
   ListChecks,
   MessageSquareText,
@@ -421,22 +420,6 @@ type RequestFormState = {
   securityReview: SecurityReview
 }
 
-type TaskFormState = {
-  type: IssueType
-  title: string
-  owner: string
-  reporter: string
-  priority: Priority
-  stage: ProjectStatus
-  output: string
-  acceptanceCriteria: string
-  estimate: number
-  dueDate: string
-  status: TaskStatus
-  statusNote: string
-  attachments: TaskAttachment[]
-}
-
 function roleOwnsStatus(status: ProjectStatus, role: Role) {
   if (status === 'dept_review') {
     return fullApprovalRoles.includes(role)
@@ -515,22 +498,6 @@ const emptyRequestForm: RequestFormState = {
   },
 }
 
-const emptyTaskForm: TaskFormState = {
-  type: 'task',
-  title: '',
-  owner: '',
-  reporter: '이영업',
-  priority: 'normal',
-  stage: 'development',
-  output: '',
-  acceptanceCriteria: '',
-  estimate: 1,
-  dueDate: '2026-05-24',
-  status: 'todo',
-  statusNote: '',
-  attachments: [],
-}
-
 const emptyReviewDocs: ReviewDocs = {
   srs: '',
   sds: '',
@@ -570,7 +537,7 @@ function parseSrsSections(text: string): Record<SrsSectionKey, string> {
   if (!text) return result
   const lines = text.split('\n')
   let current: SrsSectionKey | null = null
-  const buffer: Record<SrsSectionKey, string[]> = Object.fromEntries(srsSections.map((s) => [s.key, []])) as Record<SrsSectionKey, string[]>
+  const buffer = Object.fromEntries(srsSections.map((s) => [s.key, [] as string[]])) as Record<SrsSectionKey, string[]>
   for (const line of lines) {
     const headerMatch = line.match(/^#\s*(.+?)\s*\((.+?)\)\s*$/)
     if (headerMatch) {
@@ -620,9 +587,7 @@ function App() {
   const [loadState, setLoadState] = useState<'loading' | 'live' | 'error'>(hasSupabaseConfig ? 'loading' : 'error')
   const [viewMode, setViewMode] = useState<ViewMode>('dashboard')
   const [requestForm, setRequestForm] = useState<RequestFormState>(emptyRequestForm)
-  const [taskForm, setTaskForm] = useState<TaskFormState>(emptyTaskForm)
   const [reviewDocsDrafts, setReviewDocsDrafts] = useState<Record<string, ReviewDocs>>({})
-  const [securityReviewDrafts, setSecurityReviewDrafts] = useState<Record<string, SecurityReview>>({})
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const requestTypeConfig = requestTypeOptions.find((item) => item.type === requestForm.requestType) ?? requestTypeOptions[0]
 
@@ -668,7 +633,6 @@ function App() {
 
   const selected = projects.find((project) => project.id === selectedId)
   const currentReviewDocsDraft = selected ? reviewDocsDrafts[selected.id] ?? selected.reviewDocs ?? emptyReviewDocs : emptyReviewDocs
-  const currentSecurityReviewDraft = selected ? securityReviewDrafts[selected.id] ?? selected.securityReview : emptyRequestForm.securityReview
   const serviceScopedProjects = useMemo(
     () => projects.filter((project) => matchesServiceFilter(project, serviceFilter, serviceOptions)),
     [projects, serviceFilter, serviceOptions],
@@ -800,47 +764,11 @@ function App() {
     (selected?.status === 'dept_review' && pendingApprovalRoles.length > 0) ||
     (selected?.status === 'planning' && !hasRequiredReviewDocs),
   )
-  const canManageProjectTasks = Boolean(selected && ['schedule', 'development', 'qc_security', 'completion', 'published'].includes(selected.status))
   const canApproveCurrentRole = Boolean(
     selected?.status === 'dept_review' &&
     selectedApprovalState.requiredRoles.includes(role) &&
     !selectedApprovalState.approvedRoles.includes(role),
   )
-
-  async function updateWorkflowConfig(config: WorkflowConfig) {
-    if (!selected || !supabase) return
-
-    const nextLogs = [
-      {
-        id: crypto.randomUUID(),
-        at: '방금 전',
-        actor: roleLabels[role],
-        message: `승인 단계에서 검증 플로우를 변경했습니다. QC/보안 ${config.requiresQcSecurity ? '포함' : '생략'}.`,
-        meta: { workflowConfig: config },
-      },
-      ...selected.logs,
-    ]
-
-    setProjects((current) =>
-      current.map((project) =>
-        project.id === selected.id
-          ? {
-              ...project,
-              workflowConfig: config,
-              logs: nextLogs,
-              updatedAt: new Date().toISOString(),
-            }
-          : project,
-      ),
-    )
-
-    const { error } = await supabase
-      .from('pms_projects')
-      .update({ logs: nextLogs })
-      .eq('id', selected.id)
-
-    if (error) setLoadState('error')
-  }
 
   async function updateApprovalState(approvalState: ApprovalState, message: string) {
     if (!selected || !supabase) return
@@ -878,41 +806,6 @@ function App() {
     const { error } = await supabase
       .from('pms_projects')
       .update({ next_action: nextAction, logs: nextLogs })
-      .eq('id', selected.id)
-
-    if (error) setLoadState('error')
-  }
-
-  async function updateSelectedSecurityReview() {
-    if (!selected || !supabase) return
-
-    const nextLogs = [
-      {
-        id: crypto.randomUUID(),
-        at: '방금 전',
-        actor: roleLabels[role],
-        message: 'PM이 보안 검토 정보를 업데이트했습니다.',
-        meta: { securityReview: currentSecurityReviewDraft },
-      },
-      ...selected.logs,
-    ]
-
-    setProjects((current) =>
-      current.map((project) =>
-        project.id === selected.id
-          ? {
-              ...project,
-              securityReview: currentSecurityReviewDraft,
-              logs: nextLogs,
-              updatedAt: new Date().toISOString(),
-            }
-          : project,
-      ),
-    )
-
-    const { error } = await supabase
-      .from('pms_projects')
-      .update({ logs: nextLogs })
       .eq('id', selected.id)
 
     if (error) setLoadState('error')
@@ -1206,32 +1099,6 @@ function App() {
       .eq('id', selected.id)
 
     if (error) setLoadState('error')
-  }
-
-  async function addTask(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!selected) return
-    const newTask: ProjectTask = {
-      id: crypto.randomUUID(),
-      key: `${selected.code}-${selected.tasks.length + 1}`,
-      type: taskForm.type,
-      title: taskForm.title,
-      owner: taskForm.owner,
-      reporter: taskForm.reporter,
-      priority: taskForm.priority,
-      stage: taskForm.stage,
-      output: taskForm.output,
-      acceptanceCriteria: taskForm.acceptanceCriteria,
-      estimate: taskForm.estimate,
-      dueDate: taskForm.dueDate,
-      status: taskForm.status,
-      statusNote: taskForm.statusNote,
-      statusChangedAt: new Date().toISOString(),
-      attachments: taskForm.attachments,
-    }
-
-    await updateSelectedProjectTasks([newTask, ...selected.tasks], `태스크를 추가했습니다: ${newTask.title}`)
-    setTaskForm(emptyTaskForm)
   }
 
   async function addTaskToProject(projectId: string, task: ProjectTask) {
@@ -1934,7 +1801,6 @@ function DashboardOverview({
   const serviceScopeLabel = serviceFilter === 'all' ? '전체 서비스' : serviceFilter
   const visibleStatuses = summary.projectsByStatus
   const isAdmin = role === 'admin'
-  const kanbanColumns = Math.min(Math.max(visibleStatuses.length, 1), 5)
   const phaseFor = (index: number) => (index < 3 ? 1 : index < 5 ? 2 : 3)
   const statusCountMap = Object.fromEntries(summary.statusCounts.map((item) => [item.status, item.count])) as Record<ProjectStatus, number>
   const roleDueSoon = role === 'admin' ? summary.dueSoon : summary.dueSoon.filter((project) => isProjectAssignedToRole(project, role))
