@@ -328,15 +328,17 @@ h3 {
 
 .connection {
   min-width: max-content;
+  min-height: 42px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 12px;
+  padding: 0 14px;
   border: 1px solid #d9dce2;
   border-radius: 8px;
   background: #fff;
   color: #5f6670;
   font-size: 13px;
+  box-sizing: border-box;
 }
 
 .connection.live {
