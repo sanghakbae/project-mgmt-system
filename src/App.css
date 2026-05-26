@@ -146,7 +146,7 @@ button {
   height: 22px;
   display: grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: 6px;
   background: #e1e3e8;
   font-size: 12px;
 }
@@ -358,7 +358,13 @@ h3 {
   min-height: 106px;
   padding: 16px;
   display: grid;
-  align-content: space-between;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "icon label"
+    "value value";
+  column-gap: 12px;
+  row-gap: 16px;
+  align-items: center;
   border-radius: 8px;
   border: 0;
   color: #fff;
@@ -366,6 +372,18 @@ h3 {
   transition:
     transform 0.16s ease,
     box-shadow 0.16s ease;
+}
+
+.metric > div {
+  grid-area: icon;
+}
+
+.metric > span {
+  grid-area: label;
+}
+
+.metric > strong {
+  grid-area: value;
 }
 
 .metric:hover {
@@ -497,6 +515,201 @@ h3 {
   overflow: hidden;
 }
 
+.dashboardKanban.tightColumns {
+  justify-content: start;
+}
+
+.dashboardKanban.adminScroll {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 14px;
+  padding: 4px 0 8px;
+  overflow: visible;
+}
+
+.dashboardKanban.adminScroll .kanbanColumn {
+  min-width: 0;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+}
+
+.dashboardKanban.adminScroll .kanbanColumn.phase1 {
+  border-color: #b7cae3;
+}
+.dashboardKanban.adminScroll .kanbanColumn.phase2 {
+  border-color: #e2c98d;
+}
+.dashboardKanban.adminScroll .kanbanColumn.phase3 {
+  border-color: #a9d3b8;
+}
+
+.dashboardKanban.adminScroll .kanbanColumn.dim {
+  background: linear-gradient(180deg, #eef0f3 0, #eef0f3 92px, #f7f8fa 92px, #f7f8fa 100%) !important;
+  border-color: #dadde2 !important;
+  filter: grayscale(0.6);
+  opacity: 0.65;
+}
+
+.dashboardKanban.adminScroll .kanbanColumn.dim .kanbanHeaderMeta small {
+  color: #8a8f97 !important;
+}
+
+.dashboardKanban.adminScroll .kanbanColumn.dim .kanbanColumnHeader {
+  background: #fff;
+  color: #6b7077;
+}
+
+.dashboardKanban.adminScroll .kanbanColumn.dim .kanbanColumnHeader strong {
+  color: #8a8f97;
+}
+
+.dashboardKanban.adminScroll .kanbanColumn.owned .kanbanColumnHeader {
+  border-color: currentColor;
+}
+
+.dashboardKanban.adminScroll .kanbanColumn::before {
+  content: '';
+  display: block;
+  position: absolute;
+  top: 30px;
+  right: -10px;
+  width: 14px;
+  height: 2px;
+  background: #c5ccd6;
+  z-index: 1;
+}
+
+.dashboardKanban.adminScroll .kanbanColumn::after {
+  content: '';
+  display: block;
+  position: absolute;
+  top: 25px;
+  right: -13px;
+  width: 10px;
+  height: 10px;
+  border-top: 2px solid #c5ccd6;
+  border-right: 2px solid #c5ccd6;
+  transform: rotate(45deg);
+  z-index: 2;
+}
+
+.dashboardKanban.adminScroll .kanbanColumn:last-child::before,
+.dashboardKanban.adminScroll .kanbanColumn:last-child::after {
+  display: none;
+}
+
+.dashboardKanban.adminScroll .kanbanColumn.phase1 + .kanbanColumn.phase2::before,
+.dashboardKanban.adminScroll .kanbanColumn.phase2 + .kanbanColumn.phase3::before {
+  background: #95a0ad;
+  height: 3px;
+  top: 30px;
+}
+
+.dashboardKanban.adminScroll .kanbanColumn.phase1:has(+ .kanbanColumn.phase2)::after,
+.dashboardKanban.adminScroll .kanbanColumn.phase2:has(+ .kanbanColumn.phase3)::after {
+  border-color: #95a0ad;
+}
+
+.dashboardKanban.adminScroll .kanbanColumnHeader {
+  min-height: auto;
+  padding: 8px 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.dashboardKanban.adminScroll .kanbanHeaderMeta {
+  gap: 2px;
+}
+
+.dashboardKanban.adminScroll .kanbanColumnHeader span {
+  font-size: 12px;
+}
+
+.dashboardKanban.adminScroll .kanbanHeaderMeta em {
+  font-size: 10px;
+}
+
+.dashboardKanban.adminScroll .kanbanHeaderCount {
+  flex-direction: row;
+  align-items: center;
+  justify-items: start;
+  gap: 6px;
+}
+
+.dashboardKanban.adminScroll .kanbanColumnHeader strong {
+  font-size: 18px;
+}
+
+.dashboardKanban.adminScroll .kanbanCard {
+  padding: 8px 9px;
+  gap: 5px;
+}
+
+.dashboardKanban.adminScroll .kanbanCard strong {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.dashboardKanban.adminScroll .kanbanCard p {
+  font-size: 11px;
+}
+
+.dashboardKanban.adminScroll .kanbanMeta {
+  font-size: 10px;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.dashboardKanban.adminScroll .kanbanCardTop .statusPill {
+  display: none;
+}
+
+.dashboardKanban.adminScroll .kanbanCard > p {
+  display: none;
+}
+
+.dashboardKanban.adminScroll .requestTypePill::before {
+  content: none;
+}
+
+.dashboardKanban.adminScroll .requestTypePill {
+  font-size: 10px;
+  min-height: 18px;
+  padding: 0 6px;
+}
+
+.kanbanColumn.phase1 {
+  background:
+    linear-gradient(180deg, #e8f1fb 0, #e8f1fb 92px, #f9fbfd 92px, #f9fbfd 100%);
+  border-color: #cfdcec;
+}
+
+.kanbanColumn.phase2 {
+  background:
+    linear-gradient(180deg, #fbf1dc 0, #fbf1dc 92px, #fdfaf2 92px, #fdfaf2 100%);
+  border-color: #ecdcb8;
+}
+
+.kanbanColumn.phase3 {
+  background:
+    linear-gradient(180deg, #e3f3e8 0, #e3f3e8 92px, #f7fbf8 92px, #f7fbf8 100%);
+  border-color: #c8e2d1;
+}
+
+.kanbanColumn.phase1 .kanbanHeaderMeta small {
+  color: #2767b3;
+}
+.kanbanColumn.phase2 .kanbanHeaderMeta small {
+  color: #a87208;
+}
+.kanbanColumn.phase3 .kanbanHeaderMeta small {
+  color: #198247;
+}
+
 .workflowOverviewGrid {
   display: grid;
   grid-template-columns: repeat(10, minmax(0, 1fr));
@@ -556,16 +769,23 @@ h3 {
 
 .kanbanColumnHeader {
   min-height: 72px;
-  padding: 12px;
+  padding: 10px 12px;
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   border: 1px solid #d9dde4;
   border-radius: 7px;
   background: #fff;
   color: #20242b;
   text-align: left;
   box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.kanbanColumnHeader:hover {
+  border-color: #b9bfc8;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
 }
 
 .kanbanHeaderMeta {
@@ -582,8 +802,9 @@ h3 {
 
 .kanbanColumnHeader span {
   color: #20242b;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
+  letter-spacing: -0.2px;
 }
 
 .kanbanHeaderMeta em {
@@ -608,7 +829,7 @@ h3 {
   padding: 0 7px;
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
+  border-radius: 6px;
   color: #9a6d00;
   background: #fff1cc;
   font-size: 10px;
@@ -649,8 +870,9 @@ h3 {
 }
 
 .kanbanCard strong {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.4;
+  color: #1a1f27;
 }
 
 .kanbanCard p {
@@ -663,18 +885,23 @@ h3 {
 .kanbanMeta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  color: #7b818b;
+  gap: 10px;
+  padding-top: 6px;
+  border-top: 1px dashed #ebedf0;
+  color: #555c66;
   font-size: 11px;
   font-weight: 700;
 }
 
+.kanbanMeta span:nth-child(2) {
+  color: #b8500a;
+}
+
 .kanbanEmpty {
-  padding: 20px 12px;
-  border: 1px dashed #d5d8de;
+  padding: 18px 12px;
   border-radius: 7px;
-  color: #7b818b;
-  background: #fbfbfc;
+  color: #98a0aa;
+  background: rgba(255, 255, 255, 0.5);
   font-size: 12px;
   text-align: center;
 }
@@ -757,14 +984,57 @@ h3 {
 
 .dashboardProjectItem {
   width: 100%;
-  padding: 11px;
+  padding: 11px 14px;
   display: grid;
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "top    meta"
+    "title  meta"
+    "desc   meta";
+  column-gap: 12px;
+  row-gap: 6px;
+  align-items: center;
   border: 1px solid #e3e5e9;
   border-radius: 7px;
   background: #fff;
   color: #20242b;
   text-align: left;
+}
+
+.dashboardProjectItem > .dashboardProjectItemTop {
+  grid-area: top;
+}
+
+.dashboardProjectItem > strong {
+  grid-area: title;
+}
+
+.dashboardProjectItem > p {
+  grid-area: desc;
+}
+
+.dashboardProjectItem > small {
+  grid-area: meta;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  white-space: nowrap;
+  text-align: right;
+  font-size: 11px;
+  color: #6b7077;
+  line-height: 1.4;
+}
+
+.dashboardProjectItem .metaDday {
+  font-size: 13px;
+  font-weight: 800;
+  color: #b8500a;
+}
+
+.dashboardProjectItem .metaTime {
+  color: #98a0aa;
+  font-size: 10px;
 }
 
 .dashboardProjectItem:hover {
@@ -854,6 +1124,29 @@ h3 {
   place-items: center;
 }
 
+.searchFilterRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 10px;
+  flex-wrap: wrap;
+}
+
+.searchFilterRow .searchBox {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 200px;
+}
+
+.searchFilterRow .filterChips {
+  margin: 0 0 0 auto;
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
 .searchBox {
   height: 42px;
   margin: 16px 0 10px;
@@ -885,7 +1178,7 @@ h3 {
   min-height: 32px;
   padding: 0 12px;
   border: 1px solid #d8dbe1;
-  border-radius: 999px;
+  border-radius: 6px;
   background: #fff;
   color: #5f6670;
   font-size: 12px;
@@ -937,13 +1230,10 @@ h3 {
   width: 100%;
   min-width: 0;
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(260px, 300px);
-  grid-template-columns: none;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 10px;
   max-height: none;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: visible;
   padding: 0 0 4px;
   scroll-snap-type: x proximity;
 }
@@ -1043,13 +1333,563 @@ h3 {
   font-size: 12px;
 }
 
-.serviceList {
+.projectHoldList {
   display: grid;
+  gap: 8px;
+  max-height: 540px;
+  overflow-y: auto;
+}
+
+.projectHoldRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #dfe2e7;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.projectHoldRow.onHold {
+  background: repeating-linear-gradient(135deg, #fff 0, #fff 10px, #fff8e6 10px, #fff8e6 20px);
+  border-color: #e0c878;
+}
+
+.projectHoldInfo {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.projectHoldTop {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.projectHoldInfo strong {
+  font-size: 13px;
+  color: #1a1f27;
+}
+
+.projectHoldInfo small {
+  color: #7b818b;
+  font-size: 11px;
+}
+
+.projectHoldInfo em {
+  color: #876900;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.holdTag {
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #c98a1a;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.holdBanner {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #e0c878;
+  border-left: 4px solid #c98a1a;
+  border-radius: 7px;
+  background: #fff8e6;
+  color: #6b4a07;
+  font-size: 13px;
+}
+
+.holdBanner strong {
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: #c98a1a;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
+
+.projectCard.onHold,
+.kanbanCard.onHold {
+  position: relative;
+  background: repeating-linear-gradient(135deg, #fff 0, #fff 10px, #fff8e6 10px, #fff8e6 20px);
+}
+
+.projectCard.onHold::after,
+.kanbanCard.onHold::after {
+  content: '보류';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #c98a1a;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
+
+.srsLabelRow {
+  display: inline-flex;
+  align-items: center;
   gap: 10px;
 }
 
-.serviceListItem {
+.srsLabelRow .miniButton {
+  padding: 2px 8px;
+  font-size: 11px;
+  min-height: 22px;
+}
+
+.docCard {
+  position: relative;
+}
+
+.docCard + .docCard {
+  margin-top: 14px;
+}
+
+.srsSdsRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.srsSdsRow > .docCard {
+  margin-top: 0;
+  min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  .srsSdsRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.docCard .panelHeader.compact h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.docTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+
+.docTag.srsTag {
+  background: #fff3bf;
+  color: #876900;
+}
+
+.docTag.sdsTag {
+  background: #dff3fb;
+  color: #116b91;
+}
+
+.docCard.srsCard,
+.docCard.sdsCard {
+  border-left: 1px solid #e1e5eb;
+}
+
+.docAttachmentField {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px dashed #d2d7df;
+  border-radius: 8px;
+  background: #fafbfc;
+}
+
+.docAttachmentHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.docAttachmentHeader strong {
+  font-size: 12px;
+  color: #20242b;
+}
+
+.uploadButton {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.docAttachmentEmpty {
+  margin: 0;
+  font-size: 11px;
+  color: #98a0aa;
+}
+
+.docAttachmentList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.docAttachmentList li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 1px solid #e3e5e9;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+}
+
+.docAttachmentList li a {
+  flex: 1 1 auto;
+  color: #246fbd;
+  text-decoration: none;
+  font-weight: 700;
+  word-break: break-all;
+}
+
+.docAttachmentList li a:hover {
+  text-decoration: underline;
+}
+
+.numberedSection {
+  border-left: 4px solid #cbd0d9;
+  padding-left: 16px;
+}
+
+.numberedSection.sectionRequester {
+  border-left-color: #d9271e;
+}
+
+.numberedSection.sectionSrsSds {
+  border-left-color: #c98a1a;
+}
+
+.numberedSection.sectionTasks {
+  border-left-color: #246fbd;
+}
+
+.numberedSection.sectionReview {
+  border-left-color: #0f9f5f;
+}
+
+.numberedSection > .panelHeader.compact {
+  margin-bottom: 12px;
+}
+
+.numberedSection > .panelHeader.compact h3 {
+  font-size: 15px;
+  letter-spacing: -0.3px;
+}
+
+.numberedSection > .panelHeader.compact > span,
+.numberedSection > .panelHeader.compact > div > span {
+  color: #7b818b;
+  font-size: 11px;
+}
+
+.requesterContent {
+  /* alias - keep for backward compat */
+}
+
+.requesterContentBadges {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.requesterSummary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 16px 18px;
+  background: #fff;
+  border: 1px solid #e3e5e9;
+  border-radius: 10px;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.02);
+}
+
+.requesterField {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 7px;
+  background: #fafbfc;
+  border: 1px solid #eef0f3;
+}
+
+.requesterField:nth-child(1),
+.requesterField:nth-child(2) {
+  grid-column: 1 / -1;
+  background: linear-gradient(180deg, #fff 0%, #fafbfc 100%);
+}
+
+.requesterField span {
+  color: #7b818b;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.requesterField strong {
+  font-size: 17px;
+  font-weight: 800;
+  color: #1a1f27;
+  letter-spacing: -0.3px;
+  line-height: 1.35;
+}
+
+.requesterField p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #2a2f37;
+  word-break: keep-all;
+}
+
+.requesterField em {
+  color: #b3b7be;
+  font-style: normal;
+}
+
+.docReadView {
+  margin: 0;
+  padding: 10px 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #2a2f37;
+  background: #fbfbfc;
+  border: 1px solid #e3e5e9;
+  border-radius: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.docAttachmentList li span {
+  color: #7b818b;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.docSaveBar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.taskComments {
+  grid-column: 2;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px dashed #e3e5e9;
+}
+
+.commentToggle {
+  font-size: 11px;
+}
+
+.commentThread {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid #e3e5e9;
+  border-radius: 6px;
+  background: #fafbfc;
+}
+
+.commentList {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.commentList li {
+  padding: 8px 10px;
+  border: 1px solid #e8ebef;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.commentMeta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.commentMeta strong {
+  font-size: 12px;
+}
+
+.commentMeta span {
+  color: #98a0aa;
+  font-size: 10px;
+}
+
+.commentList li p {
+  margin: 0;
+  font-size: 12px;
+  color: #2a2f37;
+  line-height: 1.5;
+}
+
+.commentForm {
+  display: flex;
+  gap: 6px;
+}
+
+.commentForm input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #d8dbe1;
+  border-radius: 5px;
+  font-size: 12px;
+  background: #fff;
+}
+
+.issuesList {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.issueRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 12px 14px;
+  border: 1px solid #e3e5e9;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.issueInfo {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.issueTop {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.issueInfo strong {
+  font-size: 13px;
+}
+
+.issueInfo small {
+  color: #6b7077;
+  font-size: 11px;
+}
+
+.issueNote {
+  color: #555c66;
+  font-size: 12px;
+  font-style: normal;
+  background: #f6f7f9;
+  padding: 4px 8px;
+  border-radius: 5px;
+  margin-top: 2px;
+}
+
+.attachmentBadge {
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: #f0f2f6;
+  color: #555d68;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.srsSectionGroup {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid #e1e5eb;
+  border-radius: 8px;
+  background: #fbfbfc;
+}
+
+.srsGroupHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.srsGroupHeader strong {
+  font-size: 13px;
+}
+
+.srsGroupHeader span {
+  color: #7b818b;
+  font-size: 11px;
+}
+
+.srsSectionField {
+  display: grid;
+  gap: 4px;
+}
+
+.srsSectionField > span {
+  font-size: 12px;
+  font-weight: 700;
+  color: #20242b;
+}
+
+.srsSectionField > span em {
+  color: #98a0aa;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+.srsSectionField textarea {
+  min-height: 64px;
+  resize: vertical;
+}
+
+.serviceList {
+  display: grid;
+  gap: 6px;
+}
+
+.serviceListItem {
+  padding: 6px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1094,7 +1934,6 @@ h3 {
 }
 
 .requestPanel .eyebrow,
-.requestPanel h2,
 .requestPanel p,
 .requestPanel legend,
 .requestPanel label,
@@ -1104,6 +1943,11 @@ h3 {
 .requestPanel select,
 .requestPanel button {
   font-size: 12px;
+}
+
+.requestIntro h2,
+.settingsPanel h2 {
+  font-size: 16px;
 }
 
 .requestIntro p:last-child {
@@ -1190,7 +2034,7 @@ h3 {
   align-items: center;
   justify-content: center;
   border: 1px solid #d6dbe3;
-  border-radius: 999px;
+  border-radius: 6px;
   color: #5f6670;
   background: #fbfbfc;
   font-size: 12px;
@@ -1322,13 +2166,23 @@ h3 {
 .requestTypePill {
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
-  padding: 0 9px;
-  border-radius: 999px;
-  color: #0f5e8c;
-  background: #e5f3fb;
-  font-size: 12px;
-  font-weight: 800;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 5px;
+  color: #4a5260;
+  background: transparent;
+  border: 1px solid #c9ced6;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.requestTypePill::before {
+  content: '분류 ';
+  margin-right: 4px;
+  color: #98a0aa;
+  font-weight: 600;
+  font-size: 10px;
 }
 
 .detailHeroMeta {
@@ -1340,17 +2194,56 @@ h3 {
 
 .projectCard {
   width: 100%;
-  padding: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   border: 1px solid #dfe2e7;
   background: #fff;
   border-radius: 8px;
   text-align: left;
 }
 
-.projectCard.selected {
-  border-color: #d9271e;
-  box-shadow: 0 0 0 2px rgba(217, 39, 30, 0.1);
+.cardTopPills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
 }
+
+.projectCard p {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  letter-spacing: -0.3px;
+  margin: 0;
+}
+
+.projectCard strong {
+  margin: 0;
+}
+
+.projectCard.selected {
+  position: relative;
+  border-color: #d9271e;
+  background: linear-gradient(180deg, #fff7f6 0%, #fff 60%);
+  box-shadow: 0 0 0 2px rgba(217, 39, 30, 0.18), 0 6px 18px rgba(217, 39, 30, 0.08);
+}
+
+.projectCard.selected::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: -1px;
+  bottom: -1px;
+  width: 4px;
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+  background: #d9271e;
+}
+
 
 .projectCard strong {
   display: block;
@@ -1396,21 +2289,32 @@ h3 {
   align-items: center;
   white-space: nowrap;
   min-height: 24px;
-  padding: 0 9px;
-  border-radius: 999px;
+  padding: 0 10px;
+  border-radius: 6px;
   font-size: 12px;
   font-weight: 800;
   background: #eef0f3;
   color: #555d68;
+  letter-spacing: -0.2px;
 }
 
-.statusPill.dept_review,
-.statusPill.srs {
+.statusPill::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.statusPill.dept_review {
   color: #876900;
   background: #fff3bf;
 }
 
-.statusPill.sds,
+.statusPill.planning,
 .statusPill.schedule {
   color: #116b91;
   background: #dff3fb;
@@ -1472,12 +2376,31 @@ h3 {
 }
 
 .actionBanner {
+  margin-top: 16px;
   gap: 14px;
   padding: 14px;
   border: 1px solid #d7dbe1;
   border-left: 4px solid #8f98a5;
   background: #f7f8fa;
   border-radius: 8px;
+}
+
+.actionBanner .actionButtons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.actionBanner .actionButtons .primaryButton,
+.actionBanner .actionButtons .miniButton {
+  height: 38px;
+  min-height: 38px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+.holdBanner + .actionBanner {
+  margin-top: 8px;
 }
 
 .actionIcon {
@@ -1583,7 +2506,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: 6px;
   font-size: 12px;
   font-weight: 800;
 }
@@ -1620,7 +2543,7 @@ h3 {
   gap: 6px;
   padding: 0 10px;
   border: 1px solid #d8dde5;
-  border-radius: 999px;
+  border-radius: 6px;
   background: #fff;
 }
 
@@ -1764,7 +2687,7 @@ h3 {
 .progressTrack {
   height: 10px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: 6px;
   background: #eceef2;
 }
 
@@ -1821,7 +2744,7 @@ h3 {
   height: 26px;
   display: inline-grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: 6px;
   color: #555d68;
   background: #eef0f3;
   font-size: 12px;
@@ -1919,7 +2842,7 @@ h3 {
   gap: 5px;
   padding: 0 8px;
   border: 1px solid #dfe3e8;
-  border-radius: 999px;
+  border-radius: 6px;
   color: #39414c;
   background: #fff;
   font-size: 12px;
@@ -1937,7 +2860,7 @@ h3 {
   display: inline-grid;
   place-items: center;
   border: 0;
-  border-radius: 999px;
+  border-radius: 50%;
   color: #555d68;
   background: #e3e8ef;
   font-size: 13px;
@@ -2004,7 +2927,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   padding: 0 7px;
-  border-radius: 999px;
+  border-radius: 6px;
   color: #555d68;
   background: #f1f3f6;
   font-size: 11px;
@@ -2117,22 +3040,25 @@ h3 {
 
 .requirementGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
 }
 
 .requirementBlock {
-  padding: 13px;
+  padding: 14px 16px;
   border: 1px solid #e3e5e9;
-  border-radius: 7px;
-  background: #fbfbfc;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .requirementBlock span {
   display: block;
-  margin-bottom: 6px;
-  color: #555d68;
-  font-size: 12px;
+  margin-bottom: 8px;
+  color: #6b7077;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
   font-weight: 800;
 }
 
@@ -2140,7 +3066,8 @@ h3 {
   margin: 0;
   color: #20242b;
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.65;
+  word-break: keep-all;
 }
 
 .approvalContextSection strong {

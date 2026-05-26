@@ -2,13 +2,11 @@ import type { Project, ProjectStatus, Role } from './types'
 
 export const workflow: Array<{ status: ProjectStatus; label: string; owner: string; optional?: boolean }> = [
   { status: 'request', label: '요청', owner: '요청자' },
-  { status: 'srs', label: 'SRS', owner: '기획' },
-  { status: 'sds', label: 'SDS', owner: '기획/개발' },
+  { status: 'planning', label: '기획 (SRS+SDS)', owner: 'PM' },
   { status: 'dept_review', label: '승인', owner: '승인자' },
   { status: 'schedule', label: '개발 준비/일정 확정', owner: 'PM' },
   { status: 'development', label: '개발', owner: '개발' },
-  { status: 'qc_security', label: 'QC/보안', owner: '품질/보안', optional: true },
-  { status: 'uat', label: 'UAT', owner: '요청자', optional: true },
+  { status: 'qc_security', label: 'QC/보안/PM', owner: '품질·보안·PM' },
   { status: 'completion', label: '완료보고', owner: 'PM' },
   { status: 'published', label: '게시', owner: '시스템' },
 ]
@@ -49,7 +47,7 @@ export const demoProjects: Project[] = [
     progress: 18,
     nextAction: '마케팅/법무 검토 의견 취합',
     assigneeRole: 'pm',
-    workflowConfig: { requiresQcSecurity: true, requiresUat: true },
+    workflowConfig: { requiresQcSecurity: true },
     approvalState: {
       requiredRoles: ['pm', 'cem', 'security', 'infra', 'qa', 'patent', 'admin'],
       approvedRoles: ['pm', 'cem'],
@@ -61,10 +59,7 @@ export const demoProjects: Project[] = [
       storagePolicy: '발송 이력과 대상 로그는 내부 DB에 저장, 운영 로그 90일 보관',
       securityNotes: '수신 동의 여부 검증, 관리자 권한 분리, 발송 이력 감사 로그 필요',
     },
-    tasks: [
-      { id: 't1', title: '수신 동의 문구 검토', owner: '법무', dueDate: '2026-05-18', status: 'doing' },
-      { id: 't2', title: '발송 대상 세그먼트 정의', owner: '마케팅', dueDate: '2026-05-19', status: 'todo' },
-    ],
+    tasks: [],
     logs: [
       { id: 'l1', at: '2026-05-17 09:10', actor: '김검토', message: '법무 검토 태스크를 추가했습니다.' },
       { id: 'l2', at: '2026-05-15 19:16', actor: '이영업', message: '신규 요청을 등록했습니다.' },
@@ -80,7 +75,7 @@ export const demoProjects: Project[] = [
     requester: '이영업',
     ownerTeam: '영업',
     priority: 'normal',
-    status: 'sds',
+    status: 'planning',
     summary: '외부 파트너사가 자체 API를 테스트하고 문서를 확인할 수 있는 포털을 구축합니다.',
     currentProblem: '파트너사가 API 문서와 테스트 계정을 매번 영업 담당자에게 요청하고 있습니다.',
     desiredOutcome: '파트너사가 직접 문서, 샌드박스 키, 호출 이력을 확인합니다.',
@@ -93,7 +88,7 @@ export const demoProjects: Project[] = [
     progress: 36,
     nextAction: 'SDS 초안 작성 완료',
     assigneeRole: 'developer',
-    workflowConfig: { requiresQcSecurity: true, requiresUat: false },
+    workflowConfig: { requiresQcSecurity: true },
     approvalState: {
       requiredRoles: ['pm', 'cem', 'security', 'infra', 'qa', 'patent', 'admin'],
       approvedRoles: ['pm', 'cem', 'security', 'infra', 'qa', 'patent', 'admin'],
@@ -105,10 +100,7 @@ export const demoProjects: Project[] = [
       storagePolicy: 'API 키와 호출 이력 저장, 키 재발급 정책과 만료 정책 필요',
       securityNotes: 'OAuth 인증, API 키 노출 방지, 파트너별 접근 분리 정책 검토 필요',
     },
-    tasks: [
-      { id: 't3', title: 'OAuth 플로우 결정', owner: '개발', dueDate: '2026-05-20', status: 'doing' },
-      { id: 't4', title: '파트너 샌드박스 권한표 작성', owner: '영업', dueDate: '2026-05-22', status: 'todo' },
-    ],
+    tasks: [],
     logs: [
       { id: 'l3', at: '2026-05-17 09:58', actor: '박개발', message: 'SRS를 승인하고 SDS 단계로 이동했습니다.' },
       { id: 'l4', at: '2026-05-16 14:20', actor: '이영업', message: '파트너사 샘플 계정 요구사항을 첨부했습니다.' },
@@ -137,7 +129,7 @@ export const demoProjects: Project[] = [
     progress: 58,
     nextAction: '정산 예외 케이스 API 구현',
     assigneeRole: 'developer',
-    workflowConfig: { requiresQcSecurity: false, requiresUat: false },
+    workflowConfig: { requiresQcSecurity: false },
     approvalState: {
       requiredRoles: ['pm', 'cem', 'security', 'infra', 'qa', 'patent', 'admin'],
       approvedRoles: ['pm', 'cem', 'security', 'infra', 'qa', 'patent', 'admin'],
@@ -149,11 +141,7 @@ export const demoProjects: Project[] = [
       storagePolicy: '정산 파일과 로그 보관 필요, 회계 감사용 보존 기간 확인 필요',
       securityNotes: '다운로드 권한 통제, 정산 로그 추적, 파일 보관 기간 검토 필요',
     },
-    tasks: [
-      { id: 't5', title: '정산 예외 케이스 API', owner: '개발', dueDate: '2026-05-18', status: 'doing' },
-      { id: 't6', title: '샘플 데이터 30건 확보', owner: '운영', dueDate: '2026-05-17', status: 'blocked' },
-      { id: 't7', title: '회계 검증 시나리오', owner: '재무', dueDate: '2026-05-20', status: 'todo' },
-    ],
+    tasks: [],
     logs: [
       { id: 'l5', at: '2026-05-17 11:30', actor: '박개발', message: '레거시 데이터 누락으로 일부 작업을 보류했습니다.' },
       { id: 'l6', at: '2026-05-15 10:12', actor: '최운영', message: '긴급 우선순위로 상향했습니다.' },
@@ -178,11 +166,11 @@ export const demoProjects: Project[] = [
     dueDate: '2026-05-28',
     createdAt: '2026-05-15',
     updatedAt: '2026-05-17T10:42:00+09:00',
-    risk: '보안 검사 결과가 늦어지면 UAT 일정 영향',
+    risk: '보안 검사 결과가 늦어지면 요청자 확인 일정 영향',
     progress: 72,
     nextAction: 'QC와 보안 검사 결과 입력',
     assigneeRole: 'qa',
-    workflowConfig: { requiresQcSecurity: true, requiresUat: true },
+    workflowConfig: { requiresQcSecurity: true },
     approvalState: {
       requiredRoles: ['pm', 'cem', 'security', 'infra', 'qa', 'patent', 'admin'],
       approvedRoles: ['pm', 'cem', 'security', 'infra', 'qa', 'patent', 'admin'],
@@ -194,10 +182,7 @@ export const demoProjects: Project[] = [
       storagePolicy: '결제 로그와 오류 로그 저장, 서명 검증 로그 보관 필요',
       securityNotes: '웹훅 서명 검증, 결제 실패 로그 마스킹, 운영자 권한 분리 필요',
     },
-    tasks: [
-      { id: 't8', title: '결제 성공/실패 케이스 QC', owner: 'QC', dueDate: '2026-05-18', status: 'doing' },
-      { id: 't9', title: '웹훅 서명 검증', owner: '보안', dueDate: '2026-05-18', status: 'todo' },
-    ],
+    tasks: [],
     logs: [
       { id: 'l7', at: '2026-05-17 10:42', actor: '한QC', message: 'QC/보안 동시 검사를 시작했습니다.' },
       { id: 'l8', at: '2026-05-16 18:03', actor: '박개발', message: '개발 산출물을 제출했습니다.' },
@@ -226,7 +211,7 @@ export const demoProjects: Project[] = [
     progress: 8,
     nextAction: '범위 축소 후 재요청 필요',
     assigneeRole: 'requester',
-    workflowConfig: { requiresQcSecurity: false, requiresUat: true },
+    workflowConfig: { requiresQcSecurity: false },
     approvalState: {
       requiredRoles: ['pm', 'cem', 'security', 'infra', 'qa', 'patent', 'admin'],
       approvedRoles: ['pm'],
@@ -238,7 +223,7 @@ export const demoProjects: Project[] = [
       storagePolicy: '상담 로그 보관 정책과 개인정보 마스킹 기준 확인 필요',
       securityNotes: '개인정보 처리 위탁, 대화 로그 저장 범위, 모델 학습 반영 여부 검토 필요',
     },
-    tasks: [{ id: 't10', title: '대체 범위 재정의', owner: '고객센터', dueDate: '2026-05-22', status: 'todo' }],
+    tasks: [],
     logs: [
       { id: 'l9', at: '2026-05-16 16:00', actor: '김검토', message: '범위 과다 및 정책 미비로 반려했습니다.' },
     ],

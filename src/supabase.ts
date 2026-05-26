@@ -12,7 +12,6 @@ export const supabase = hasSupabaseConfig
 
 const defaultWorkflowConfig: Project['workflowConfig'] = {
   requiresQcSecurity: true,
-  requiresUat: true,
 }
 
 const defaultSecurityReview: Project['securityReview'] = {
@@ -110,8 +109,22 @@ export function mapProjectRow(row: ProjectRow): Project {
     requiredRoles: baselineRoles,
     approvedRoles: (savedApprovalState?.approvedRoles ?? []).filter((item) => baselineRoles.includes(item)),
   }
-  const hasReviewDocs = reviewDocs.srs.trim().length > 0 && reviewDocs.sds.trim().length > 0
-  const normalizedStatus = row.status === 'dept_review' && !hasReviewDocs ? 'sds' : row.status
+  const hasSrs = reviewDocs.srs.trim().length > 0
+  const hasSds = reviewDocs.sds.trim().length > 0
+  const hasReviewDocs = hasSrs && hasSds
+  const legacyRaw = row.status as string
+  // 레거시 status 값을 새 워크플로우로 매핑: uat → qc_security, srs/sds → planning
+  const legacyMappedStatus: Project['status'] = (legacyRaw === 'uat'
+    ? 'qc_security'
+    : legacyRaw === 'srs' || legacyRaw === 'sds'
+      ? 'planning'
+      : (legacyRaw as Project['status']))
+  // 문서 작성 상태에 따라 단계 정규화: 기획 문서(SRS+SDS) 미완료 시 'planning' 단계로 강제
+  const docsGatedStatuses: Project['status'][] = ['dept_review', 'schedule', 'development', 'qc_security', 'completion', 'published']
+  let normalizedStatus: Project['status'] = legacyMappedStatus
+  if (docsGatedStatuses.includes(legacyMappedStatus) && !hasReviewDocs) {
+    normalizedStatus = 'planning'
+  }
 
   return {
     id: row.id,
@@ -134,10 +147,10 @@ export function mapProjectRow(row: ProjectRow): Project {
     updatedAt: row.updated_at,
     risk: row.risk,
     progress: row.progress,
-    nextAction: normalizedStatus === 'sds' && row.status === 'dept_review' && !hasReviewDocs
-      ? 'SRS와 SDS 등록 후 승인 단계로 이동할 수 있습니다.'
+    nextAction: normalizedStatus !== legacyMappedStatus
+      ? 'PM이 기획 문서(SRS+SDS)를 등록해야 다음 단계로 진행할 수 있습니다.'
       : row.next_action,
-    assigneeRole: normalizedStatus === 'sds' && row.status === 'dept_review' && !hasReviewDocs
+    assigneeRole: normalizedStatus !== legacyMappedStatus
       ? 'pm'
       : normalizeAssigneeRole(row.assignee_role),
     workflowConfig,

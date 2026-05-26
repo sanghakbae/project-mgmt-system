@@ -16,12 +16,10 @@ export type ProjectRequestType =
 export type ProjectStatus =
   | 'request'
   | 'dept_review'
-  | 'srs'
-  | 'sds'
+  | 'planning'
   | 'schedule'
   | 'development'
   | 'qc_security'
-  | 'uat'
   | 'completion'
   | 'published'
   | 'rejected'
@@ -41,7 +39,6 @@ export type TaskAttachment = {
 
 export type WorkflowConfig = {
   requiresQcSecurity: boolean
-  requiresUat: boolean
 }
 
 export type ApprovalState = {
@@ -57,9 +54,27 @@ export type SecurityReview = {
   securityNotes: string
 }
 
+export type ReviewDocAttachment = {
+  id: string
+  name: string
+  size: number
+  type: string
+  dataUrl?: string
+  uploadedAt: string
+}
+
 export type ReviewDocs = {
   srs: string
   sds: string
+  srsAttachments?: ReviewDocAttachment[]
+  sdsAttachments?: ReviewDocAttachment[]
+}
+
+export type TaskComment = {
+  id: string
+  at: string
+  actor: string
+  message: string
 }
 
 export type ProjectTask = {
@@ -79,6 +94,7 @@ export type ProjectTask = {
   statusNote?: string
   statusChangedAt?: string
   attachments?: TaskAttachment[]
+  comments?: TaskComment[]
 }
 
 export type ActivityLog = {
@@ -124,4 +140,6 @@ export type Project = {
   reviewDocs?: ReviewDocs
   tasks: ProjectTask[]
   logs: ActivityLog[]
+  onHold?: boolean
+  holdReason?: string
 }
