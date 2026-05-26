@@ -21,6 +21,8 @@ import {
   Users,
 } from 'lucide-react'
 import './App.css'
+import { RichEditor, RichTextView } from './RichEditor'
+import { notifyGoogleChat } from './notify'
 import { roleLabels, workflow } from './data'
 import { hasSupabaseConfig, mapProjectRow, supabase } from './supabase'
 import type { ApprovalState, IssueType, Priority, Project, ProjectRequestType, ProjectStatus, ProjectTask, ReviewDocs, Role, SecurityReview, TaskAttachment, TaskStatus, WorkflowConfig } from './types'
@@ -588,6 +590,7 @@ function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('dashboard')
   const [requestForm, setRequestForm] = useState<RequestFormState>(emptyRequestForm)
   const [reviewDocsDrafts, setReviewDocsDrafts] = useState<Record<string, ReviewDocs>>({})
+  const [previewAttachment, setPreviewAttachment] = useState<{ name: string; type: string; dataUrl?: string; size: number } | null>(null)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const requestTypeConfig = requestTypeOptions.find((item) => item.type === requestForm.requestType) ?? requestTypeOptions[0]
 
@@ -771,23 +774,39 @@ function App() {
   )
 
   async function updateApprovalState(approvalState: ApprovalState, message: string) {
-    if (!selected || !supabase) return
+    if (!selected) return
 
-    const nextAction =
-      approvalState.requiredRoles.every((item) => approvalState.approvedRoles.includes(item))
+    const allApproved = approvalState.requiredRoles.every((item) => approvalState.approvedRoles.includes(item))
+    const shouldAdvance = allApproved && selected.status === 'dept_review'
+
+    const advancedStatus: ProjectStatus = shouldAdvance ? 'schedule' : selected.status
+    const advancedAssigneeRole = shouldAdvance ? nextRoleFor(advancedStatus) : selected.assigneeRole
+    const advancedProgress = shouldAdvance ? Math.min(100, selected.progress + 12) : selected.progress
+    const nextAction = shouldAdvance
+      ? nextActionFor(advancedStatus)
+      : allApproved
         ? '필수 승인 완료, 다음 단계 진행 가능'
         : `승인 대기: ${approvalState.requiredRoles.filter((item) => !approvalState.approvedRoles.includes(item)).map((item) => approvalStepLabels[item]).join(', ')}`
 
-    const nextLogs = [
-      {
-        id: crypto.randomUUID(),
-        at: '방금 전',
-        actor: roleLabels[role],
-        message,
-        meta: { approvalState },
-      },
-      ...selected.logs,
-    ]
+    const baseLogEntry = {
+      id: crypto.randomUUID(),
+      at: '방금 전',
+      actor: roleLabels[role],
+      message,
+      meta: { approvalState },
+    }
+    const advanceLogEntry = shouldAdvance
+      ? {
+          id: crypto.randomUUID(),
+          at: '방금 전',
+          actor: roleLabels[role],
+          message: `모든 승인 완료 → ${statusLabels[advancedStatus]} 단계로 자동 진행했습니다.`,
+        }
+      : null
+
+    const nextLogs = advanceLogEntry
+      ? [advanceLogEntry, baseLogEntry, ...selected.logs]
+      : [baseLogEntry, ...selected.logs]
 
     setProjects((current) =>
       current.map((project) =>
@@ -795,6 +814,9 @@ function App() {
           ? {
               ...project,
               approvalState,
+              status: advancedStatus,
+              assigneeRole: advancedAssigneeRole,
+              progress: advancedProgress,
               nextAction,
               logs: nextLogs,
               updatedAt: new Date().toISOString(),
@@ -803,23 +825,30 @@ function App() {
       ),
     )
 
+    if (!supabase) return
     const { error } = await supabase
       .from('pms_projects')
-      .update({ next_action: nextAction, logs: nextLogs })
+      .update({
+        status: advancedStatus,
+        assignee_role: persistAssigneeRole(advancedAssigneeRole),
+        progress: advancedProgress,
+        next_action: nextAction,
+        logs: nextLogs,
+      })
       .eq('id', selected.id)
 
     if (error) setLoadState('error')
   }
 
   async function updateSelectedReviewDocs() {
-    if (!selected || !supabase) return
+    if (!selected) return
 
     const nextLogs = [
       {
         id: crypto.randomUUID(),
         at: '방금 전',
         actor: roleLabels[role],
-        message: 'PM이 SRS/SDS 검토 문서를 업데이트했습니다.',
+        message: 'PM이 기획 문서(SRS+SDS)를 업데이트했습니다.',
         meta: { reviewDocs: currentReviewDocsDraft },
       },
       ...selected.logs,
@@ -837,7 +866,19 @@ function App() {
           : project,
       ),
     )
+    setReviewDocsDrafts((current) => {
+      const { [selected.id]: _removed, ...rest } = current
+      void _removed
+      return rest
+    })
+    window.alert('기획 문서를 저장했습니다.')
 
+    void notifyGoogleChat('doc.update', `PM이 기획 문서를 업데이트했습니다.`, {
+      프로젝트: selected.title,
+      코드: selected.code,
+    })
+
+    if (!supabase) return
     const { error } = await supabase
       .from('pms_projects')
       .update({ logs: nextLogs })
@@ -855,6 +896,12 @@ function App() {
     }
 
     await updateApprovalState(approvalState, `${roleLabels[role]} 승인을 완료했습니다.`)
+    const allApproved = approvalState.requiredRoles.every((item) => approvalState.approvedRoles.includes(item))
+    void notifyGoogleChat('project.approve', `${roleLabels[role]}이(가) 승인했습니다.`, {
+      프로젝트: selected.title,
+      코드: selected.code,
+      ...(allApproved ? { 상태: '모든 승인 완료 → 다음 단계 자동 진행' } : { 남은승인: approvalState.requiredRoles.filter((r) => !approvalState.approvedRoles.includes(r)).map((r) => approvalStepLabels[r]).join(', ') }),
+    })
   }
 
   async function toggleHoldProject(projectId: string) {
@@ -894,6 +941,12 @@ function App() {
           : project,
       ),
     )
+
+    void notifyGoogleChat(willHold ? 'project.hold' : 'project.unhold', willHold ? `프로젝트를 보류 처리했습니다.` : `프로젝트 보류를 해제했습니다.`, {
+      프로젝트: target.title,
+      코드: target.code,
+      ...(willHold && reason ? { 사유: reason } : {}),
+    })
 
     if (!supabase) return
     const { error } = await supabase
@@ -960,6 +1013,13 @@ function App() {
       .eq('id', selected.id)
 
     if (error) setLoadState('error')
+
+    void notifyGoogleChat('project.advance', `단계 진행: ${statusLabels[targetStatus]}`, {
+      프로젝트: selected.title,
+      코드: selected.code,
+      다음담당: roleLabels[nextAssigneeRole],
+      진행률: `${nextProgress}%`,
+    })
   }
 
   async function submitRequest(event: FormEvent<HTMLFormElement>) {
@@ -1059,6 +1119,14 @@ function App() {
     setRequestForm(emptyRequestForm)
     setViewMode('dashboard')
     setStatusFilter('all')
+
+    void notifyGoogleChat('project.create', `신규 요청이 등록되었습니다: ${savedProject.title}`, {
+      코드: savedProject.code,
+      분류: requestTypeLabels[savedProject.requestType],
+      요청자: savedProject.requester,
+      서비스: savedProject.serviceName,
+      마감: savedProject.dueDate,
+    })
   }
 
   async function updateSelectedProjectTasks(nextTasks: ProjectTask[], logMessage: string) {
@@ -1121,6 +1189,13 @@ function App() {
           : project,
       ),
     )
+    void notifyGoogleChat('task.create', `새 일감 등록: ${task.title}`, {
+      프로젝트: target.title,
+      유형: task.type ?? 'task',
+      담당: task.owner,
+      마감: task.dueDate,
+    })
+
     if (!supabase) return
     const { error } = await supabase
       .from('pms_projects')
@@ -1167,6 +1242,12 @@ function App() {
         : task,
     )
     await updateSelectedProjectTasks(nextTasks, `${roleLabels[role]}님이 태스크에 댓글을 남겼습니다.`)
+    const targetTask = selected.tasks.find((task) => task.id === taskId)
+    void notifyGoogleChat('task.comment', `태스크 댓글: ${targetTask?.title ?? ''}`, {
+      프로젝트: selected.title,
+      작성자: roleLabels[role],
+      내용: trimmed,
+    })
   }
 
   async function changeTaskStatus(taskId: string, status: TaskStatus, statusNote: string) {
@@ -1183,6 +1264,10 @@ function App() {
     )
     const changedTask = nextTasks.find((task) => task.id === taskId)
     await updateSelectedProjectTasks(nextTasks, `${changedTask?.title ?? '태스크'} 상태를 ${taskLabels[status]}로 변경했습니다. 사유: ${statusNote}`)
+    void notifyGoogleChat('task.status', `태스크 상태 변경: ${changedTask?.title ?? ''} → ${taskLabels[status]}`, {
+      프로젝트: selected.title,
+      사유: statusNote,
+    })
   }
 
   return (
@@ -1473,39 +1558,6 @@ function App() {
               </div>
             </section>
 
-            {selected.status === 'dept_review' && (
-              <section className="requirementsPanel approvalContextPanel">
-                <div className="panelHeader compact">
-                  <h3>프로젝트 개요</h3>
-                  <span>요청 내용 · SRS · SDS</span>
-                </div>
-                <div className="approvalContextGrid">
-                  <div className="approvalContextSection">
-                    <strong>요청 내용</strong>
-                    <p>{selected.summary}</p>
-                    <div className="approvalContextMeta">
-                      <span>{selected.serviceName}</span>
-                      <span>{selected.serviceArea}</span>
-                      <span>{selected.requester} · {selected.ownerTeam}</span>
-                    </div>
-                    <ul className="approvalBulletList">
-                      <li><b>{requestTypeOptions.find((item) => item.type === selected.requestType)?.problemLabel ?? '현재 문제'}:</b> {selected.currentProblem}</li>
-                      <li><b>{requestTypeOptions.find((item) => item.type === selected.requestType)?.outcomeLabel ?? '원하는 결과'}:</b> {selected.desiredOutcome}</li>
-                      <li><b>{requestTypeOptions.find((item) => item.type === selected.requestType)?.metricLabel ?? '성공 기준'}:</b> {selected.successMetric}</li>
-                    </ul>
-                  </div>
-                  <div className="approvalContextSection">
-                    <strong>SRS</strong>
-                    <p>{(selected.reviewDocs?.srs ?? '').trim() || '아직 등록된 SRS 내용이 없습니다. PM이 요구사항 정의 문서를 먼저 등록해야 합니다.'}</p>
-                  </div>
-                  <div className="approvalContextSection">
-                    <strong>SDS</strong>
-                    <p>{(selected.reviewDocs?.sds ?? '').trim() || '아직 등록된 SDS 내용이 없습니다. PM이 설계 검토 문서를 먼저 등록해야 합니다.'}</p>
-                  </div>
-                </div>
-              </section>
-            )}
-
             <section className="requirementsPanel numberedSection sectionSrsSds">
               <div className="panelHeader compact">
                 <h3>② PM이 등록한 기획 문서 (SRS · SDS)</h3>
@@ -1528,18 +1580,18 @@ function App() {
                                 <span>
                                   {section.ko} <em>({section.en})</em>
                                 </span>
-                                <textarea
+                                <RichEditor
                                   value={sectionsMap[section.key]}
-                                  onChange={(event) => {
-                                    const updated = { ...sectionsMap, [section.key]: event.target.value }
+                                  placeholder={section.placeholder}
+                                  minHeight={80}
+                                  onChange={(html) => {
+                                    const updated = { ...sectionsMap, [section.key]: html }
                                     const nextSrs = serializeSrsSections(updated)
                                     setReviewDocsDrafts((current) => ({
                                       ...current,
                                       [selected.id]: { ...currentReviewDocsDraft, srs: nextSrs },
                                     }))
                                   }}
-                                  placeholder={section.placeholder}
-                                  rows={3}
                                 />
                               </label>
                             )
@@ -1552,6 +1604,7 @@ function App() {
                             ...current,
                             [selected.id]: { ...currentReviewDocsDraft, srsAttachments: next },
                           }))}
+                          onPreview={setPreviewAttachment}
                         />
                       </div>
                     </section>
@@ -1564,11 +1617,11 @@ function App() {
                         <div className="formGrid">
                           <label>
                             <span>설계 내용</span>
-                            <textarea
+                            <RichEditor
                               value={currentReviewDocsDraft.sds}
-                              onChange={(event) => setReviewDocsDrafts((current) => ({ ...current, [selected.id]: { ...currentReviewDocsDraft, sds: event.target.value } }))}
-                              placeholder={'예: 화면/기능 설계\n데이터/연동 설계\n권한/예외 처리\n운영 고려사항'}
-                              rows={8}
+                              placeholder={'예: 화면/기능 설계, 데이터/연동 설계, 권한/예외 처리, 운영 고려사항'}
+                              minHeight={220}
+                              onChange={(html) => setReviewDocsDrafts((current) => ({ ...current, [selected.id]: { ...currentReviewDocsDraft, sds: html } }))}
                             />
                           </label>
                         </div>
@@ -1579,6 +1632,7 @@ function App() {
                             ...current,
                             [selected.id]: { ...currentReviewDocsDraft, sdsAttachments: next },
                           }))}
+                          onPreview={setPreviewAttachment}
                         />
                       </div>
                     </section>
@@ -1595,12 +1649,18 @@ function App() {
                     <div className="panelHeader compact">
                       <h3><span className="docTag srsTag">SRS</span> 요구사항 정의서</h3>
                     </div>
-                    <pre className="docReadView">{(selected.reviewDocs?.srs ?? '').trim() || '아직 등록된 SRS 내용이 없습니다.'}</pre>
+                    <RichTextView html={selected.reviewDocs?.srs ?? ''} fallback="아직 등록된 SRS 내용이 없습니다." />
                     {(selected.reviewDocs?.srsAttachments?.length ?? 0) > 0 && (
                       <ul className="docAttachmentList">
                         {selected.reviewDocs?.srsAttachments?.map((file) => (
                           <li key={file.id}>
-                            <a href={file.dataUrl} download={file.name}>{file.name}</a>
+                            <button
+                              type="button"
+                              className="attachmentLink"
+                              onClick={() => setPreviewAttachment({ name: file.name, type: file.type, dataUrl: file.dataUrl, size: file.size })}
+                            >
+                              {file.name}
+                            </button>
                             <span>{formatBytes(file.size)}</span>
                           </li>
                         ))}
@@ -1611,12 +1671,18 @@ function App() {
                     <div className="panelHeader compact">
                       <h3><span className="docTag sdsTag">SDS</span> 설계 명세서</h3>
                     </div>
-                    <pre className="docReadView">{(selected.reviewDocs?.sds ?? '').trim() || '아직 등록된 SDS 내용이 없습니다.'}</pre>
+                    <RichTextView html={selected.reviewDocs?.sds ?? ''} fallback="아직 등록된 SDS 내용이 없습니다." />
                     {(selected.reviewDocs?.sdsAttachments?.length ?? 0) > 0 && (
                       <ul className="docAttachmentList">
                         {selected.reviewDocs?.sdsAttachments?.map((file) => (
                           <li key={file.id}>
-                            <a href={file.dataUrl} download={file.name}>{file.name}</a>
+                            <button
+                              type="button"
+                              className="attachmentLink"
+                              onClick={() => setPreviewAttachment({ name: file.name, type: file.type, dataUrl: file.dataUrl, size: file.size })}
+                            >
+                              {file.name}
+                            </button>
                             <span>{formatBytes(file.size)}</span>
                           </li>
                         ))}
@@ -1636,6 +1702,7 @@ function App() {
                 project={selected}
                 onStatusChange={changeTaskStatus}
                 onAddComment={(taskId, message) => void addTaskComment(taskId, message)}
+                onPreviewAttachment={setPreviewAttachment}
                 currentRole={role}
               />
             </section>
@@ -1751,6 +1818,52 @@ function App() {
         </section>
         )}
       </main>
+      {previewAttachment && (
+        <AttachmentPreviewModal
+          attachment={previewAttachment}
+          onClose={() => setPreviewAttachment(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function AttachmentPreviewModal({
+  attachment,
+  onClose,
+}: {
+  attachment: { name: string; type: string; dataUrl?: string; size: number }
+  onClose: () => void
+}) {
+  const isImage = attachment.type.startsWith('image/')
+  const isPdf = attachment.type === 'application/pdf'
+  return (
+    <div className="attachmentModalBackdrop" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="attachmentModal" onClick={(event) => event.stopPropagation()}>
+        <div className="attachmentModalHeader">
+          <strong>{attachment.name}</strong>
+          <div className="attachmentModalActions">
+            {attachment.dataUrl && (
+              <a className="miniButton" href={attachment.dataUrl} download={attachment.name}>다운로드</a>
+            )}
+            <button className="miniButton" type="button" onClick={onClose}>닫기</button>
+          </div>
+        </div>
+        <div className="attachmentModalBody">
+          {!attachment.dataUrl ? (
+            <p className="attachmentModalFallback">미리볼 데이터가 없습니다.</p>
+          ) : isImage ? (
+            <img src={attachment.dataUrl} alt={attachment.name} />
+          ) : isPdf ? (
+            <iframe src={attachment.dataUrl} title={attachment.name} />
+          ) : (
+            <p className="attachmentModalFallback">
+              이 파일 형식은 미리보기를 지원하지 않습니다. ({attachment.type || '알 수 없는 형식'})<br />
+              다운로드 후 확인해주세요.
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -1959,11 +2072,13 @@ function ProjectTasksPanel({
   project,
   onStatusChange,
   onAddComment,
+  onPreviewAttachment,
   currentRole,
 }: {
   project: Project
   onStatusChange: (taskId: string, status: TaskStatus, statusNote: string) => void
   onAddComment: (taskId: string, message: string) => void
+  onPreviewAttachment?: (attachment: { name: string; type: string; dataUrl?: string; size: number }) => void
   currentRole: Role
 }) {
   const [statusDrafts, setStatusDrafts] = useState<Record<string, { status: TaskStatus; note: string }>>({})
@@ -2046,8 +2161,18 @@ function ProjectTasksPanel({
               <p className="statusNote">최근 상태 메모: {task.statusNote || '아직 기록 없음'}</p>
               {(task.attachments?.length ?? 0) > 0 && (
                 <div className="taskAttachments" aria-label={`${task.title} 첨부 파일`}>
-                  {task.attachments?.map((attachment) =>
-                    attachment.dataUrl ? (
+                  {task.attachments?.map((attachment) => (
+                    onPreviewAttachment ? (
+                      <button
+                        key={attachment.id}
+                        type="button"
+                        className="attachmentChip attachmentLink"
+                        onClick={() => onPreviewAttachment({ name: attachment.name, type: attachment.type, dataUrl: attachment.dataUrl, size: attachment.size })}
+                      >
+                        <Paperclip size={13} />
+                        {attachment.name}
+                      </button>
+                    ) : attachment.dataUrl ? (
                       <a key={attachment.id} href={attachment.dataUrl} download={attachment.name}>
                         <Paperclip size={13} />
                         {attachment.name}
@@ -2057,8 +2182,8 @@ function ProjectTasksPanel({
                         <Paperclip size={13} />
                         {attachment.name}
                       </span>
-                    ),
-                  )}
+                    )
+                  ))}
                 </div>
               )}
             </div>
@@ -2314,10 +2439,12 @@ function DocAttachmentField({
   label,
   attachments,
   onChange,
+  onPreview,
 }: {
   label: string
   attachments: import('./types').ReviewDocAttachment[]
   onChange: (next: import('./types').ReviewDocAttachment[]) => void
+  onPreview?: (attachment: { name: string; type: string; dataUrl?: string; size: number }) => void
 }) {
   function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -2365,9 +2492,17 @@ function DocAttachmentField({
         <ul className="docAttachmentList">
           {attachments.map((file) => (
             <li key={file.id}>
-              <a href={file.dataUrl} download={file.name}>
-                {file.name}
-              </a>
+              {onPreview ? (
+                <button
+                  type="button"
+                  className="attachmentLink"
+                  onClick={() => onPreview({ name: file.name, type: file.type, dataUrl: file.dataUrl, size: file.size })}
+                >
+                  {file.name}
+                </button>
+              ) : (
+                <a href={file.dataUrl} download={file.name}>{file.name}</a>
+              )}
               <span>{formatBytes(file.size)}</span>
               <button
                 type="button"
@@ -2576,7 +2711,7 @@ function RequirementBlock({ label, value }: { label: string; value: string }) {
   return (
     <div className="requirementBlock">
       <span>{label}</span>
-      <p>{value}</p>
+      <RichTextView html={value} fallback="(미입력)" />
     </div>
   )
 }
