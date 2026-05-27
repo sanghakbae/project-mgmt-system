@@ -1733,6 +1733,7 @@ function App() {
             <RequesterContentPanel
               project={selected}
               currentRole={role}
+              highlight={role === 'requester' && selected.status === 'request'}
               canEdit={(role === 'requester' || role === 'admin') && ['request', 'planning'].includes(selected.status)}
               onSave={(patch) => void updateRequesterContent(patch)}
               onInquire={(message, parentId) => void addProjectComment(message, parentId)}
@@ -1748,9 +1749,9 @@ function App() {
               </div>
             </section>
             ) : (
-            <section className="requirementsPanel numberedSection sectionSrsSds">
+            <section className={`requirementsPanel numberedSection sectionSrsSds ${role === 'pm' && !selected.docsLocked && selected.status === 'planning' ? 'neonHighlight' : ''}`}>
               <div className="panelHeader compact">
-                <h3>② PM이 등록한 기획 문서 (SRS · SDS)</h3>
+                <h3>② PM이 등록한 기획 문서 (SRS · SDS){role === 'pm' && !selected.docsLocked && selected.status === 'planning' && <span className="neonTag">작성 필요</span>}</h3>
                 <span>{selected.docsLocked ? '승인 완료 · 잠김 (수정하려면 이전 단계로 회송)' : role === 'pm' ? 'PM 작성 · 항목별 입력 · 첨부 가능' : 'PM이 작성하는 영역 · 읽기 전용'}</span>
               </div>
               {role === 'pm' && !selected.docsLocked ? (
@@ -1928,7 +1929,7 @@ function App() {
               </div>
             )}
 
-            <div className="actionBanner">
+            <div className={`actionBanner ${canAct && !selected.onHold && selected.status !== 'published' ? 'neonHighlight' : ''}`}>
               <div className={canAct ? 'actionIcon active' : 'actionIcon'}>
                 {canAct ? <Check size={18} /> : <ShieldCheck size={18} />}
               </div>
@@ -2909,7 +2910,7 @@ function CommentItem({
       <div className="commentRowLeft">
         <span className={`qaBadge ${kind}`}>{kind === 'q' ? '문의' : '답변'}</span>
         <strong>{comment.actor}</strong>
-        <em>{roleLabels[comment.role]}</em>
+        {comment.actor !== roleLabels[comment.role] && <em>{roleLabels[comment.role]}</em>}
         <span className="commentRowTime">{formatDateTime(comment.at)}</span>
       </div>
       <div className="commentRowRight">
@@ -3024,6 +3025,7 @@ function RequesterContentPanel({
   project,
   currentRole,
   canEdit,
+  highlight,
   onSave,
   onInquire,
   onEditInquiry,
@@ -3032,6 +3034,7 @@ function RequesterContentPanel({
   project: Project
   currentRole: Role
   canEdit: boolean
+  highlight?: boolean
   onSave: (patch: Partial<Project>) => void
   onInquire?: (message: string, parentId?: string) => void
   onEditInquiry?: (id: string, message: string, sectionPrefix?: string) => void
@@ -3081,7 +3084,7 @@ function RequesterContentPanel({
   const set = <K extends keyof typeof form>(k: K, v: string) => setForm((s) => ({ ...s, [k]: v }))
 
   return (
-    <section className="requirementsPanel numberedSection sectionRequester requesterContent">
+    <section className={`requirementsPanel numberedSection sectionRequester requesterContent ${highlight && canEdit ? 'neonHighlight' : ''}`}>
       <div className="panelHeader compact">
         <div>
           <p className="eyebrow">{project.code}</p>

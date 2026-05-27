@@ -4065,15 +4065,40 @@ h3 {
 }
 
 /* 댓글 행: 좌측 작성자/시각, 우측 내용 */
+/* 현재 역할이 입력/판단해야 하는 영역 네온 강조 */
+.neonHighlight {
+  border-color: #d9271e !important;
+  box-shadow: 0 0 0 2px rgba(217, 39, 30, 0.45), 0 0 14px rgba(217, 39, 30, 0.3);
+  animation: neonPulse 1.9s ease-in-out infinite;
+}
+
+@keyframes neonPulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(217, 39, 30, 0.4), 0 0 8px rgba(217, 39, 30, 0.22); }
+  50% { box-shadow: 0 0 0 2px rgba(217, 39, 30, 0.75), 0 0 20px rgba(217, 39, 30, 0.5); }
+}
+
+.neonTag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #d9271e;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  vertical-align: middle;
+  animation: neonPulse 1.9s ease-in-out infinite;
+}
+
 .commentThreadList {
   display: grid;
-  gap: 8px;
+  gap: 12px;
 }
 
 .commentThread {
   display: grid;
-  gap: 4px;
-  padding: 8px 10px;
+  gap: 8px;
+  padding: 14px 16px;
   border: 1px solid #e8ebef;
   border-radius: 8px;
   background: #fff;
@@ -4081,16 +4106,16 @@ h3 {
 
 .commentRow {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 16px;
   align-items: start;
-  padding: 4px 0;
+  padding: 6px 0;
 }
 
 .commentRow.reply {
   border-top: 1px dashed #eef0f3;
-  margin-top: 4px;
-  padding-top: 8px;
+  margin-top: 8px;
+  padding-top: 12px;
 }
 
 .commentRowLeft {
@@ -4124,10 +4149,14 @@ h3 {
 .commentRowRight > p {
   margin: 0;
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.7;
   color: #2a2f37;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.qaReplyBtn {
+  margin-top: 4px;
 }
 
 .commentRowActions {
