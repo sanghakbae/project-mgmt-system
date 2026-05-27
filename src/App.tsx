@@ -1175,7 +1175,7 @@ function App() {
   }
 
   // 목표2: 단계별 문의 댓글 등록
-  async function addProjectComment(message: string) {
+  async function addProjectCommentForStage(stage: ProjectStatus, message: string) {
     if (!selected) return
     const trimmed = message.trim()
     if (!trimmed) return
@@ -1184,12 +1184,18 @@ function App() {
       at: new Date().toISOString(),
       actor: roleLabels[role],
       role,
-      stage: selected.status,
+      stage,
       message: trimmed,
     }
     const nextComments = [...(selected.comments ?? []), comment]
-    await patchSelectedProject({ comments: nextComments }, `[${statusLabels[selected.status]}] 문의/의견을 남겼습니다.`)
-    void notifyGoogleChat('task.comment', `[${statusLabels[selected.status]}] 문의: ${selected.title}`, { 작성자: roleLabels[role], 내용: trimmed })
+    await patchSelectedProject({ comments: nextComments }, `[${statusLabels[stage]}] 문의/의견을 남겼습니다.`)
+    void notifyGoogleChat('task.comment', `[${statusLabels[stage]}] 문의: ${selected.title}`, { 작성자: roleLabels[role], 내용: trimmed })
+  }
+
+  // 현재 단계 기준 댓글 (섹션 문의 박스용)
+  async function addProjectComment(message: string) {
+    if (!selected) return
+    await addProjectCommentForStage(selected.status, message)
   }
 
   async function submitRequest(event: FormEvent<HTMLFormElement>) {
@@ -1870,13 +1876,14 @@ function App() {
 
             <section className="requirementsPanel numberedSection sectionInquiry">
               <div className="panelHeader compact">
-                <h3>④ 단계별 문의 / 논의</h3>
-                <span>현재 단계: {statusLabels[selected.status]} · 전 역할 작성 가능</span>
+                <h3>단계별 문의 / 논의</h3>
+                <span>각 단계 아래에 문의/의견을 남길 수 있습니다 · 전 역할 작성 가능</span>
               </div>
               <StageInquiryPanel
                 project={selected}
+                workflow={selectedWorkflow}
                 currentRole={role}
-                onAddComment={(message) => void addProjectComment(message)}
+                onAddComment={(stage, message) => void addProjectCommentForStage(stage, message)}
               />
             </section>
 
@@ -2018,13 +2025,28 @@ function App() {
                   <h3>활동 로그</h3>
                   <MessageSquareText size={17} />
                 </div>
-                <div className="logList">
-                  {selected.logs.map((log) => (
-                    <div key={log.id}>
-                      <span>{log.at} · {log.actor}</span>
-                      <p>{log.message}</p>
-                    </div>
-                  ))}
+                <div className="logTableWrap">
+                  <table className="logTable">
+                    <thead>
+                      <tr>
+                        <th>시각</th>
+                        <th>담당</th>
+                        <th>내용</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selected.logs.map((log) => (
+                        <tr key={log.id}>
+                          <td className="logTime">{log.at}</td>
+                          <td className="logActor">{log.actor}</td>
+                          <td className="logMsg">{log.message}</td>
+                        </tr>
+                      ))}
+                      {selected.logs.length === 0 && (
+                        <tr><td colSpan={3} className="logEmpty">활동 기록이 없습니다.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </section>
             </div>
@@ -2806,7 +2828,7 @@ function SectionInquiryBox({ sectionLabel, comments, onAdd }: { sectionLabel: st
   return (
     <div className="sectionInquiryBox">
       <button type="button" className="sectionInquiryToggle" onClick={() => setOpen((v) => !v)}>
-        💬 이 내용에 문의 {related.length > 0 ? `(${related.length})` : ''}
+        💬 문의 사항 {related.length > 0 ? `(${related.length})` : ''}
       </button>
       {open && (
         <div className="sectionInquiryBody">
@@ -2958,69 +2980,71 @@ function RequesterContentPanel({
 
 function StageInquiryPanel({
   project,
+  workflow: stages,
   currentRole,
   onAddComment,
 }: {
   project: Project
+  workflow: Array<{ status: ProjectStatus; label: string }>
   currentRole: Role
-  onAddComment: (message: string) => void
+  onAddComment: (stage: ProjectStatus, message: string) => void
 }) {
-  const [draft, setDraft] = useState('')
-  const [stageFilter, setStageFilter] = useState<'all' | ProjectStatus>('all')
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [openStages, setOpenStages] = useState<Record<string, boolean>>({ [project.status]: true })
   const comments = project.comments ?? []
-  const filtered = stageFilter === 'all' ? comments : comments.filter((c) => c.stage === stageFilter)
-  const stagesWithComments = Array.from(new Set(comments.map((c) => c.stage)))
 
   return (
-    <div className="stageInquiry">
-      <div className="inquiryFilterRow">
-        <button type="button" className={stageFilter === 'all' ? 'active' : ''} onClick={() => setStageFilter('all')}>
-          전체 {comments.length}
-        </button>
-        {stagesWithComments.map((stage) => (
-          <button key={stage} type="button" className={stageFilter === stage ? 'active' : ''} onClick={() => setStageFilter(stage)}>
-            {statusLabels[stage]} {comments.filter((c) => c.stage === stage).length}
-          </button>
-        ))}
-      </div>
-
-      <div className="inquiryList">
-        {filtered.length === 0 ? (
-          <p className="docAttachmentEmpty">아직 등록된 문의가 없습니다. 단계 진행 중 궁금한 점을 남겨보세요.</p>
-        ) : (
-          filtered
-            .slice()
-            .reverse()
-            .map((comment) => (
-              <div key={comment.id} className="inquiryItem">
-                <div className="inquiryMeta">
-                  <span className={`statusPill ${comment.stage}`}>{statusLabels[comment.stage]}</span>
-                  <strong>{comment.actor}</strong>
-                  <em>{roleLabels[comment.role]}</em>
-                  <span className="inquiryTime">{formatDateTime(comment.at)}</span>
-                </div>
-                <p>{comment.message}</p>
+    <div className="stageInquiryGroups">
+      {stages.map((stage) => {
+        const stageComments = comments.filter((c) => c.stage === stage.status)
+        const isCurrent = stage.status === project.status
+        const open = openStages[stage.status] ?? false
+        const draft = drafts[stage.status] ?? ''
+        return (
+          <div key={stage.status} className={`stageGroup ${isCurrent ? 'current' : ''}`}>
+            <button type="button" className="stageGroupHeader" onClick={() => setOpenStages((s) => ({ ...s, [stage.status]: !open }))}>
+              <span className={`statusPill ${stage.status}`}>{stage.label}</span>
+              {isCurrent && <span className="stageGroupNow">현재</span>}
+              <span className="stageGroupCount">문의 {stageComments.length}</span>
+              <span className="stageGroupChevron">{open ? '▾' : '▸'}</span>
+            </button>
+            {open && (
+              <div className="stageGroupBody">
+                {stageComments.length > 0 && (
+                  <ul className="stageCommentList">
+                    {stageComments.slice().reverse().map((c) => (
+                      <li key={c.id}>
+                        <div className="stageCommentMeta">
+                          <strong>{c.actor}</strong>
+                          <em>{roleLabels[c.role]}</em>
+                          <span>{formatDateTime(c.at)}</span>
+                        </div>
+                        <p>{c.message}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <form
+                  className="inquiryForm"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    if (!draft.trim()) return
+                    onAddComment(stage.status, draft)
+                    setDrafts((s) => ({ ...s, [stage.status]: '' }))
+                  }}
+                >
+                  <input
+                    value={draft}
+                    onChange={(event) => setDrafts((s) => ({ ...s, [stage.status]: event.target.value }))}
+                    placeholder={`${stage.label} 단계 · ${roleLabels[currentRole]}로 문의/의견 남기기`}
+                  />
+                  <button className="primaryButton" type="submit" disabled={!draft.trim()}>등록</button>
+                </form>
               </div>
-            ))
-        )}
-      </div>
-
-      <form
-        className="inquiryForm"
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (!draft.trim()) return
-          onAddComment(draft)
-          setDraft('')
-        }}
-      >
-        <input
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder={`[${statusLabels[project.status]}] 단계 기준 · ${roleLabels[currentRole]}로 문의/의견 남기기`}
-        />
-        <button className="primaryButton" type="submit" disabled={!draft.trim()}>등록</button>
-      </form>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

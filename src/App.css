@@ -2058,13 +2058,178 @@ h3 {
 }
 
 .sectionInquiryToggle {
-  background: none;
-  border: 0;
-  padding: 4px 0;
-  color: #8a5cf6;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f3eeff;
+  border: 1px solid #d9caf8;
+  border-radius: 6px;
+  padding: 6px 12px;
+  color: #6d3fd1;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   cursor: pointer;
+}
+
+.sectionInquiryToggle:hover {
+  background: #ece2ff;
+}
+
+/* 단계별 문의 그룹 (아코디언) */
+.stageInquiryGroups {
+  display: grid;
+  gap: 8px;
+}
+
+.stageGroup {
+  border: 1px solid #e3e5e9;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.stageGroup.current {
+  border-color: #8a5cf6;
+  box-shadow: 0 0 0 2px rgba(138, 92, 246, 0.12);
+}
+
+.stageGroupHeader {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #fafbfc;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.stageGroupNow {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #8a5cf6;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.stageGroupCount {
+  color: #7b818b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.stageGroupChevron {
+  margin-left: auto;
+  color: #98a0aa;
+}
+
+.stageGroupBody {
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid #eef0f3;
+}
+
+.stageCommentList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.stageCommentList li {
+  padding: 8px 10px;
+  border: 1px solid #e8ebef;
+  border-radius: 6px;
+  background: #faf8ff;
+}
+
+.stageCommentMeta {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.stageCommentMeta strong {
+  font-size: 12px;
+}
+
+.stageCommentMeta em {
+  font-style: normal;
+  font-size: 11px;
+  color: #7b818b;
+}
+
+.stageCommentMeta span {
+  margin-left: auto;
+  color: #98a0aa;
+  font-size: 10px;
+}
+
+.stageCommentList li p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #2a2f37;
+  white-space: pre-wrap;
+}
+
+/* 활동 로그 테이블 */
+.logTableWrap {
+  overflow-x: auto;
+  border: 1px solid #e3e5e9;
+  border-radius: 8px;
+}
+
+.logTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.logTable th,
+.logTable td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #eef0f3;
+  text-align: left;
+  vertical-align: top;
+}
+
+.logTable th {
+  background: #fafbfc;
+  color: #6b7077;
+  font-weight: 800;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.logTable tr:last-child td {
+  border-bottom: 0;
+}
+
+.logTable .logTime {
+  white-space: nowrap;
+  color: #7b818b;
+}
+
+.logTable .logActor {
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.logTable .logMsg {
+  color: #2a2f37;
+  line-height: 1.5;
+}
+
+.logTable .logEmpty {
+  text-align: center;
+  color: #98a0aa;
+  padding: 16px;
 }
 
 .sectionInquiryBody {
