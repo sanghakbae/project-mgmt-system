@@ -2312,21 +2312,6 @@ h3 {
   color: #198247;
 }
 
-.qaReply {
-  margin: 6px 0 0 14px;
-  padding: 8px 10px;
-  border-left: 2px solid #a9d3b8;
-  background: #f5fbf7;
-  border-radius: 0 6px 6px 0;
-}
-
-.qaReply p {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-}
-
 .qaNoReply {
   margin: 4px 0 0 14px;
   font-size: 11px;
@@ -4178,10 +4163,7 @@ h3 {
 /* 답변: 바로 위 문의에 붙여 한 쌍처럼 */
 .commentRow.reply {
   margin: 2px 0 0 18px;
-  padding: 8px 10px;
-  border-left: 2px solid #a9d3b8;
-  background: #f5fbf7;
-  border-radius: 0 6px 6px 0;
+  padding: 4px 0;
 }
 
 .replyIcon {
