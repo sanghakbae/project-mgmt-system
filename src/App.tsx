@@ -1351,27 +1351,6 @@ function App() {
     if (error) setLoadState('error')
   }
 
-  async function purgeDemoTasksExceptKeys(keepKeys: string[]) {
-    const keepSet = new Set(keepKeys.map((key) => key.trim()).filter(Boolean))
-    const updates: Array<{ id: string; tasks: ProjectTask[] }> = []
-    setProjects((current) =>
-      current.map((project) => {
-        const nextTasks = project.tasks.filter((task) => task.key && keepSet.has(task.key))
-        if (nextTasks.length !== project.tasks.length) {
-          updates.push({ id: project.id, tasks: nextTasks })
-        }
-        return { ...project, tasks: nextTasks }
-      }),
-    )
-    if (!supabase) return
-    for (const update of updates) {
-      const { error } = await supabase
-        .from('pms_projects')
-        .update({ tasks: update.tasks })
-        .eq('id', update.id)
-      if (error) setLoadState('error')
-    }
-  }
 
   // 관리자: 프로젝트 삭제
   async function deleteProject(projectId: string) {
@@ -1550,7 +1529,6 @@ function App() {
             setServiceOptions={replaceServiceOptions}
             projects={projects}
             onToggleHold={toggleHoldProject}
-            onPurgeDemoTasks={purgeDemoTasksExceptKeys}
             onDeleteProject={deleteProject}
           />
         ) : viewMode === 'dashboard' ? (
@@ -2858,19 +2836,16 @@ function SettingsPanel({
   setServiceOptions,
   projects,
   onToggleHold,
-  onPurgeDemoTasks,
   onDeleteProject,
 }: {
   serviceOptions: string[]
   setServiceOptions: (nextOptions: string[]) => void
   projects: Project[]
   onToggleHold: (projectId: string) => void
-  onPurgeDemoTasks: (keepKeys: string[]) => void
   onDeleteProject: (projectId: string) => void
 }) {
   const [draft, setDraft] = useState('')
   const [holdFilter, setHoldFilter] = useState<'all' | 'onHold' | 'active'>('all')
-  const [purgeKeyInput, setPurgeKeyInput] = useState('PMS-2026-001-4')
 
   function addService(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -2995,44 +2970,6 @@ function SettingsPanel({
               )
             })}
           {projects.length === 0 && <p className="emptyText">등록된 프로젝트가 없습니다.</p>}
-        </div>
-      </div>
-
-      <div className="settingsSection">
-        <div className="panelHeader compact">
-          <div>
-            <h3>데모 태스크 일괄 삭제</h3>
-            <p>아래 키 목록에 해당하는 태스크만 남기고 나머지는 전부 삭제합니다. 콤마로 여러 키 입력 가능.</p>
-          </div>
-        </div>
-        <div className="serviceAddForm">
-          <input
-            value={purgeKeyInput}
-            onChange={(event) => setPurgeKeyInput(event.target.value)}
-            placeholder="예: PMS-2026-001-4"
-            aria-label="유지할 태스크 키"
-          />
-          <button
-            className="primaryButton"
-            type="button"
-            onClick={() => {
-              const keepKeys = purgeKeyInput.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean)
-              const totalTasks = projects.reduce((sum, project) => sum + project.tasks.length, 0)
-              const keepCount = projects.reduce(
-                (sum, project) => sum + project.tasks.filter((task) => task.key && keepKeys.includes(task.key)).length,
-                0,
-              )
-              const purgeCount = totalTasks - keepCount
-              if (purgeCount === 0) {
-                window.alert('삭제 대상 태스크가 없습니다.')
-                return
-              }
-              if (!window.confirm(`전체 ${totalTasks}개 태스크 중 ${purgeCount}개를 삭제합니다. 계속할까요?`)) return
-              onPurgeDemoTasks(keepKeys)
-            }}
-          >
-            정리 실행
-          </button>
         </div>
       </div>
     </section>
