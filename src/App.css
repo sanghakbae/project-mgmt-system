@@ -3297,21 +3297,9 @@ h3 {
 
 .projectCard.selected {
   position: relative;
-  border-color: #d9271e;
-  background: linear-gradient(180deg, #fff7f6 0%, #fff 60%);
-  box-shadow: 0 0 0 2px rgba(217, 39, 30, 0.18), 0 6px 18px rgba(217, 39, 30, 0.08);
-}
-
-.projectCard.selected::before {
-  content: '';
-  position: absolute;
-  left: -1px;
-  top: -1px;
-  bottom: -1px;
-  width: 4px;
-  border-top-left-radius: 8px;
-  border-bottom-left-radius: 8px;
-  background: #d9271e;
+  border-color: #22c55e;
+  background: #fff;
+  box-shadow: 0 0 0 1px #22c55e, 0 0 6px rgba(34, 197, 94, 0.45);
 }
 
 
