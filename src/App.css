@@ -1578,13 +1578,13 @@ h3 {
 
 /* 접기: SRS는 좌측, SDS는 우측으로 */
 .srsSdsRow.srsCollapsed {
-  grid-template-columns: 46px minmax(0, 1fr);
+  grid-template-columns: 44px minmax(0, 1fr);
 }
 .srsSdsRow.sdsCollapsed {
-  grid-template-columns: minmax(0, 1fr) 46px;
+  grid-template-columns: minmax(0, 1fr) 44px;
 }
 .srsSdsRow.srsCollapsed.sdsCollapsed {
-  grid-template-columns: 46px minmax(0, 1fr) 46px;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
 }
 
 .docCardHeader {
@@ -1628,9 +1628,12 @@ h3 {
 }
 
 .docCard.collapsed .docTag {
-  writing-mode: vertical-rl;
+  writing-mode: horizontal-tb;
   text-orientation: mixed;
-  padding: 8px 4px;
+  padding: 6px 4px;
+  font-size: 10px;
+  letter-spacing: 0;
+  white-space: nowrap;
 }
 
 /* SRS 읽기 전용 섹션 뷰 */
@@ -1706,6 +1709,13 @@ h3 {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.docTitle {
+  font-size: 17px;
+  font-weight: 800;
+  color: #14171c;
+  letter-spacing: -0.2px;
 }
 
 .docTag {

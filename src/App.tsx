@@ -1812,7 +1812,7 @@ function App() {
                 <>
                   <div className={`srsSdsRow ${srsCollapsed ? 'srsCollapsed' : ''} ${sdsCollapsed ? 'sdsCollapsed' : ''}`}>
                     <section className={`requirementsPanel docCard srsCard ${srsCollapsed ? 'collapsed' : ''}`}>
-                      <div className="panelHeader compact docCardHeader" role="button" onClick={() => setSrsCollapsed((v) => !v)} title={srsCollapsed ? '펼치기' : '접기'}>
+                      <div className="panelHeader compact docCardHeader" role="button" onClick={() => { const next = !srsCollapsed; setSrsCollapsed(next); if (next) setSdsCollapsed(false) }} title={srsCollapsed ? '펼치기' : '접기'}>
                         <h3><span className="docTag srsTag">SRS</span> <span className="docTitle">요구사항 정의서</span></h3>
                         <span className="docSubtitle">PM 작성 · 항목별 입력 · 첨부 가능</span>
                       </div>
@@ -1854,7 +1854,7 @@ function App() {
                       </div>
                     </section>
                     <section className={`requirementsPanel docCard sdsCard ${sdsCollapsed ? 'collapsed' : ''}`}>
-                      <div className="panelHeader compact docCardHeader" role="button" onClick={() => setSdsCollapsed((v) => !v)} title={sdsCollapsed ? '펼치기' : '접기'}>
+                      <div className="panelHeader compact docCardHeader" role="button" onClick={() => { const next = !sdsCollapsed; setSdsCollapsed(next); if (next) setSrsCollapsed(false) }} title={sdsCollapsed ? '펼치기' : '접기'}>
                         <h3><span className="docTag sdsTag">SDS</span> <span className="docTitle">설계 명세서</span></h3>
                         <span className="docSubtitle">PM 작성 · 설계 검토 · 첨부 가능</span>
                       </div>
@@ -1891,7 +1891,7 @@ function App() {
               ) : (
                 <div className={`srsSdsRow ${srsCollapsed ? 'srsCollapsed' : ''} ${sdsCollapsed ? 'sdsCollapsed' : ''}`}>
                   <section className={`requirementsPanel docCard srsCard ${srsCollapsed ? 'collapsed' : ''}`}>
-                    <div className="panelHeader compact docCardHeader" role="button" onClick={() => setSrsCollapsed((v) => !v)} title={srsCollapsed ? '펼치기' : '접기'}>
+                    <div className="panelHeader compact docCardHeader" role="button" onClick={() => { const next = !srsCollapsed; setSrsCollapsed(next); if (next) setSdsCollapsed(false) }} title={srsCollapsed ? '펼치기' : '접기'}>
                       <h3><span className="docTag srsTag">SRS</span> <span className="docTitle">요구사항 정의서</span></h3>
                     </div>
                     <SrsReadView srs={selected.reviewDocs?.srs ?? ''} />
@@ -1913,7 +1913,7 @@ function App() {
                     )}
                   </section>
                   <section className={`requirementsPanel docCard sdsCard ${sdsCollapsed ? 'collapsed' : ''}`}>
-                    <div className="panelHeader compact docCardHeader" role="button" onClick={() => setSdsCollapsed((v) => !v)} title={sdsCollapsed ? '펼치기' : '접기'}>
+                    <div className="panelHeader compact docCardHeader" role="button" onClick={() => { const next = !sdsCollapsed; setSdsCollapsed(next); if (next) setSrsCollapsed(false) }} title={sdsCollapsed ? '펼치기' : '접기'}>
                       <h3><span className="docTag sdsTag">SDS</span> <span className="docTitle">설계 명세서</span></h3>
                     </div>
                     <RichTextView html={selected.reviewDocs?.sds ?? ''} fallback="아직 등록된 SDS 내용이 없습니다." />
