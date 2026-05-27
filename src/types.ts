@@ -90,6 +90,14 @@ export type ReviewDocs = {
   sdsAttachments?: ReviewDocAttachment[]
 }
 
+// 일정 조율: 팀이 확정하는 실제 일정 (요청자 희망 완료일과 별개)
+export type ScheduleInfo = {
+  plannedStart: string
+  plannedEnd: string
+  milestones: string
+  note: string
+}
+
 export type TaskComment = {
   id: string
   at: string
@@ -128,6 +136,7 @@ export type ActivityLog = {
     approvalState?: ApprovalState
     securityReview?: SecurityReview
     reviewDocs?: ReviewDocs
+    schedule?: ScheduleInfo
     comments?: ProjectComment[]
     qcSignoff?: QcSignoffState
     requesterConfirmed?: boolean
@@ -164,6 +173,7 @@ export type Project = {
   approvalState: ApprovalState
   securityReview: SecurityReview
   reviewDocs?: ReviewDocs
+  schedule?: ScheduleInfo
   tasks: ProjectTask[]
   logs: ActivityLog[]
   comments?: ProjectComment[]

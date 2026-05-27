@@ -26,7 +26,7 @@ import { RichEditor, RichTextView } from './RichEditor'
 import { notifyGoogleChat } from './notify'
 import { roleLabels, workflow } from './data'
 import { hasSupabaseConfig, mapProjectRow, supabase } from './supabase'
-import type { ApprovalState, IssueType, Priority, Project, ProjectRequestType, ProjectStatus, ProjectTask, ReviewDocs, Role, SecurityReview, TaskStatus, WorkflowConfig } from './types'
+import type { ApprovalState, IssueType, Priority, Project, ProjectRequestType, ProjectStatus, ProjectTask, ReviewDocs, Role, ScheduleInfo, SecurityReview, TaskStatus, WorkflowConfig } from './types'
 
 const statusLabels: Record<ProjectStatus, string> = {
   request: '요청',
@@ -518,6 +518,13 @@ const emptyReviewDocs: ReviewDocs = {
   sds: '',
 }
 
+const emptySchedule: ScheduleInfo = {
+  plannedStart: '',
+  plannedEnd: '',
+  milestones: '',
+  note: '',
+}
+
 type SrsSectionKey =
   | 'introduction'
   | 'summary'
@@ -603,6 +610,7 @@ function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('dashboard')
   const [requestForm, setRequestForm] = useState<RequestFormState>(emptyRequestForm)
   const [reviewDocsDrafts, setReviewDocsDrafts] = useState<Record<string, ReviewDocs>>({})
+  const [scheduleDrafts, setScheduleDrafts] = useState<Record<string, ScheduleInfo>>({})
   const [previewAttachment, setPreviewAttachment] = useState<{ name: string; type: string; dataUrl?: string; size: number } | null>(null)
   const [srsCollapsed, setSrsCollapsed] = useState(false)
   const [sdsCollapsed, setSdsCollapsed] = useState(false)
@@ -651,6 +659,7 @@ function App() {
 
   const selected = projects.find((project) => project.id === selectedId)
   const currentReviewDocsDraft = selected ? reviewDocsDrafts[selected.id] ?? selected.reviewDocs ?? emptyReviewDocs : emptyReviewDocs
+  const currentScheduleDraft = selected ? scheduleDrafts[selected.id] ?? selected.schedule ?? emptySchedule : emptySchedule
   const serviceScopedProjects = useMemo(
     () => projects.filter((project) => matchesServiceFilter(project, serviceFilter, serviceOptions)),
     [projects, serviceFilter, serviceOptions],
@@ -911,6 +920,55 @@ function App() {
     void notifyGoogleChat('doc.update', `PM이 기획 문서를 업데이트했습니다.`, {
       프로젝트: selected.title,
       코드: selected.code,
+    })
+
+    if (!supabase) return
+    const { error } = await supabase
+      .from('pms_projects')
+      .update({ logs: nextLogs })
+      .eq('id', selected.id)
+
+    if (error) setLoadState('error')
+  }
+
+  async function updateSelectedSchedule() {
+    if (!selected) return
+
+    const nextLogs = [
+      {
+        id: crypto.randomUUID(),
+        at: logStamp(),
+        actor: roleLabels[role],
+        message: 'PM이 일정 조율 정보를 업데이트했습니다.',
+        meta: { schedule: currentScheduleDraft },
+      },
+      ...selected.logs,
+    ]
+
+    setProjects((current) =>
+      current.map((project) =>
+        project.id === selected.id
+          ? {
+              ...project,
+              schedule: currentScheduleDraft,
+              logs: nextLogs,
+              updatedAt: new Date().toISOString(),
+            }
+          : project,
+      ),
+    )
+    setScheduleDrafts((current) => {
+      const { [selected.id]: _removed, ...rest } = current
+      void _removed
+      return rest
+    })
+    window.alert('일정 조율 정보를 저장했습니다.')
+
+    void notifyGoogleChat('schedule.update', `PM이 일정을 확정했습니다.`, {
+      프로젝트: selected.title,
+      코드: selected.code,
+      착수예정: currentScheduleDraft.plannedStart || '미정',
+      완료예정: currentScheduleDraft.plannedEnd || '미정',
     })
 
     if (!supabase) return
@@ -1888,6 +1946,83 @@ function App() {
               />
             </section>
             )}
+
+            <section className={`requirementsPanel numberedSection sectionSchedule ${['pm', 'admin'].includes(role) && selected.status === 'schedule' ? 'neonHighlight' : ''}`}>
+              <div className="panelHeader compact">
+                <h3>일정 조율</h3>
+                <span>요청자 희망 완료일 {formatDate(selected.dueDate)} 기준으로 팀이 실제 일정을 확정합니다.</span>
+              </div>
+              {['pm', 'admin'].includes(role) ? (
+                <div className="scheduleEditor">
+                  <div className="scheduleDateRow">
+                    <label>
+                      <span>착수 예정일</span>
+                      <input
+                        type="date"
+                        value={currentScheduleDraft.plannedStart}
+                        onChange={(e) => setScheduleDrafts((c) => ({ ...c, [selected.id]: { ...currentScheduleDraft, plannedStart: e.target.value } }))}
+                      />
+                    </label>
+                    <label>
+                      <span>완료 예정일</span>
+                      <input
+                        type="date"
+                        value={currentScheduleDraft.plannedEnd}
+                        onChange={(e) => setScheduleDrafts((c) => ({ ...c, [selected.id]: { ...currentScheduleDraft, plannedEnd: e.target.value } }))}
+                      />
+                    </label>
+                    <span className={`scheduleCompare ${currentScheduleDraft.plannedEnd && currentScheduleDraft.plannedEnd > selected.dueDate ? 'late' : 'onTime'}`}>
+                      {currentScheduleDraft.plannedEnd
+                        ? currentScheduleDraft.plannedEnd > selected.dueDate
+                          ? `희망일보다 ${Math.ceil((new Date(currentScheduleDraft.plannedEnd).getTime() - new Date(selected.dueDate).getTime()) / 86_400_000)}일 지연`
+                          : '희망일 내 완료 예정'
+                        : '완료 예정일 미정'}
+                    </span>
+                  </div>
+                  <div className="scheduleField">
+                    <span>주요 마일스톤</span>
+                    <RichEditor
+                      value={currentScheduleDraft.milestones}
+                      placeholder="예) 설계 완료 6/5 · 개발 완료 6/20 · QC 6/25"
+                      minHeight={80}
+                      onChange={(html) => setScheduleDrafts((c) => ({ ...c, [selected.id]: { ...currentScheduleDraft, milestones: html } }))}
+                    />
+                  </div>
+                  <div className="scheduleField">
+                    <span>일정 협의 메모</span>
+                    <RichEditor
+                      value={currentScheduleDraft.note}
+                      placeholder="일정 조율 과정에서의 합의 사항, 리스크, 의존성 등을 적어주세요."
+                      minHeight={80}
+                      onChange={(html) => setScheduleDrafts((c) => ({ ...c, [selected.id]: { ...currentScheduleDraft, note: html } }))}
+                    />
+                  </div>
+                  <div className="docSaveBar">
+                    <button className="primaryButton" type="button" onClick={() => void updateSelectedSchedule()}>
+                      일정 저장
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="scheduleReadView">
+                  <div className="scheduleDateRow">
+                    <div className="scheduleReadItem"><span>착수 예정일</span><strong>{selected.schedule?.plannedStart || '미정'}</strong></div>
+                    <div className="scheduleReadItem"><span>완료 예정일</span><strong>{selected.schedule?.plannedEnd || '미정'}</strong></div>
+                    <div className="scheduleReadItem"><span>희망 완료일</span><strong>{formatDate(selected.dueDate)}</strong></div>
+                  </div>
+                  <div className="scheduleReadBlock"><span>주요 마일스톤</span><RichTextView html={selected.schedule?.milestones ?? ''} fallback="아직 등록된 마일스톤이 없습니다." /></div>
+                  <div className="scheduleReadBlock"><span>일정 협의 메모</span><RichTextView html={selected.schedule?.note ?? ''} fallback="아직 등록된 협의 메모가 없습니다." /></div>
+                </div>
+              )}
+              <SectionInquiryBox
+                sectionLabel="일정 조율"
+                comments={selected.comments}
+                currentRole={role}
+                onAdd={(message, parentId) => void addProjectComment(message, parentId)}
+                onEdit={(id, msg, prefix) => void editProjectComment(id, msg, prefix)}
+                onDelete={(id) => void deleteProjectComment(id)}
+              />
+            </section>
 
             <section className="requirementsPanel numberedSection sectionTasks">
               <div className="panelHeader compact">

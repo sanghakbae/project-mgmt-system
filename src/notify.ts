@@ -18,6 +18,7 @@ export type NotifyEvent =
   | 'task.comment'
   | 'task.status'
   | 'doc.update'
+  | 'schedule.update'
 
 export async function notifyGoogleChat(event: NotifyEvent, message: string, context?: Record<string, string | number | undefined>) {
   if (!webhookUrl) return

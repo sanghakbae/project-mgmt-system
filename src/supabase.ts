@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import type { Project, ReviewDocs } from './types'
+import type { Project, ReviewDocs, ScheduleInfo } from './types'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
@@ -25,6 +25,13 @@ const defaultSecurityReview: Project['securityReview'] = {
 const defaultReviewDocs: ReviewDocs = {
   srs: '',
   sds: '',
+}
+
+const defaultSchedule: ScheduleInfo = {
+  plannedStart: '',
+  plannedEnd: '',
+  milestones: '',
+  note: '',
 }
 
 const fullApprovalRoles: Project['approvalState']['requiredRoles'] = ['pm', 'cem', 'security', 'infra', 'qa', 'patent', 'admin']
@@ -117,6 +124,8 @@ export function mapProjectRow(row: ProjectRow): Project {
     row.logs?.find((log) => log.meta?.securityReview)?.meta?.securityReview ?? defaultSecurityReview
   const reviewDocs =
     row.logs?.find((log) => log.meta?.reviewDocs)?.meta?.reviewDocs ?? defaultReviewDocs
+  const schedule =
+    row.logs?.find((log) => log.meta?.schedule)?.meta?.schedule ?? defaultSchedule
   // 신규 상태 필드: 가장 최근 로그 meta에서 복원
   const comments = row.logs?.find((log) => log.meta?.comments)?.meta?.comments ?? []
   const qcSignoff = row.logs?.find((log) => log.meta?.qcSignoff)?.meta?.qcSignoff ?? { qa: false, security: false, pm: false }
@@ -181,6 +190,7 @@ export function mapProjectRow(row: ProjectRow): Project {
     approvalState,
     securityReview,
     reviewDocs,
+    schedule,
     tasks: row.tasks ?? [],
     logs: row.logs ?? [],
     comments,

@@ -2684,6 +2684,74 @@ h3 {
   margin-top: 10px;
 }
 
+.scheduleEditor,
+.scheduleReadView {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.scheduleDateRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.scheduleDateRow label,
+.scheduleReadItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scheduleDateRow label span,
+.scheduleReadItem span,
+.scheduleField span,
+.scheduleReadBlock span {
+  font-size: 12px;
+  font-weight: 700;
+  color: #5f6670;
+}
+
+.scheduleDateRow input[type='date'] {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid #d8dbe1;
+  border-radius: 7px;
+  background: #fff;
+  font-size: 13px;
+}
+
+.scheduleReadItem strong {
+  font-size: 14px;
+  color: #20242b;
+}
+
+.scheduleCompare {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.scheduleCompare.onTime {
+  color: #1c7a4d;
+  background: #e9f7ef;
+}
+
+.scheduleCompare.late {
+  color: #c0392b;
+  background: #fdf3f1;
+}
+
+.scheduleField,
+.scheduleReadBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .taskComments {
   grid-column: 2;
   margin-top: 4px;
