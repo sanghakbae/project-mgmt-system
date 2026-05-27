@@ -1947,83 +1947,6 @@ function App() {
             </section>
             )}
 
-            <section className={`requirementsPanel numberedSection sectionSchedule ${['pm', 'developer', 'admin'].includes(role) && selected.status === 'schedule' ? 'neonHighlight' : ''}`}>
-              <div className="panelHeader compact">
-                <h3>일정 조율</h3>
-                <span>요청자 희망 완료일 {formatDate(selected.dueDate)} 기준으로 기획(PM)과 개발이 협의해 실제 일정을 확정합니다.</span>
-              </div>
-              {['pm', 'developer', 'admin'].includes(role) ? (
-                <div className="scheduleEditor">
-                  <div className="scheduleDateRow">
-                    <label>
-                      <span>착수 예정일</span>
-                      <input
-                        type="date"
-                        value={currentScheduleDraft.plannedStart}
-                        onChange={(e) => setScheduleDrafts((c) => ({ ...c, [selected.id]: { ...currentScheduleDraft, plannedStart: e.target.value } }))}
-                      />
-                    </label>
-                    <label>
-                      <span>완료 예정일</span>
-                      <input
-                        type="date"
-                        value={currentScheduleDraft.plannedEnd}
-                        onChange={(e) => setScheduleDrafts((c) => ({ ...c, [selected.id]: { ...currentScheduleDraft, plannedEnd: e.target.value } }))}
-                      />
-                    </label>
-                    <span className={`scheduleCompare ${currentScheduleDraft.plannedEnd && currentScheduleDraft.plannedEnd > selected.dueDate ? 'late' : 'onTime'}`}>
-                      {currentScheduleDraft.plannedEnd
-                        ? currentScheduleDraft.plannedEnd > selected.dueDate
-                          ? `희망일보다 ${Math.ceil((new Date(currentScheduleDraft.plannedEnd).getTime() - new Date(selected.dueDate).getTime()) / 86_400_000)}일 지연`
-                          : '희망일 내 완료 예정'
-                        : '완료 예정일 미정'}
-                    </span>
-                  </div>
-                  <div className="scheduleField">
-                    <span>주요 마일스톤</span>
-                    <RichEditor
-                      value={currentScheduleDraft.milestones}
-                      placeholder="예) 설계 완료 6/5 · 개발 완료 6/20 · QC 6/25"
-                      minHeight={80}
-                      onChange={(html) => setScheduleDrafts((c) => ({ ...c, [selected.id]: { ...currentScheduleDraft, milestones: html } }))}
-                    />
-                  </div>
-                  <div className="scheduleField">
-                    <span>일정 협의 메모</span>
-                    <RichEditor
-                      value={currentScheduleDraft.note}
-                      placeholder="일정 조율 과정에서의 합의 사항, 리스크, 의존성 등을 적어주세요."
-                      minHeight={80}
-                      onChange={(html) => setScheduleDrafts((c) => ({ ...c, [selected.id]: { ...currentScheduleDraft, note: html } }))}
-                    />
-                  </div>
-                  <div className="docSaveBar">
-                    <button className="primaryButton" type="button" onClick={() => void updateSelectedSchedule()}>
-                      일정 저장
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="scheduleReadView">
-                  <div className="scheduleDateRow">
-                    <div className="scheduleReadItem"><span>착수 예정일</span><strong>{selected.schedule?.plannedStart || '미정'}</strong></div>
-                    <div className="scheduleReadItem"><span>완료 예정일</span><strong>{selected.schedule?.plannedEnd || '미정'}</strong></div>
-                    <div className="scheduleReadItem"><span>희망 완료일</span><strong>{formatDate(selected.dueDate)}</strong></div>
-                  </div>
-                  <div className="scheduleReadBlock"><span>주요 마일스톤</span><RichTextView html={selected.schedule?.milestones ?? ''} fallback="아직 등록된 마일스톤이 없습니다." /></div>
-                  <div className="scheduleReadBlock"><span>일정 협의 메모</span><RichTextView html={selected.schedule?.note ?? ''} fallback="아직 등록된 협의 메모가 없습니다." /></div>
-                </div>
-              )}
-              <SectionInquiryBox
-                sectionLabel="일정 조율"
-                comments={selected.comments}
-                currentRole={role}
-                onAdd={(message, parentId) => void addProjectComment(message, parentId)}
-                onEdit={(id, msg, prefix) => void editProjectComment(id, msg, prefix)}
-                onDelete={(id) => void deleteProjectComment(id)}
-              />
-            </section>
-
             <section className="requirementsPanel numberedSection sectionTasks">
               <div className="panelHeader compact">
                 <h3>③ 태스크(일감) 목록</h3>
@@ -2147,6 +2070,83 @@ function App() {
                 </button>
               </div>
             </div>
+
+            <section className={`requirementsPanel numberedSection sectionSchedule ${['pm', 'developer', 'admin'].includes(role) && selected.status === 'schedule' ? 'neonHighlight' : ''}`}>
+              <div className="panelHeader compact">
+                <h3>일정 조율</h3>
+                <span>요청자 희망 완료일 {formatDate(selected.dueDate)} 기준으로 기획(PM)과 개발이 협의해 실제 일정을 확정합니다.</span>
+              </div>
+              {['pm', 'developer', 'admin'].includes(role) ? (
+                <div className="scheduleEditor">
+                  <div className="scheduleDateRow">
+                    <label>
+                      <span>착수 예정일</span>
+                      <input
+                        type="date"
+                        value={currentScheduleDraft.plannedStart}
+                        onChange={(e) => setScheduleDrafts((c) => ({ ...c, [selected.id]: { ...currentScheduleDraft, plannedStart: e.target.value } }))}
+                      />
+                    </label>
+                    <label>
+                      <span>완료 예정일</span>
+                      <input
+                        type="date"
+                        value={currentScheduleDraft.plannedEnd}
+                        onChange={(e) => setScheduleDrafts((c) => ({ ...c, [selected.id]: { ...currentScheduleDraft, plannedEnd: e.target.value } }))}
+                      />
+                    </label>
+                    <span className={`scheduleCompare ${currentScheduleDraft.plannedEnd && currentScheduleDraft.plannedEnd > selected.dueDate ? 'late' : 'onTime'}`}>
+                      {currentScheduleDraft.plannedEnd
+                        ? currentScheduleDraft.plannedEnd > selected.dueDate
+                          ? `희망일보다 ${Math.ceil((new Date(currentScheduleDraft.plannedEnd).getTime() - new Date(selected.dueDate).getTime()) / 86_400_000)}일 지연`
+                          : '희망일 내 완료 예정'
+                        : '완료 예정일 미정'}
+                    </span>
+                  </div>
+                  <div className="scheduleField">
+                    <span>주요 마일스톤</span>
+                    <RichEditor
+                      value={currentScheduleDraft.milestones}
+                      placeholder="예) 설계 완료 6/5 · 개발 완료 6/20 · QC 6/25"
+                      minHeight={80}
+                      onChange={(html) => setScheduleDrafts((c) => ({ ...c, [selected.id]: { ...currentScheduleDraft, milestones: html } }))}
+                    />
+                  </div>
+                  <div className="scheduleField">
+                    <span>일정 협의 메모</span>
+                    <RichEditor
+                      value={currentScheduleDraft.note}
+                      placeholder="일정 조율 과정에서의 합의 사항, 리스크, 의존성 등을 적어주세요."
+                      minHeight={80}
+                      onChange={(html) => setScheduleDrafts((c) => ({ ...c, [selected.id]: { ...currentScheduleDraft, note: html } }))}
+                    />
+                  </div>
+                  <div className="docSaveBar">
+                    <button className="primaryButton" type="button" onClick={() => void updateSelectedSchedule()}>
+                      일정 저장
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="scheduleReadView">
+                  <div className="scheduleDateRow">
+                    <div className="scheduleReadItem"><span>착수 예정일</span><strong>{selected.schedule?.plannedStart || '미정'}</strong></div>
+                    <div className="scheduleReadItem"><span>완료 예정일</span><strong>{selected.schedule?.plannedEnd || '미정'}</strong></div>
+                    <div className="scheduleReadItem"><span>희망 완료일</span><strong>{formatDate(selected.dueDate)}</strong></div>
+                  </div>
+                  <div className="scheduleReadBlock"><span>주요 마일스톤</span><RichTextView html={selected.schedule?.milestones ?? ''} fallback="아직 등록된 마일스톤이 없습니다." /></div>
+                  <div className="scheduleReadBlock"><span>일정 협의 메모</span><RichTextView html={selected.schedule?.note ?? ''} fallback="아직 등록된 협의 메모가 없습니다." /></div>
+                </div>
+              )}
+              <SectionInquiryBox
+                sectionLabel="일정 조율"
+                comments={selected.comments}
+                currentRole={role}
+                onAdd={(message, parentId) => void addProjectComment(message, parentId)}
+                onEdit={(id, msg, prefix) => void editProjectComment(id, msg, prefix)}
+                onDelete={(id) => void deleteProjectComment(id)}
+              />
+            </section>
 
             {blockedTasks.length > 0 && (
               <section className="riskPanel">
