@@ -1705,6 +1705,7 @@ function App() {
               project={selected}
               canEdit={(role === 'requester' || role === 'admin') && ['request', 'planning'].includes(selected.status)}
               onSave={(patch) => void updateRequesterContent(patch)}
+              onInquire={(message) => void addProjectComment(message)}
             />
 
             {!planningRequiredByType[selected.requestType] ? (
@@ -1848,6 +1849,7 @@ function App() {
                   </section>
                 </div>
               )}
+              <SectionInquiryBox sectionLabel="SRS/SDS" comments={selected.comments} onAdd={(message) => void addProjectComment(message)} />
             </section>
             )}
 
@@ -2796,14 +2798,57 @@ function DocAttachmentField({
   )
 }
 
+// 섹션별 문의 입력 박스: 해당 섹션 라벨을 붙여 프로젝트 댓글로 등록
+function SectionInquiryBox({ sectionLabel, comments, onAdd }: { sectionLabel: string; comments?: import('./types').ProjectComment[]; onAdd: (message: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState('')
+  const related = (comments ?? []).filter((c) => c.message.startsWith(`[${sectionLabel}]`))
+  return (
+    <div className="sectionInquiryBox">
+      <button type="button" className="sectionInquiryToggle" onClick={() => setOpen((v) => !v)}>
+        💬 이 내용에 문의 {related.length > 0 ? `(${related.length})` : ''}
+      </button>
+      {open && (
+        <div className="sectionInquiryBody">
+          {related.length > 0 && (
+            <ul className="sectionInquiryList">
+              {related.slice().reverse().map((c) => (
+                <li key={c.id}>
+                  <strong>{c.actor}</strong>
+                  <span>{formatDateTime(c.at)}</span>
+                  <p>{c.message.replace(`[${sectionLabel}] `, '')}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          <form
+            className="inquiryForm"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!draft.trim()) return
+              onAdd(`[${sectionLabel}] ${draft.trim()}`)
+              setDraft('')
+            }}
+          >
+            <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`${sectionLabel}에 대한 문의/의견`} />
+            <button className="primaryButton" type="submit" disabled={!draft.trim()}>등록</button>
+          </form>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function RequesterContentPanel({
   project,
   canEdit,
   onSave,
+  onInquire,
 }: {
   project: Project
   canEdit: boolean
   onSave: (patch: Partial<Project>) => void
+  onInquire?: (message: string) => void
 }) {
   const cfg = requestTypeOptions.find((item) => item.type === project.requestType)
   const [editing, setEditing] = useState(false)
@@ -2876,12 +2921,12 @@ function RequesterContentPanel({
             <label><span>희망 완료일</span><input type="date" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} /></label>
           </div>
           <div className="formGrid">
-            <label><span>{cfg?.summaryLabel ?? '요약'}</span><textarea value={form.summary} onChange={(e) => set('summary', e.target.value)} rows={3} /></label>
-            <label><span>{cfg?.problemLabel ?? '현재 문제'}</span><textarea value={form.currentProblem} onChange={(e) => set('currentProblem', e.target.value)} rows={3} /></label>
-            <label><span>{cfg?.outcomeLabel ?? '원하는 결과'}</span><textarea value={form.desiredOutcome} onChange={(e) => set('desiredOutcome', e.target.value)} rows={3} /></label>
-            <label><span>{cfg?.metricLabel ?? '성공 기준'}</span><textarea value={form.successMetric} onChange={(e) => set('successMetric', e.target.value)} rows={2} /></label>
+            <label><span>{cfg?.summaryLabel ?? '요약'}</span><RichEditor value={form.summary} onChange={(html) => set('summary', html)} minHeight={70} placeholder="무엇을 왜 요청하는지" /></label>
+            <label><span>{cfg?.problemLabel ?? '현재 문제'}</span><RichEditor value={form.currentProblem} onChange={(html) => set('currentProblem', html)} minHeight={70} /></label>
+            <label><span>{cfg?.outcomeLabel ?? '원하는 결과'}</span><RichEditor value={form.desiredOutcome} onChange={(html) => set('desiredOutcome', html)} minHeight={70} /></label>
+            <label><span>{cfg?.metricLabel ?? '성공 기준'}</span><RichEditor value={form.successMetric} onChange={(html) => set('successMetric', html)} minHeight={60} /></label>
             <label><span>{cfg?.audienceLabel ?? '영향 사용자/부서'}</span><input value={form.affectedUsers} onChange={(e) => set('affectedUsers', e.target.value)} /></label>
-            <label><span>리스크/검토 사항</span><textarea value={form.risk} onChange={(e) => set('risk', e.target.value)} rows={2} /></label>
+            <label><span>리스크/검토 사항</span><RichEditor value={form.risk} onChange={(html) => set('risk', html)} minHeight={60} /></label>
           </div>
           <div className="docSaveBar">
             <button className="miniButton" type="button" onClick={() => setEditing(false)}>취소</button>
@@ -2904,6 +2949,7 @@ function RequesterContentPanel({
             <RequirementBlock label={cfg?.audienceLabel ?? '영향 사용자/부서'} value={project.affectedUsers || '(요청자 미입력)'} />
             <RequirementBlock label="리스크/검토 사항" value={project.risk || '(요청자 미입력)'} />
           </div>
+          {onInquire && <SectionInquiryBox sectionLabel="요청내용" comments={project.comments} onAdd={onInquire} />}
         </>
       )}
     </section>

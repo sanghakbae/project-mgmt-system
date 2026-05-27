@@ -2051,6 +2051,61 @@ h3 {
   gap: 8px;
 }
 
+.sectionInquiryBox {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed #e3e5e9;
+}
+
+.sectionInquiryToggle {
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  color: #8a5cf6;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sectionInquiryBody {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.sectionInquiryList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.sectionInquiryList li {
+  padding: 8px 10px;
+  border: 1px solid #e8ebef;
+  border-radius: 6px;
+  background: #faf8ff;
+}
+
+.sectionInquiryList li strong {
+  font-size: 12px;
+  margin-right: 6px;
+}
+
+.sectionInquiryList li span {
+  color: #98a0aa;
+  font-size: 10px;
+}
+
+.sectionInquiryList li p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #2a2f37;
+  white-space: pre-wrap;
+}
+
 .projectManageActions {
   display: flex;
   gap: 6px;
@@ -2218,6 +2273,7 @@ h3 {
 .docSaveBar {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   margin-top: 10px;
 }
 
