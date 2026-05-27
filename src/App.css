@@ -1609,6 +1609,7 @@ h3 {
   padding: 8px 0;
   overflow: hidden;
   display: flex;
+  align-items: center;
   justify-content: center;
 }
 
@@ -1619,6 +1620,7 @@ h3 {
 
 .docCard.collapsed > .docCardHeader {
   width: 100%;
+  margin-bottom: 0;
   justify-content: center;
 }
 
@@ -1711,10 +1713,10 @@ h3 {
   gap: 8px;
 }
 
-.docTitle {
-  font-size: 17px;
-  font-weight: 800;
-  color: #14171c;
+.docCard .panelHeader.compact h3 .docTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #000;
   letter-spacing: -0.2px;
 }
 
