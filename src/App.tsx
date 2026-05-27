@@ -612,6 +612,8 @@ function App() {
   const [requestForm, setRequestForm] = useState<RequestFormState>(emptyRequestForm)
   const [reviewDocsDrafts, setReviewDocsDrafts] = useState<Record<string, ReviewDocs>>({})
   const [previewAttachment, setPreviewAttachment] = useState<{ name: string; type: string; dataUrl?: string; size: number } | null>(null)
+  const [srsCollapsed, setSrsCollapsed] = useState(false)
+  const [sdsCollapsed, setSdsCollapsed] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const requestTypeConfig = requestTypeOptions.find((item) => item.type === requestForm.requestType) ?? requestTypeOptions[0]
 
@@ -1175,7 +1177,7 @@ function App() {
   }
 
   // 목표2: 단계별 문의 댓글 등록
-  async function addProjectCommentForStage(stage: ProjectStatus, message: string) {
+  async function addProjectCommentForStage(stage: ProjectStatus, message: string, parentId?: string) {
     if (!selected) return
     const trimmed = message.trim()
     if (!trimmed) return
@@ -1186,16 +1188,18 @@ function App() {
       role,
       stage,
       message: trimmed,
+      ...(parentId ? { parentId } : {}),
     }
     const nextComments = [...(selected.comments ?? []), comment]
-    await patchSelectedProject({ comments: nextComments }, `[${statusLabels[stage]}] 문의/의견을 남겼습니다.`)
-    void notifyGoogleChat('task.comment', `[${statusLabels[stage]}] 문의: ${selected.title}`, { 작성자: roleLabels[role], 내용: trimmed })
+    const verb = parentId ? '답변을' : '문의/의견을'
+    await patchSelectedProject({ comments: nextComments }, `[${statusLabels[stage]}] ${verb} 남겼습니다.`)
+    void notifyGoogleChat('task.comment', `[${statusLabels[stage]}] ${parentId ? '답변' : '문의'}: ${selected.title}`, { 작성자: roleLabels[role], 내용: trimmed })
   }
 
   // 현재 단계 기준 댓글 (섹션 문의 박스용)
-  async function addProjectComment(message: string) {
+  async function addProjectComment(message: string, parentId?: string) {
     if (!selected) return
-    await addProjectCommentForStage(selected.status, message)
+    await addProjectCommentForStage(selected.status, message, parentId)
   }
 
   async function submitRequest(event: FormEvent<HTMLFormElement>) {
@@ -1711,7 +1715,7 @@ function App() {
               project={selected}
               canEdit={(role === 'requester' || role === 'admin') && ['request', 'planning'].includes(selected.status)}
               onSave={(patch) => void updateRequesterContent(patch)}
-              onInquire={(message) => void addProjectComment(message)}
+              onInquire={(message, parentId) => void addProjectComment(message, parentId)}
             />
 
             {!planningRequiredByType[selected.requestType] ? (
@@ -1729,10 +1733,11 @@ function App() {
               </div>
               {role === 'pm' && !selected.docsLocked ? (
                 <>
-                  <div className="srsSdsRow">
-                    <section className="requirementsPanel docCard srsCard">
-                      <div className="panelHeader compact">
+                  <div className={`srsSdsRow ${srsCollapsed ? 'srsCollapsed' : ''} ${sdsCollapsed ? 'sdsCollapsed' : ''}`}>
+                    <section className={`requirementsPanel docCard srsCard ${srsCollapsed ? 'collapsed' : ''}`}>
+                      <div className="panelHeader compact docCardHeader">
                         <h3><span className="docTag srsTag">SRS</span> 요구사항 정의서</h3>
+                        <button type="button" className="collapseBtn" onClick={() => setSrsCollapsed((v) => !v)} title={srsCollapsed ? '펼치기' : '접기'}>{srsCollapsed ? '▶' : '◀'}</button>
                         <span>PM 작성 · 항목별 입력 · 첨부 가능</span>
                       </div>
                       <div className="requestForm securityReviewEditor">
@@ -1772,9 +1777,10 @@ function App() {
                         />
                       </div>
                     </section>
-                    <section className="requirementsPanel docCard sdsCard">
-                      <div className="panelHeader compact">
+                    <section className={`requirementsPanel docCard sdsCard ${sdsCollapsed ? 'collapsed' : ''}`}>
+                      <div className="panelHeader compact docCardHeader">
                         <h3><span className="docTag sdsTag">SDS</span> 설계 명세서</h3>
+                        <button type="button" className="collapseBtn" onClick={() => setSdsCollapsed((v) => !v)} title={sdsCollapsed ? '펼치기' : '접기'}>{sdsCollapsed ? '◀' : '▶'}</button>
                         <span>PM 작성 · 설계 검토 · 첨부 가능</span>
                       </div>
                       <div className="requestForm securityReviewEditor">
@@ -1808,10 +1814,11 @@ function App() {
                   </div>
                 </>
               ) : (
-                <div className="srsSdsRow">
-                  <section className="requirementsPanel docCard srsCard">
-                    <div className="panelHeader compact">
+                <div className={`srsSdsRow ${srsCollapsed ? 'srsCollapsed' : ''} ${sdsCollapsed ? 'sdsCollapsed' : ''}`}>
+                  <section className={`requirementsPanel docCard srsCard ${srsCollapsed ? 'collapsed' : ''}`}>
+                    <div className="panelHeader compact docCardHeader">
                       <h3><span className="docTag srsTag">SRS</span> 요구사항 정의서</h3>
+                      <button type="button" className="collapseBtn" onClick={() => setSrsCollapsed((v) => !v)} title={srsCollapsed ? '펼치기' : '접기'}>{srsCollapsed ? '▶' : '◀'}</button>
                     </div>
                     <RichTextView html={selected.reviewDocs?.srs ?? ''} fallback="아직 등록된 SRS 내용이 없습니다." />
                     {(selected.reviewDocs?.srsAttachments?.length ?? 0) > 0 && (
@@ -1831,9 +1838,10 @@ function App() {
                       </ul>
                     )}
                   </section>
-                  <section className="requirementsPanel docCard sdsCard">
-                    <div className="panelHeader compact">
+                  <section className={`requirementsPanel docCard sdsCard ${sdsCollapsed ? 'collapsed' : ''}`}>
+                    <div className="panelHeader compact docCardHeader">
                       <h3><span className="docTag sdsTag">SDS</span> 설계 명세서</h3>
+                      <button type="button" className="collapseBtn" onClick={() => setSdsCollapsed((v) => !v)} title={sdsCollapsed ? '펼치기' : '접기'}>{sdsCollapsed ? '◀' : '▶'}</button>
                     </div>
                     <RichTextView html={selected.reviewDocs?.sds ?? ''} fallback="아직 등록된 SDS 내용이 없습니다." />
                     {(selected.reviewDocs?.sdsAttachments?.length ?? 0) > 0 && (
@@ -1855,7 +1863,7 @@ function App() {
                   </section>
                 </div>
               )}
-              <SectionInquiryBox sectionLabel="SRS/SDS" comments={selected.comments} onAdd={(message) => void addProjectComment(message)} />
+              <SectionInquiryBox sectionLabel="SRS/SDS" comments={selected.comments} onAdd={(message, parentId) => void addProjectComment(message, parentId)} />
             </section>
             )}
 
@@ -1882,8 +1890,6 @@ function App() {
               <StageInquiryPanel
                 project={selected}
                 workflow={selectedWorkflow}
-                currentRole={role}
-                onAddComment={(stage, message) => void addProjectCommentForStage(stage, message)}
               />
             </section>
 
@@ -2821,24 +2827,51 @@ function DocAttachmentField({
 }
 
 // 섹션별 문의 입력 박스: 해당 섹션 라벨을 붙여 프로젝트 댓글로 등록
-function SectionInquiryBox({ sectionLabel, comments, onAdd }: { sectionLabel: string; comments?: import('./types').ProjectComment[]; onAdd: (message: string) => void }) {
+function SectionInquiryBox({ sectionLabel, comments, onAdd }: { sectionLabel: string; comments?: import('./types').ProjectComment[]; onAdd: (message: string, parentId?: string) => void }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
-  const related = (comments ?? []).filter((c) => c.message.startsWith(`[${sectionLabel}]`))
+  const [replyTo, setReplyTo] = useState<string | null>(null)
+  const [replyDraft, setReplyDraft] = useState('')
+  const all = (comments ?? []).filter((c) => c.message.startsWith(`[${sectionLabel}]`))
+  const threads = all.filter((c) => !c.parentId)
+  const repliesOf = (id: string) => all.filter((c) => c.parentId === id)
+  const strip = (m: string) => m.replace(`[${sectionLabel}] `, '')
   return (
     <div className="sectionInquiryBox">
       <button type="button" className="sectionInquiryToggle" onClick={() => setOpen((v) => !v)}>
-        💬 문의 사항 {related.length > 0 ? `(${related.length})` : ''}
+        💬 문의 사항 {threads.length > 0 ? `(${threads.length})` : ''}
       </button>
       {open && (
         <div className="sectionInquiryBody">
-          {related.length > 0 && (
+          {threads.length > 0 && (
             <ul className="sectionInquiryList">
-              {related.slice().reverse().map((c) => (
-                <li key={c.id}>
-                  <strong>{c.actor}</strong>
-                  <span>{formatDateTime(c.at)}</span>
-                  <p>{c.message.replace(`[${sectionLabel}] `, '')}</p>
+              {threads.slice().reverse().map((q) => (
+                <li key={q.id}>
+                  <div className="stageCommentMeta"><span className="qaBadge q">문의</span><strong>{q.actor}</strong><span>{formatDateTime(q.at)}</span></div>
+                  <p>{strip(q.message)}</p>
+                  {repliesOf(q.id).map((a) => (
+                    <div key={a.id} className="qaReply">
+                      <div className="stageCommentMeta"><span className="qaBadge a">답변</span><strong>{a.actor}</strong><span>{formatDateTime(a.at)}</span></div>
+                      <p>{strip(a.message)}</p>
+                    </div>
+                  ))}
+                  {replyTo === q.id ? (
+                    <form
+                      className="inquiryForm"
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        if (!replyDraft.trim()) return
+                        onAdd(`[${sectionLabel}] ${replyDraft.trim()}`, q.id)
+                        setReplyDraft('')
+                        setReplyTo(null)
+                      }}
+                    >
+                      <input value={replyDraft} onChange={(e) => setReplyDraft(e.target.value)} placeholder="답변 입력" autoFocus />
+                      <button className="primaryButton" type="submit" disabled={!replyDraft.trim()}>답변</button>
+                    </form>
+                  ) : (
+                    <button type="button" className="qaReplyBtn" onClick={() => { setReplyTo(q.id); setReplyDraft('') }}>답변 달기</button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -2870,7 +2903,7 @@ function RequesterContentPanel({
   project: Project
   canEdit: boolean
   onSave: (patch: Partial<Project>) => void
-  onInquire?: (message: string) => void
+  onInquire?: (message: string, parentId?: string) => void
 }) {
   const cfg = requestTypeOptions.find((item) => item.type === project.requestType)
   const [editing, setEditing] = useState(false)
@@ -2978,73 +3011,64 @@ function RequesterContentPanel({
   )
 }
 
+// ④ 단계별 문의/논의: 문의 + 답변을 표시만 (입력은 각 섹션 문의 박스에서)
 function StageInquiryPanel({
   project,
   workflow: stages,
-  currentRole,
-  onAddComment,
 }: {
   project: Project
   workflow: Array<{ status: ProjectStatus; label: string }>
-  currentRole: Role
-  onAddComment: (stage: ProjectStatus, message: string) => void
 }) {
-  const [drafts, setDrafts] = useState<Record<string, string>>({})
-  const [openStages, setOpenStages] = useState<Record<string, boolean>>({ [project.status]: true })
   const comments = project.comments ?? []
+  const threads = comments.filter((c) => !c.parentId)
+  const repliesOf = (id: string) => comments.filter((c) => c.parentId === id)
+
+  if (comments.length === 0) {
+    return <p className="docAttachmentEmpty">아직 등록된 문의가 없습니다. 각 섹션의 "문의 사항"에서 등록하면 여기에 모입니다.</p>
+  }
 
   return (
     <div className="stageInquiryGroups">
-      {stages.map((stage) => {
-        const stageComments = comments.filter((c) => c.stage === stage.status)
-        const isCurrent = stage.status === project.status
-        const open = openStages[stage.status] ?? false
-        const draft = drafts[stage.status] ?? ''
-        return (
-          <div key={stage.status} className={`stageGroup ${isCurrent ? 'current' : ''}`}>
-            <button type="button" className="stageGroupHeader" onClick={() => setOpenStages((s) => ({ ...s, [stage.status]: !open }))}>
-              <span className={`statusPill ${stage.status}`}>{stage.label}</span>
-              {isCurrent && <span className="stageGroupNow">현재</span>}
-              <span className="stageGroupCount">문의 {stageComments.length}</span>
-              <span className="stageGroupChevron">{open ? '▾' : '▸'}</span>
-            </button>
-            {open && (
-              <div className="stageGroupBody">
-                {stageComments.length > 0 && (
-                  <ul className="stageCommentList">
-                    {stageComments.slice().reverse().map((c) => (
-                      <li key={c.id}>
-                        <div className="stageCommentMeta">
-                          <strong>{c.actor}</strong>
-                          <em>{roleLabels[c.role]}</em>
-                          <span>{formatDateTime(c.at)}</span>
-                        </div>
-                        <p>{c.message}</p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <form
-                  className="inquiryForm"
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    if (!draft.trim()) return
-                    onAddComment(stage.status, draft)
-                    setDrafts((s) => ({ ...s, [stage.status]: '' }))
-                  }}
-                >
-                  <input
-                    value={draft}
-                    onChange={(event) => setDrafts((s) => ({ ...s, [stage.status]: event.target.value }))}
-                    placeholder={`${stage.label} 단계 · ${roleLabels[currentRole]}로 문의/의견 남기기`}
-                  />
-                  <button className="primaryButton" type="submit" disabled={!draft.trim()}>등록</button>
-                </form>
+      {stages
+        .filter((stage) => threads.some((t) => t.stage === stage.status))
+        .map((stage) => {
+          const stageThreads = threads.filter((t) => t.stage === stage.status)
+          return (
+            <div key={stage.status} className="stageGroup">
+              <div className="stageGroupHeader static">
+                <span className={`statusPill ${stage.status}`}>{stage.label}</span>
+                <span className="stageGroupCount">문의 {stageThreads.length}</span>
               </div>
-            )}
-          </div>
-        )
-      })}
+              <div className="stageGroupBody">
+                <ul className="stageCommentList">
+                  {stageThreads.slice().reverse().map((q) => (
+                    <li key={q.id}>
+                      <div className="stageCommentMeta">
+                        <span className="qaBadge q">문의</span>
+                        <strong>{q.actor}</strong>
+                        <em>{roleLabels[q.role]}</em>
+                        <span>{formatDateTime(q.at)}</span>
+                      </div>
+                      <p>{q.message}</p>
+                      {repliesOf(q.id).map((a) => (
+                        <div key={a.id} className="qaReply">
+                          <div className="stageCommentMeta">
+                            <span className="qaBadge a">답변</span>
+                            <strong>{a.actor}</strong>
+                            <em>{roleLabels[a.role]}</em>
+                            <span>{formatDateTime(a.at)}</span>
+                          </div>
+                          <p>{a.message}</p>
+                        </div>
+                      ))}
+                      {repliesOf(q.id).length === 0 && <p className="qaNoReply">답변 대기 중</p>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )
+        })}
     </div>
   )
 }

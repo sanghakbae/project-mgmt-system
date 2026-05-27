@@ -1484,6 +1484,68 @@ h3 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 14px;
+  align-items: start;
+}
+
+/* 접기: SRS는 좌측, SDS는 우측으로 */
+.srsSdsRow.srsCollapsed {
+  grid-template-columns: 46px minmax(0, 1fr);
+}
+.srsSdsRow.sdsCollapsed {
+  grid-template-columns: minmax(0, 1fr) 46px;
+}
+.srsSdsRow.srsCollapsed.sdsCollapsed {
+  grid-template-columns: 46px minmax(0, 1fr) 46px;
+}
+
+.docCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collapseBtn {
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #d8dbe1;
+  border-radius: 5px;
+  background: #fff;
+  color: #555d68;
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.collapseBtn:hover {
+  background: #eef0f3;
+}
+
+.docCard.collapsed {
+  padding: 8px 4px;
+  overflow: hidden;
+}
+
+.docCard.collapsed > .docCardHeader {
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+}
+
+.docCard.collapsed > .docCardHeader h3 {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.docCard.collapsed > .docCardHeader .collapseBtn {
+  margin-left: 0;
+}
+
+/* 접힌 카드는 헤더 외 모든 내용 숨김 */
+.docCard.collapsed > *:not(.docCardHeader) {
+  display: none;
 }
 
 .srsSdsRow > .docCard {
@@ -2103,6 +2165,59 @@ h3 {
   border: 0;
   cursor: pointer;
   text-align: left;
+}
+
+.stageGroupHeader.static {
+  cursor: default;
+}
+
+.qaBadge {
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.qaBadge.q {
+  background: #e5f0fb;
+  color: #1f63aa;
+}
+
+.qaBadge.a {
+  background: #e3f3e8;
+  color: #198247;
+}
+
+.qaReply {
+  margin: 6px 0 0 14px;
+  padding: 8px 10px;
+  border-left: 2px solid #a9d3b8;
+  background: #f5fbf7;
+  border-radius: 0 6px 6px 0;
+}
+
+.qaReply p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.qaNoReply {
+  margin: 4px 0 0 14px;
+  font-size: 11px;
+  color: #98a0aa;
+}
+
+.qaReplyBtn {
+  margin-top: 6px;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #246fbd;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .stageGroupNow {

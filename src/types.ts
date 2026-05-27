@@ -63,6 +63,7 @@ export type ProjectComment = {
   stage: ProjectStatus
   message: string
   resolved?: boolean
+  parentId?: string
 }
 
 export type SecurityReview = {
