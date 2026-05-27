@@ -939,7 +939,7 @@ function App() {
         id: crypto.randomUUID(),
         at: logStamp(),
         actor: roleLabels[role],
-        message: 'PM이 일정 조율 정보를 업데이트했습니다.',
+        message: `${roleLabels[role]}이(가) 일정 조율 정보를 업데이트했습니다.`,
         meta: { schedule: currentScheduleDraft },
       },
       ...selected.logs,
@@ -964,7 +964,7 @@ function App() {
     })
     window.alert('일정 조율 정보를 저장했습니다.')
 
-    void notifyGoogleChat('schedule.update', `PM이 일정을 확정했습니다.`, {
+    void notifyGoogleChat('schedule.update', `${roleLabels[role]}이(가) 일정을 업데이트했습니다.`, {
       프로젝트: selected.title,
       코드: selected.code,
       착수예정: currentScheduleDraft.plannedStart || '미정',
@@ -1947,12 +1947,12 @@ function App() {
             </section>
             )}
 
-            <section className={`requirementsPanel numberedSection sectionSchedule ${['pm', 'admin'].includes(role) && selected.status === 'schedule' ? 'neonHighlight' : ''}`}>
+            <section className={`requirementsPanel numberedSection sectionSchedule ${['pm', 'developer', 'admin'].includes(role) && selected.status === 'schedule' ? 'neonHighlight' : ''}`}>
               <div className="panelHeader compact">
                 <h3>일정 조율</h3>
-                <span>요청자 희망 완료일 {formatDate(selected.dueDate)} 기준으로 팀이 실제 일정을 확정합니다.</span>
+                <span>요청자 희망 완료일 {formatDate(selected.dueDate)} 기준으로 기획(PM)과 개발이 협의해 실제 일정을 확정합니다.</span>
               </div>
-              {['pm', 'admin'].includes(role) ? (
+              {['pm', 'developer', 'admin'].includes(role) ? (
                 <div className="scheduleEditor">
                   <div className="scheduleDateRow">
                     <label>
