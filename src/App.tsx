@@ -1571,22 +1571,16 @@ function App() {
             <p className="eyebrow">2026. 5. 17. 운영 현황</p>
           </div>
           <div className="topbarActions">
-            <label className="roleControl">
-              <span>현재 역할</span>
-              <select value={role} onChange={(event) => {
-                const next = event.target.value as Role
+            <RoleSwitcher
+              role={role}
+              roles={activeRoles}
+              onSelect={(next) => {
                 setRole(next)
                 if (next !== 'admin' && viewMode === 'settings') {
                   setViewMode('dashboard')
                 }
-              }} aria-label="역할 선택">
-                {activeRoles.map((item) => (
-                  <option key={item} value={item}>
-                    {roleLabels[item]}
-                  </option>
-                ))}
-              </select>
-            </label>
+              }}
+            />
             <div className={`connection ${loadState}`}>
               <Database size={16} />
               {loadState === 'live' ? 'Supabase 연결됨' : loadState === 'loading' ? 'DB 불러오는 중' : 'Supabase 연결 필요'}
@@ -2138,6 +2132,42 @@ function AttachmentPreviewModal({
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function RoleSwitcher({ role, roles, onSelect }: { role: Role; roles: Role[]; onSelect: (next: Role) => void }) {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOpen(false)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [open])
+  return (
+    <div className="roleControl roleSwitcher" onClick={(e) => e.stopPropagation()}>
+      <span>현재 역할</span>
+      <button type="button" className="roleSwitcherBtn" onClick={() => setOpen((v) => !v)} aria-haspopup="listbox" aria-expanded={open}>
+        {roleLabels[role]}
+        <span className="roleSwitcherChevron">{open ? '▴' : '▾'}</span>
+      </button>
+      {open && (
+        <div className="roleSwitcherMenu" role="listbox">
+          {roles.map((item) => (
+            <button
+              key={item}
+              type="button"
+              role="option"
+              aria-selected={item === role}
+              className={item === role ? 'active' : ''}
+              onClick={() => { onSelect(item); setOpen(false) }}
+            >
+              {roleLabels[item]}
+              {item === role && <span className="roleCheck">✓</span>}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -2907,39 +2937,34 @@ function CommentItem({
   const canManage = (comment.role === currentRole || currentRole === 'admin') && (onEdit || onDelete)
   return (
     <div className={`commentRow ${kind === 'a' ? 'reply' : ''}`}>
-      <div className="commentRowLeft">
-        <span className={`qaBadge ${kind}`}>{kind === 'q' ? '문의' : '답변'}</span>
-        <strong>{comment.actor}</strong>
-        {comment.actor !== roleLabels[comment.role] && <em>{roleLabels[comment.role]}</em>}
-        <span className="commentRowTime">{formatDateTime(comment.at)}</span>
-      </div>
-      <div className="commentRowRight">
-        {editing ? (
-          <form
-            className="inquiryForm"
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (!draft.trim() || !onEdit) return
-              onEdit(comment.id, draft)
-              setEditing(false)
-            }}
-          >
-            <input value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus />
-            <button className="primaryButton" type="submit" disabled={!draft.trim()}>저장</button>
-            <button className="miniButton" type="button" onClick={() => { setDraft(display); setEditing(false) }}>취소</button>
-          </form>
-        ) : (
-          <>
-            <p>{display}</p>
-            {canManage && (
-              <div className="commentRowActions">
-                {onEdit && <button type="button" onClick={() => { setDraft(display); setEditing(true) }}>수정</button>}
-                {onDelete && <button type="button" className="danger" onClick={() => { if (window.confirm('삭제할까요?')) onDelete(comment.id) }}>삭제</button>}
-              </div>
-            )}
-          </>
-        )}
-      </div>
+      <span className={`qaBadge ${kind}`}>{kind === 'q' ? '문의' : '답변'}</span>
+      <strong className="commentAuthor">{comment.actor}</strong>
+      <span className="commentRowTime">{formatDateTime(comment.at)}</span>
+      {editing ? (
+        <form
+          className="inquiryForm commentEditForm"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (!draft.trim() || !onEdit) return
+            onEdit(comment.id, draft)
+            setEditing(false)
+          }}
+        >
+          <input value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus />
+          <button className="primaryButton" type="submit" disabled={!draft.trim()}>저장</button>
+          <button className="miniButton" type="button" onClick={() => { setDraft(display); setEditing(false) }}>취소</button>
+        </form>
+      ) : (
+        <>
+          <p className="commentBody">{display}</p>
+          {canManage && (
+            <div className="commentRowActions">
+              {onEdit && <button type="button" onClick={() => { setDraft(display); setEditing(true) }}>수정</button>}
+              {onDelete && <button type="button" className="danger" onClick={() => { if (window.confirm('삭제할까요?')) onDelete(comment.id) }}>삭제</button>}
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
