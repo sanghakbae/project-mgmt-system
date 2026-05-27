@@ -1735,10 +1735,9 @@ function App() {
                 <>
                   <div className={`srsSdsRow ${srsCollapsed ? 'srsCollapsed' : ''} ${sdsCollapsed ? 'sdsCollapsed' : ''}`}>
                     <section className={`requirementsPanel docCard srsCard ${srsCollapsed ? 'collapsed' : ''}`}>
-                      <div className="panelHeader compact docCardHeader">
-                        <h3><span className="docTag srsTag">SRS</span> 요구사항 정의서</h3>
-                        <button type="button" className="collapseBtn" onClick={() => setSrsCollapsed((v) => !v)} title={srsCollapsed ? '펼치기' : '접기'}>{srsCollapsed ? '▶' : '◀'}</button>
-                        <span>PM 작성 · 항목별 입력 · 첨부 가능</span>
+                      <div className="panelHeader compact docCardHeader" role="button" onClick={() => setSrsCollapsed((v) => !v)} title={srsCollapsed ? '펼치기' : '접기'}>
+                        <h3><span className="docTag srsTag">SRS</span> <span className="docTitle">요구사항 정의서</span></h3>
+                        <span className="docSubtitle">PM 작성 · 항목별 입력 · 첨부 가능</span>
                       </div>
                       <div className="requestForm securityReviewEditor">
                         <div className="srsSectionGroup">
@@ -1778,10 +1777,9 @@ function App() {
                       </div>
                     </section>
                     <section className={`requirementsPanel docCard sdsCard ${sdsCollapsed ? 'collapsed' : ''}`}>
-                      <div className="panelHeader compact docCardHeader">
-                        <h3><span className="docTag sdsTag">SDS</span> 설계 명세서</h3>
-                        <button type="button" className="collapseBtn" onClick={() => setSdsCollapsed((v) => !v)} title={sdsCollapsed ? '펼치기' : '접기'}>{sdsCollapsed ? '◀' : '▶'}</button>
-                        <span>PM 작성 · 설계 검토 · 첨부 가능</span>
+                      <div className="panelHeader compact docCardHeader" role="button" onClick={() => setSdsCollapsed((v) => !v)} title={sdsCollapsed ? '펼치기' : '접기'}>
+                        <h3><span className="docTag sdsTag">SDS</span> <span className="docTitle">설계 명세서</span></h3>
+                        <span className="docSubtitle">PM 작성 · 설계 검토 · 첨부 가능</span>
                       </div>
                       <div className="requestForm securityReviewEditor">
                         <div className="formGrid">
@@ -1816,11 +1814,10 @@ function App() {
               ) : (
                 <div className={`srsSdsRow ${srsCollapsed ? 'srsCollapsed' : ''} ${sdsCollapsed ? 'sdsCollapsed' : ''}`}>
                   <section className={`requirementsPanel docCard srsCard ${srsCollapsed ? 'collapsed' : ''}`}>
-                    <div className="panelHeader compact docCardHeader">
-                      <h3><span className="docTag srsTag">SRS</span> 요구사항 정의서</h3>
-                      <button type="button" className="collapseBtn" onClick={() => setSrsCollapsed((v) => !v)} title={srsCollapsed ? '펼치기' : '접기'}>{srsCollapsed ? '▶' : '◀'}</button>
+                    <div className="panelHeader compact docCardHeader" role="button" onClick={() => setSrsCollapsed((v) => !v)} title={srsCollapsed ? '펼치기' : '접기'}>
+                      <h3><span className="docTag srsTag">SRS</span> <span className="docTitle">요구사항 정의서</span></h3>
                     </div>
-                    <RichTextView html={selected.reviewDocs?.srs ?? ''} fallback="아직 등록된 SRS 내용이 없습니다." />
+                    <SrsReadView srs={selected.reviewDocs?.srs ?? ''} />
                     {(selected.reviewDocs?.srsAttachments?.length ?? 0) > 0 && (
                       <ul className="docAttachmentList">
                         {selected.reviewDocs?.srsAttachments?.map((file) => (
@@ -1839,9 +1836,8 @@ function App() {
                     )}
                   </section>
                   <section className={`requirementsPanel docCard sdsCard ${sdsCollapsed ? 'collapsed' : ''}`}>
-                    <div className="panelHeader compact docCardHeader">
-                      <h3><span className="docTag sdsTag">SDS</span> 설계 명세서</h3>
-                      <button type="button" className="collapseBtn" onClick={() => setSdsCollapsed((v) => !v)} title={sdsCollapsed ? '펼치기' : '접기'}>{sdsCollapsed ? '◀' : '▶'}</button>
+                    <div className="panelHeader compact docCardHeader" role="button" onClick={() => setSdsCollapsed((v) => !v)} title={sdsCollapsed ? '펼치기' : '접기'}>
+                      <h3><span className="docTag sdsTag">SDS</span> <span className="docTitle">설계 명세서</span></h3>
                     </div>
                     <RichTextView html={selected.reviewDocs?.sds ?? ''} fallback="아직 등록된 SDS 내용이 없습니다." />
                     {(selected.reviewDocs?.sdsAttachments?.length ?? 0) > 0 && (
@@ -2827,6 +2823,24 @@ function DocAttachmentField({
 }
 
 // 섹션별 문의 입력 박스: 해당 섹션 라벨을 붙여 프로젝트 댓글로 등록
+// SRS 읽기 전용: 섹션별 볼드 타이틀 + 본문
+function SrsReadView({ srs }: { srs: string }) {
+  if (!srs.trim()) return <p className="richEditorFallback">아직 등록된 SRS 내용이 없습니다.</p>
+  const map = parseSrsSections(srs)
+  const filled = srsSections.filter((s) => (map[s.key] ?? '').trim().length > 0)
+  if (filled.length === 0) return <RichTextView html={srs} fallback="아직 등록된 SRS 내용이 없습니다." />
+  return (
+    <div className="srsReadView">
+      {filled.map((s) => (
+        <div key={s.key} className="srsReadSection">
+          <h4>{s.ko} <em>({s.en})</em></h4>
+          <RichTextView html={map[s.key]} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function SectionInquiryBox({ sectionLabel, comments, onAdd }: { sectionLabel: string; comments?: import('./types').ProjectComment[]; onAdd: (message: string, parentId?: string) => void }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
