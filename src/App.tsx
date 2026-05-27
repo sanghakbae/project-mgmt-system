@@ -1352,6 +1352,37 @@ function App() {
   }
 
 
+  // 요청자/관리자: 요청 원본 내용 수정 (승인 전 단계만)
+  async function updateRequesterContent(patch: Partial<Project>) {
+    if (!selected) return
+    const nextLogs = [
+      { id: crypto.randomUUID(), at: '방금 전', actor: roleLabels[role], message: '요청자가 요청 내용을 수정했습니다.' },
+      ...selected.logs,
+    ]
+    const merged: Project = { ...selected, ...patch, logs: nextLogs, updatedAt: new Date().toISOString() }
+    setProjects((current) => current.map((project) => (project.id === selected.id ? merged : project)))
+    if (!supabase) return
+    const { error } = await supabase
+      .from('pms_projects')
+      .update({
+        title: merged.title,
+        service_name: merged.serviceName,
+        service_area: merged.serviceArea,
+        owner_team: merged.ownerTeam,
+        requester: merged.requester,
+        due_date: merged.dueDate,
+        summary: merged.summary,
+        current_problem: merged.currentProblem,
+        desired_outcome: merged.desiredOutcome,
+        success_metric: merged.successMetric,
+        affected_users: merged.affectedUsers,
+        risk: merged.risk,
+        logs: nextLogs,
+      })
+      .eq('id', selected.id)
+    if (error) setLoadState('error')
+  }
+
   // 관리자: 프로젝트 삭제
   async function deleteProject(projectId: string) {
     setProjects((current) => current.filter((project) => project.id !== projectId))
@@ -1635,48 +1666,11 @@ function App() {
               })}
             </div>
 
-            <section className="requirementsPanel numberedSection sectionRequester requesterContent">
-              <div className="panelHeader compact">
-                <div>
-                  <p className="eyebrow">{selected.code}</p>
-                  <h3>① 요청자가 요청한 내용</h3>
-                  <span>요청 등록 시 작성된 원본 내용</span>
-                </div>
-                <div className="requesterContentBadges">
-                  <span className="requestTypePill">{requestTypeLabels[selected.requestType]}</span>
-                  <span className={`statusPill ${selected.status}`}>{statusLabels[selected.status]}</span>
-                </div>
-              </div>
-              <div className="requesterSummary">
-                <div className="requesterField">
-                  <span>요청 제목</span>
-                  <strong>{selected.title}</strong>
-                </div>
-                <div className="requesterField">
-                  <span>{requestTypeOptions.find((item) => item.type === selected.requestType)?.summaryLabel ?? '요약'}</span>
-                  <p>{selected.summary?.trim() || <em>(요청자 미입력)</em>}</p>
-                </div>
-                <div className="requesterField">
-                  <span>{requestTypeOptions.find((item) => item.type === selected.requestType)?.serviceLabel ?? '대상 서비스'}</span>
-                  <p>{selected.serviceName} · {selected.serviceArea}</p>
-                </div>
-                <div className="requesterField">
-                  <span>요청자 · 담당 조직</span>
-                  <p>{selected.requester} · {selected.ownerTeam}</p>
-                </div>
-                <div className="requesterField">
-                  <span>희망 완료일</span>
-                  <p>{selected.dueDate || <em>(요청자 미입력)</em>}</p>
-                </div>
-              </div>
-              <div className="requirementGrid">
-                <RequirementBlock label={requestTypeOptions.find((item) => item.type === selected.requestType)?.problemLabel ?? '현재 문제'} value={selected.currentProblem || '(요청자 미입력)'} />
-                <RequirementBlock label={requestTypeOptions.find((item) => item.type === selected.requestType)?.outcomeLabel ?? '원하는 결과'} value={selected.desiredOutcome || '(요청자 미입력)'} />
-                <RequirementBlock label={requestTypeOptions.find((item) => item.type === selected.requestType)?.metricLabel ?? '성공 기준'} value={selected.successMetric || '(요청자 미입력)'} />
-                <RequirementBlock label={requestTypeOptions.find((item) => item.type === selected.requestType)?.audienceLabel ?? '영향 사용자/부서'} value={selected.affectedUsers || '(요청자 미입력)'} />
-                <RequirementBlock label="리스크/검토 사항" value={selected.risk || '(요청자 미입력)'} />
-              </div>
-            </section>
+            <RequesterContentPanel
+              project={selected}
+              canEdit={(role === 'requester' || role === 'admin') && ['request', 'planning'].includes(selected.status)}
+              onSave={(patch) => void updateRequesterContent(patch)}
+            />
 
             <section className="requirementsPanel numberedSection sectionSrsSds">
               <div className="panelHeader compact">
@@ -2750,6 +2744,120 @@ function DocAttachmentField({
         </ul>
       )}
     </div>
+  )
+}
+
+function RequesterContentPanel({
+  project,
+  canEdit,
+  onSave,
+}: {
+  project: Project
+  canEdit: boolean
+  onSave: (patch: Partial<Project>) => void
+}) {
+  const cfg = requestTypeOptions.find((item) => item.type === project.requestType)
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState({
+    title: project.title,
+    summary: project.summary,
+    serviceName: project.serviceName,
+    serviceArea: project.serviceArea,
+    requester: project.requester,
+    ownerTeam: project.ownerTeam,
+    dueDate: project.dueDate,
+    currentProblem: project.currentProblem,
+    desiredOutcome: project.desiredOutcome,
+    successMetric: project.successMetric,
+    affectedUsers: project.affectedUsers,
+    risk: project.risk,
+  })
+
+  function startEdit() {
+    setForm({
+      title: project.title,
+      summary: project.summary,
+      serviceName: project.serviceName,
+      serviceArea: project.serviceArea,
+      requester: project.requester,
+      ownerTeam: project.ownerTeam,
+      dueDate: project.dueDate,
+      currentProblem: project.currentProblem,
+      desiredOutcome: project.desiredOutcome,
+      successMetric: project.successMetric,
+      affectedUsers: project.affectedUsers,
+      risk: project.risk,
+    })
+    setEditing(true)
+  }
+
+  function save() {
+    if (!form.title.trim()) { window.alert('요청 제목은 필수입니다.'); return }
+    onSave(form)
+    setEditing(false)
+  }
+
+  const set = <K extends keyof typeof form>(k: K, v: string) => setForm((s) => ({ ...s, [k]: v }))
+
+  return (
+    <section className="requirementsPanel numberedSection sectionRequester requesterContent">
+      <div className="panelHeader compact">
+        <div>
+          <p className="eyebrow">{project.code}</p>
+          <h3>① 요청자가 요청한 내용</h3>
+          <span>{editing ? '수정 중 · 저장하면 반영됩니다' : '요청 등록 시 작성된 원본 내용'}</span>
+        </div>
+        <div className="requesterContentBadges">
+          <span className="requestTypePill">{requestTypeLabels[project.requestType]}</span>
+          <span className={`statusPill ${project.status}`}>{statusLabels[project.status]}</span>
+          {canEdit && !editing && (
+            <button className="miniButton" type="button" onClick={startEdit}>수정</button>
+          )}
+        </div>
+      </div>
+
+      {editing ? (
+        <div className="requestForm">
+          <div className="formGrid two">
+            <label><span>요청 제목</span><input value={form.title} onChange={(e) => set('title', e.target.value)} /></label>
+            <label><span>{cfg?.serviceLabel ?? '대상 서비스'}</span><input value={form.serviceName} onChange={(e) => set('serviceName', e.target.value)} /></label>
+            <label><span>{cfg?.areaLabel ?? '영역'}</span><input value={form.serviceArea} onChange={(e) => set('serviceArea', e.target.value)} /></label>
+            <label><span>요청 부서</span><input value={form.ownerTeam} onChange={(e) => set('ownerTeam', e.target.value)} /></label>
+            <label><span>요청자</span><input value={form.requester} onChange={(e) => set('requester', e.target.value)} /></label>
+            <label><span>희망 완료일</span><input type="date" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} /></label>
+          </div>
+          <div className="formGrid">
+            <label><span>{cfg?.summaryLabel ?? '요약'}</span><textarea value={form.summary} onChange={(e) => set('summary', e.target.value)} rows={3} /></label>
+            <label><span>{cfg?.problemLabel ?? '현재 문제'}</span><textarea value={form.currentProblem} onChange={(e) => set('currentProblem', e.target.value)} rows={3} /></label>
+            <label><span>{cfg?.outcomeLabel ?? '원하는 결과'}</span><textarea value={form.desiredOutcome} onChange={(e) => set('desiredOutcome', e.target.value)} rows={3} /></label>
+            <label><span>{cfg?.metricLabel ?? '성공 기준'}</span><textarea value={form.successMetric} onChange={(e) => set('successMetric', e.target.value)} rows={2} /></label>
+            <label><span>{cfg?.audienceLabel ?? '영향 사용자/부서'}</span><input value={form.affectedUsers} onChange={(e) => set('affectedUsers', e.target.value)} /></label>
+            <label><span>리스크/검토 사항</span><textarea value={form.risk} onChange={(e) => set('risk', e.target.value)} rows={2} /></label>
+          </div>
+          <div className="docSaveBar">
+            <button className="miniButton" type="button" onClick={() => setEditing(false)}>취소</button>
+            <button className="primaryButton" type="button" onClick={save}>저장</button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="requesterSummary">
+            <div className="requesterField"><span>요청 제목</span><strong>{project.title}</strong></div>
+            <div className="requesterField"><span>{cfg?.summaryLabel ?? '요약'}</span><p>{project.summary?.trim() || <em>(요청자 미입력)</em>}</p></div>
+            <div className="requesterField"><span>{cfg?.serviceLabel ?? '대상 서비스'}</span><p>{project.serviceName} · {project.serviceArea}</p></div>
+            <div className="requesterField"><span>요청자 · 담당 조직</span><p>{project.requester} · {project.ownerTeam}</p></div>
+            <div className="requesterField"><span>희망 완료일</span><p>{project.dueDate || <em>(요청자 미입력)</em>}</p></div>
+          </div>
+          <div className="requirementGrid">
+            <RequirementBlock label={cfg?.problemLabel ?? '현재 문제'} value={project.currentProblem || '(요청자 미입력)'} />
+            <RequirementBlock label={cfg?.outcomeLabel ?? '원하는 결과'} value={project.desiredOutcome || '(요청자 미입력)'} />
+            <RequirementBlock label={cfg?.metricLabel ?? '성공 기준'} value={project.successMetric || '(요청자 미입력)'} />
+            <RequirementBlock label={cfg?.audienceLabel ?? '영향 사용자/부서'} value={project.affectedUsers || '(요청자 미입력)'} />
+            <RequirementBlock label="리스크/검토 사항" value={project.risk || '(요청자 미입력)'} />
+          </div>
+        </>
+      )}
+    </section>
   )
 }
 
