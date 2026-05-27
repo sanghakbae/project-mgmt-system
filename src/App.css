@@ -1339,18 +1339,16 @@ h3 {
 .projectList {
   width: 100%;
   min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   max-height: none;
   overflow: visible;
   padding: 0 0 4px;
-  scroll-snap-type: x proximity;
 }
 
 .projectCard {
-  min-height: 142px;
-  scroll-snap-align: start;
+  min-height: 0;
 }
 
 .sidebarCollapsed .workArea {
@@ -3265,10 +3263,11 @@ h3 {
 
 .projectCard {
   width: 100%;
-  padding: 12px 14px;
+  padding: 9px 14px;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
   border: 1px solid #dfe2e7;
   background: #fff;
   border-radius: 8px;
@@ -3317,12 +3316,15 @@ h3 {
 
 
 .projectCard strong {
-  display: block;
-  margin: 10px 0 6px;
-  font-size: 15px;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.projectCard p,
 .detailHero p,
 .riskPanel p,
 .logList p {
@@ -3333,11 +3335,17 @@ h3 {
 }
 
 .cardMeta {
-  flex-wrap: wrap;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 0;
   color: #7b818b;
   font-size: 12px;
+}
+
+.projectCard .statusPill {
+  flex-shrink: 0;
 }
 
 .priority {

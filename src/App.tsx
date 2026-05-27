@@ -1748,17 +1748,14 @@ function App() {
                   type="button"
                   onClick={() => setSelectedId(project.id)}
                 >
-                  <div className="cardTopPills">
-                    <span className={`statusPill ${project.status}`}>{statusLabels[project.status]}</span>
-                    <span className="requestTypePill">{requestTypeLabels[project.requestType]}</span>
-                  </div>
+                  <span className={`statusPill ${project.status}`}>{statusLabels[project.status]}</span>
                   <strong>{project.title}</strong>
-                  <p>{project.summary}</p>
-                  <div className="cardMeta">
+                  <span className="cardMeta">
+                    <span className="requestTypePill">{requestTypeLabels[project.requestType]}</span>
                     <span className={`priority ${project.priority}`}>{priorityLabels[project.priority]}</span>
                     <span>{project.ownerTeam}</span>
                     <span>D-{Math.max(0, daysUntil(project.dueDate, demoToday))}</span>
-                  </div>
+                  </span>
                 </button>
               ))}
             </div>
