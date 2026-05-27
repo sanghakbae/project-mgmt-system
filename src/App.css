@@ -4184,6 +4184,11 @@ h3 {
   border-radius: 0 6px 6px 0;
 }
 
+.replyIcon {
+  flex-shrink: 0;
+  color: #198247;
+}
+
 .commentRow .qaBadge {
   flex-shrink: 0;
 }

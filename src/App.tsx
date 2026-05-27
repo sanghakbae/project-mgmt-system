@@ -6,6 +6,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  CornerDownRight,
   ClipboardList,
   Database,
   FileText,
@@ -2937,6 +2938,7 @@ function CommentItem({
   const canManage = (comment.role === currentRole || currentRole === 'admin') && (onEdit || onDelete)
   return (
     <div className={`commentRow ${kind === 'a' ? 'reply' : ''}`}>
+      {kind === 'a' && <CornerDownRight size={14} className="replyIcon" />}
       <span className={`qaBadge ${kind}`}>{kind === 'q' ? '문의' : '답변'}</span>
       <strong className="commentAuthor">{comment.actor}</strong>
       <span className="commentRowTime">{formatDateTime(comment.at)}</span>
