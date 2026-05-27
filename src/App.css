@@ -1282,6 +1282,24 @@ h3 {
   background: #20242b;
 }
 
+.filterChips button.dangerChip {
+  margin-left: auto;
+  color: #c0392b;
+  border-color: #e0b4ae;
+  background: #fdf3f1;
+}
+
+.filterChips button.dangerChip:hover:not(:disabled) {
+  color: #fff;
+  border-color: #c0392b;
+  background: #c0392b;
+}
+
+.filterChips button.dangerChip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .workflowFilters {
   display: grid;
   grid-template-columns: repeat(10, minmax(0, 1fr));

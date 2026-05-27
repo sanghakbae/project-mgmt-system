@@ -64,16 +64,6 @@ const approvalStepLabels: Record<Role, string> = {
   admin: '최종',
 }
 
-const approvalButtonLabels: Partial<Record<Role, string>> = {
-  pm: '확인',
-  cem: '승인',
-  security: '승인',
-  infra: '승인',
-  qa: '승인',
-  patent: '승인',
-  admin: '승인',
-}
-
 const priorityLabels: Record<Priority, string> = {
   low: '낮음',
   normal: '보통',
@@ -1457,6 +1447,16 @@ function App() {
     if (error) setLoadState('error')
   }
 
+  async function deleteAllProjects() {
+    const ids = projects.map((project) => project.id)
+    if (ids.length === 0) return
+    setProjects([])
+    setSelectedId('')
+    if (!supabase) return
+    const { error } = await supabase.from('pms_projects').delete().in('id', ids)
+    if (error) setLoadState('error')
+  }
+
   async function addTaskComment(taskId: string, message: string) {
     if (!selected) return
     const trimmed = message.trim()
@@ -1620,6 +1620,7 @@ function App() {
             projects={projects}
             onToggleHold={toggleHoldProject}
             onDeleteProject={deleteProject}
+            onDeleteAllProjects={deleteAllProjects}
           />
         ) : viewMode === 'dashboard' ? (
           <DashboardOverview
@@ -1932,26 +1933,10 @@ function App() {
                 <strong>{canAct ? selected.nextAction : `${roleLabels[role]} 역할은 현재 단계에서 대기 상태입니다.`}</strong>
                 <span>담당: {selected.status === 'qc_security' ? 'QC · 보안 · PM' : roleLabels[selected.assigneeRole]} · 마감 {formatDate(selected.dueDate)}</span>
                 {selected.status === 'dept_review' && (
-                  <div className="approvalMatrix">
-                    {fullApprovalRoles.map((item) => {
-                      const required = selectedApprovalState.requiredRoles.includes(item)
-                      const approved = selectedApprovalState.approvedRoles.includes(item)
-                      return (
-                        <div key={item} className="approvalCell">
-                          <span>{approvalStepLabels[item]}</span>
-                          <strong className={approved ? 'done' : 'pending'}>
-                            {approved ? '완료' : required ? approvalButtonLabels[item] ?? '승인' : '-'}
-                          </strong>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-                {selected.status === 'dept_review' && (
                   <span className="approvalGuide">
                     {pendingApprovalRoles.length === 0
-                      ? '요청자와 PM이 등록한 기준 정보 검토가 모두 끝났습니다.'
-                      : `남은 승인 역할: ${pendingApprovalRoles.map((item) => approvalStepLabels[item]).join(', ')} · 요청자와 PM이 등록한 내용을 검토한 뒤 승인합니다.`}
+                      ? '모든 역할이 확인을 완료했습니다. 다음 단계로 자동 진행됩니다.'
+                      : `확인 대기: ${pendingApprovalRoles.map((item) => approvalStepLabels[item]).join(', ')} · 각 역할 담당자가 확인을 누르면 자동으로 다음 단계로 진행됩니다.`}
                   </span>
                 )}
                 {selected.status === 'qc_security' && (
@@ -1978,7 +1963,7 @@ function App() {
               <div className="actionButtons">
                 {canApproveCurrentRole && (
                   <button className="miniButton approveButton" type="button" onClick={() => void approveCurrentRole()}>
-                    {approvalStepLabels[role]} {approvalButtonLabels[role] ?? '승인'}
+                    {approvalStepLabels[role]} 확인
                   </button>
                 )}
                 {canQcSignoff && (
@@ -1991,15 +1976,17 @@ function App() {
                     요청자 확인 {selected.requesterConfirmed ? '취소' : '완료'}
                   </button>
                 )}
-                <button
-                  className="primaryButton"
-                  type="button"
-                  onClick={() => void advanceSelectedProject()}
-                  disabled={!canAct || selected.status === 'published' || selected.status === 'rejected' || selected.onHold || isStepAdvanceBlocked}
-                >
-                  <Send size={16} />
-                  단계 진행
-                </button>
+                {selected.status !== 'dept_review' && (
+                  <button
+                    className="primaryButton"
+                    type="button"
+                    onClick={() => void advanceSelectedProject()}
+                    disabled={!canAct || selected.status === 'published' || selected.status === 'rejected' || selected.onHold || isStepAdvanceBlocked}
+                  >
+                    <Send size={16} />
+                    단계 진행
+                  </button>
+                )}
                 {['pm', 'admin'].includes(role) && selected.status === 'request' && (
                   <button className="miniButton" type="button" onClick={() => void togglePlanningRequired()}>
                     {isPlanningRequired(selected) ? '기획 생략' : '기획 포함'}
@@ -2044,9 +2031,9 @@ function App() {
                 </div>
                 <div className="artifactList">
                   <Artifact label="요청 승인 기록" state="승인됨" />
-                  <Artifact label="SRS" state={currentStep >= 2 ? '승인됨' : '대기'} />
-                  <Artifact label="SDS" state={currentStep >= 3 ? '작성 중' : '대기'} />
-                  <Artifact label="완료 보고서" state={currentStep >= 8 ? '게시 준비' : '대기'} />
+                  <Artifact label="SRS" state={(selected.reviewDocs?.srs ?? '').trim().length > 0 ? '완료' : '대기'} />
+                  <Artifact label="SDS" state={(selected.reviewDocs?.sds ?? '').trim().length > 0 ? '완료' : '대기'} />
+                  <Artifact label="완료 보고서" state={['completion', 'published'].includes(selected.status) ? '게시 준비' : '대기'} />
                 </div>
               </section>
 
@@ -3242,12 +3229,14 @@ function SettingsPanel({
   projects,
   onToggleHold,
   onDeleteProject,
+  onDeleteAllProjects,
 }: {
   serviceOptions: string[]
   setServiceOptions: (nextOptions: string[]) => void
   projects: Project[]
   onToggleHold: (projectId: string) => void
   onDeleteProject: (projectId: string) => void
+  onDeleteAllProjects: () => void
 }) {
   const [draft, setDraft] = useState('')
   const [holdFilter, setHoldFilter] = useState<'all' | 'onHold' | 'active'>('all')
@@ -3326,6 +3315,18 @@ function SettingsPanel({
                 {item.label}
               </button>
             ))}
+            <button
+              type="button"
+              className="dangerChip"
+              disabled={projects.length === 0}
+              onClick={() => {
+                if (window.confirm(`전체 프로젝트 ${projects.length}개를 모두 삭제합니다. 되돌릴 수 없습니다. 계속할까요?`)) {
+                  onDeleteAllProjects()
+                }
+              }}
+            >
+              전체 삭제
+            </button>
           </div>
         </div>
 
