@@ -1870,6 +1870,174 @@ h3 {
   font-size: 12px;
 }
 
+.rejectButton {
+  color: #a31f1a;
+  border-color: #e8b4b0;
+}
+
+.rejectButton:hover {
+  background: #fdeceb;
+}
+
+.qcSignoffRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.qcSignoffChip {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.qcSignoffChip.done {
+  background: #e3f3e8;
+  color: #198247;
+}
+
+.qcSignoffChip.pending {
+  background: #f0f2f6;
+  color: #7b818b;
+}
+
+.sectionInquiry {
+  border-left-color: #8a5cf6 !important;
+}
+
+.stageInquiry {
+  display: grid;
+  gap: 12px;
+}
+
+.inquiryFilterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.inquiryFilterRow button {
+  padding: 4px 10px;
+  border: 1px solid #d8dbe1;
+  border-radius: 999px;
+  background: #fff;
+  color: #555d68;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.inquiryFilterRow button.active {
+  background: #20242b;
+  color: #fff;
+  border-color: #20242b;
+}
+
+.inquiryList {
+  display: grid;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.inquiryItem {
+  padding: 10px 12px;
+  border: 1px solid #e8ebef;
+  border-radius: 8px;
+  background: #fafbfc;
+}
+
+.inquiryMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.inquiryMeta strong {
+  font-size: 12px;
+}
+
+.inquiryMeta em {
+  font-style: normal;
+  font-size: 11px;
+  color: #7b818b;
+}
+
+.inquiryTime {
+  margin-left: auto;
+  color: #98a0aa;
+  font-size: 10px;
+}
+
+.inquiryItem p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #2a2f37;
+  white-space: pre-wrap;
+}
+
+.inquiryForm {
+  display: flex;
+  gap: 6px;
+}
+
+.inquiryForm input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #d8dbe1;
+  border-radius: 7px;
+  font-size: 13px;
+  background: #fff;
+}
+
+.taskHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inlineTaskForm {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 1px dashed #c9ced6;
+  border-radius: 8px;
+  background: #fafbfc;
+}
+
+.inlineTaskGrid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.2fr 1fr 1.2fr;
+  gap: 8px;
+}
+
+.inlineTaskForm input,
+.inlineTaskForm select {
+  padding: 7px 10px;
+  border: 1px solid #d8dbe1;
+  border-radius: 6px;
+  font-size: 12px;
+  background: #fff;
+  min-width: 0;
+}
+
+.inlineTaskActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 768px) {
+  .inlineTaskGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 .attachmentLink {
   background: none;
   border: 0;

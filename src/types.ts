@@ -46,6 +46,24 @@ export type ApprovalState = {
   approvedRoles: Role[]
 }
 
+// QC/보안/PM 단계의 역할별 검토 완료 상태 (3자 합의 게이트)
+export type QcSignoffState = {
+  qa: boolean
+  security: boolean
+  pm: boolean
+}
+
+// 단계별 문의/논의 댓글
+export type ProjectComment = {
+  id: string
+  at: string
+  actor: string
+  role: Role
+  stage: ProjectStatus
+  message: string
+  resolved?: boolean
+}
+
 export type SecurityReview = {
   dataClassification: string
   accessScope: string
@@ -108,6 +126,12 @@ export type ActivityLog = {
     approvalState?: ApprovalState
     securityReview?: SecurityReview
     reviewDocs?: ReviewDocs
+    comments?: ProjectComment[]
+    qcSignoff?: QcSignoffState
+    requesterConfirmed?: boolean
+    docsLocked?: boolean
+    rejectedReason?: string
+    rejectedFromStatus?: ProjectStatus
   }
 }
 
@@ -140,6 +164,12 @@ export type Project = {
   reviewDocs?: ReviewDocs
   tasks: ProjectTask[]
   logs: ActivityLog[]
+  comments?: ProjectComment[]
+  qcSignoff?: QcSignoffState
+  docsLocked?: boolean
+  requesterConfirmed?: boolean
   onHold?: boolean
   holdReason?: string
+  rejectedReason?: string
+  rejectedFromStatus?: ProjectStatus
 }

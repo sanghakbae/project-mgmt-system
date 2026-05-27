@@ -25,7 +25,7 @@ import { RichEditor, RichTextView } from './RichEditor'
 import { notifyGoogleChat } from './notify'
 import { roleLabels, workflow } from './data'
 import { hasSupabaseConfig, mapProjectRow, supabase } from './supabase'
-import type { ApprovalState, IssueType, Priority, Project, ProjectRequestType, ProjectStatus, ProjectTask, ReviewDocs, Role, SecurityReview, TaskAttachment, TaskStatus, WorkflowConfig } from './types'
+import type { ApprovalState, IssueType, Priority, Project, ProjectRequestType, ProjectStatus, ProjectTask, ReviewDocs, Role, SecurityReview, TaskStatus, WorkflowConfig } from './types'
 
 const statusLabels: Record<ProjectStatus, string> = {
   request: '요청',
@@ -401,7 +401,7 @@ const approvalRolesByRequestType: Record<ProjectRequestType, Role[]> = {
 const activeRoles: Role[] = ['requester', 'pm', 'cem', 'developer', 'security', 'infra', 'qa', 'patent', 'admin']
 const demoToday = new Date('2026-05-17T09:00:00+09:00')
 
-type ViewMode = 'dashboard' | 'request' | 'pipeline' | 'settings' | 'task_create'
+type ViewMode = 'dashboard' | 'request' | 'pipeline' | 'settings'
 type StatusFilter = ProjectStatus | 'all' | 'active' | 'dueSoon' | 'mine' | 'risk' | 'blocked'
 
 type RequestFormState = {
@@ -759,27 +759,44 @@ function App() {
     ),
   )
   const blockedTasks = selected?.tasks.filter((task) => task.status === 'blocked') ?? []
+  const openTasks = selected?.tasks.filter((task) => task.status !== 'done') ?? []
   const hasSrsDraft = currentReviewDocsDraft.srs.trim().length > 0
   const hasSdsDraft = currentReviewDocsDraft.sds.trim().length > 0
   const hasRequiredReviewDocs = hasSrsDraft && hasSdsDraft
   const pendingApprovalRoles = selectedApprovalState.requiredRoles.filter((item) => !selectedApprovalState.approvedRoles.includes(item))
+  // QC/보안/PM 3자 합의 게이트
+  const qcSignoff = selected?.qcSignoff ?? { qa: false, security: false, pm: false }
+  const qcAllSignedOff = qcSignoff.qa && qcSignoff.security && qcSignoff.pm
+  const qcPendingRoles = (['qa', 'security', 'pm'] as const).filter((r) => !qcSignoff[r])
   const isStepAdvanceBlocked = Boolean(
+    selected?.onHold ||
     (selected?.status === 'dept_review' && pendingApprovalRoles.length > 0) ||
-    (selected?.status === 'planning' && !hasRequiredReviewDocs),
+    (selected?.status === 'planning' && !hasRequiredReviewDocs) ||
+    (selected?.status === 'qc_security' && !qcAllSignedOff) ||
+    (selected?.status === 'completion' && !selected?.requesterConfirmed),
   )
   const canApproveCurrentRole = Boolean(
     selected?.status === 'dept_review' &&
     selectedApprovalState.requiredRoles.includes(role) &&
     !selectedApprovalState.approvedRoles.includes(role),
   )
+  // QC 사인오프 가능한 역할인지 (admin은 모든 역할 대행 가능)
+  const myQcSignoffRole: ('qa' | 'security' | 'pm') | null =
+    role === 'qa' ? 'qa' : role === 'security' ? 'security' : role === 'pm' ? 'pm' : null
+  const canQcSignoff = Boolean(
+    selected?.status === 'qc_security' && (myQcSignoffRole || role === 'admin'),
+  )
 
   async function updateApprovalState(approvalState: ApprovalState, message: string) {
     if (!selected) return
 
     const allApproved = approvalState.requiredRoles.every((item) => approvalState.approvedRoles.includes(item))
-    const shouldAdvance = allApproved && selected.status === 'dept_review'
+    const shouldAdvance = allApproved && selected.status === 'dept_review' && !selected.onHold
+    // 워크플로우 배열 순서 기반으로 다음 단계 계산 (하드코딩 제거)
+    const deptIndex = selectedWorkflow.findIndex((item) => item.status === 'dept_review')
+    const nextStatusAfterApproval = selectedWorkflow[deptIndex + 1]?.status ?? selected.status
 
-    const advancedStatus: ProjectStatus = shouldAdvance ? 'schedule' : selected.status
+    const advancedStatus: ProjectStatus = shouldAdvance ? nextStatusAfterApproval : selected.status
     const advancedAssigneeRole = shouldAdvance ? nextRoleFor(advancedStatus) : selected.assigneeRole
     const advancedProgress = shouldAdvance ? Math.min(100, selected.progress + 12) : selected.progress
     const nextAction = shouldAdvance
@@ -793,7 +810,8 @@ function App() {
       at: '방금 전',
       actor: roleLabels[role],
       message,
-      meta: { approvalState },
+      // 승인 완료로 진행되면 문서 잠금 스냅샷 포함 (#12)
+      meta: { approvalState, ...(shouldAdvance ? { docsLocked: true } : {}) },
     }
     const advanceLogEntry = shouldAdvance
       ? {
@@ -818,6 +836,7 @@ function App() {
               assigneeRole: advancedAssigneeRole,
               progress: advancedProgress,
               nextAction,
+              docsLocked: shouldAdvance ? true : project.docsLocked,
               logs: nextLogs,
               updatedAt: new Date().toISOString(),
             }
@@ -962,8 +981,15 @@ function App() {
 
   async function advanceSelectedProject() {
     if (!selected || !canAct) return
+    if (selected.onHold) { window.alert('보류 중인 프로젝트입니다. 보류를 해제한 뒤 진행하세요.'); return }
     if (selected.status === 'dept_review' && pendingApprovalRoles.length > 0) return
     if (selected.status === 'planning' && !hasRequiredReviewDocs) return
+    if (selected.status === 'qc_security' && !qcAllSignedOff) { window.alert('QC·보안·PM 3자 검토가 모두 완료되어야 다음 단계로 진행할 수 있습니다.'); return }
+    if (selected.status === 'completion' && !selected.requesterConfirmed) { window.alert('요청자 확인이 완료되어야 게시할 수 있습니다.'); return }
+    // 개발 단계: 미완료 태스크가 있으면 확인
+    if (selected.status === 'development' && openTasks.length > 0) {
+      if (!window.confirm(`완료되지 않은 태스크가 ${openTasks.length}건 있습니다. 그래도 다음 단계로 진행할까요?`)) return
+    }
 
     const nextIndex = currentStep + 1
     const nextItem = selectedWorkflow[nextIndex]
@@ -1020,6 +1046,127 @@ function App() {
       다음담당: roleLabels[nextAssigneeRole],
       진행률: `${nextProgress}%`,
     })
+  }
+
+  // 공통: 선택 프로젝트 patch + 로그(상태 스냅샷 포함) + DB 동기화
+  async function patchSelectedProject(patch: Partial<Project>, logMessage: string) {
+    if (!selected) return
+    const merged: Project = { ...selected, ...patch, updatedAt: new Date().toISOString() }
+    // 컬럼이 없는 신규 필드는 로그 meta 스냅샷으로 보존
+    const stateMeta = {
+      approvalState: merged.approvalState,
+      qcSignoff: merged.qcSignoff,
+      requesterConfirmed: merged.requesterConfirmed,
+      docsLocked: merged.docsLocked,
+      rejectedReason: merged.rejectedReason,
+      rejectedFromStatus: merged.rejectedFromStatus,
+      comments: merged.comments,
+    }
+    const nextLogs = [
+      { id: crypto.randomUUID(), at: '방금 전', actor: roleLabels[role], message: logMessage, meta: stateMeta },
+      ...selected.logs,
+    ]
+    merged.logs = nextLogs
+    setProjects((current) => current.map((project) => (project.id === selected.id ? merged : project)))
+    if (!supabase) return
+    const dbPatch: Record<string, unknown> = { logs: nextLogs }
+    if (patch.status) dbPatch.status = patch.status
+    if (patch.assigneeRole) dbPatch.assignee_role = persistAssigneeRole(patch.assigneeRole)
+    if (patch.nextAction) dbPatch.next_action = patch.nextAction
+    if (patch.progress !== undefined) dbPatch.progress = patch.progress
+    const { error } = await supabase.from('pms_projects').update(dbPatch).eq('id', selected.id)
+    if (error) setLoadState('error')
+  }
+
+  // #1 반려: 현재 단계에서 요청을 반려 처리
+  async function rejectSelectedProject() {
+    if (!selected || !canAct) return
+    if (['published', 'rejected'].includes(selected.status)) return
+    const reason = (window.prompt('반려 사유를 입력하세요.') ?? '').trim()
+    if (!reason) return
+    await patchSelectedProject(
+      { status: 'rejected', rejectedReason: reason, rejectedFromStatus: selected.status, assigneeRole: 'requester', nextAction: '반려됨 · 요청자 보완 후 재요청 필요' },
+      `${roleLabels[role]}이(가) 반려했습니다. 사유: ${reason}`,
+    )
+    void notifyGoogleChat('project.hold', `프로젝트가 반려되었습니다: ${selected.title}`, { 사유: reason, 처리: roleLabels[role] })
+  }
+
+  // #2 회송(되돌리기): 이전 단계로 되돌림 (PM/admin)
+  async function revertSelectedProject() {
+    if (!selected) return
+    if (!['pm', 'admin'].includes(role)) { window.alert('PM 또는 관리자만 이전 단계로 되돌릴 수 있습니다.'); return }
+    const idx = selectedWorkflow.findIndex((item) => item.status === selected.status)
+    if (idx <= 0) { window.alert('첫 단계라 되돌릴 수 없습니다.'); return }
+    const prevStatus = selectedWorkflow[idx - 1].status
+    const reason = (window.prompt(`"${statusLabels[prevStatus]}" 단계로 되돌립니다. 사유를 입력하세요.`) ?? '').trim()
+    if (!reason) return
+    const patch: Partial<Project> = {
+      status: prevStatus,
+      assigneeRole: nextRoleFor(prevStatus),
+      nextAction: `${statusLabels[prevStatus]} 단계 재작업 (회송 사유: ${reason})`,
+      progress: Math.max(0, selected.progress - 12),
+    }
+    // 승인 단계로 되돌아가면 승인 초기화 + 문서 잠금 해제
+    if (prevStatus === 'dept_review' || prevStatus === 'planning') {
+      patch.approvalState = { requiredRoles: selected.approvalState.requiredRoles, approvedRoles: [] }
+      patch.docsLocked = false
+    }
+    if (prevStatus !== 'qc_security') patch.qcSignoff = { qa: false, security: false, pm: false }
+    await patchSelectedProject(patch, `${roleLabels[role]}이(가) ${statusLabels[prevStatus]} 단계로 회송했습니다. 사유: ${reason}`)
+    void notifyGoogleChat('project.advance', `회송: ${statusLabels[prevStatus]} 단계로 되돌림`, { 프로젝트: selected.title, 사유: reason })
+  }
+
+  // #4 QC/보안/PM 3자 사인오프 토글
+  async function toggleQcSignoff() {
+    if (!selected || selected.status !== 'qc_security') return
+    if (selected.onHold) { window.alert('보류 중에는 검토할 수 없습니다.'); return }
+    const targetRole = myQcSignoffRole ?? (role === 'admin' ? null : null)
+    if (!targetRole && role !== 'admin') return
+    // admin이면 어떤 역할을 대행할지 선택
+    let signRole = targetRole
+    if (!signRole && role === 'admin') {
+      const pick = (window.prompt('대행 사인오프할 역할 입력 (qa / security / pm)') ?? '').trim().toLowerCase()
+      if (!['qa', 'security', 'pm'].includes(pick)) return
+      signRole = pick as 'qa' | 'security' | 'pm'
+    }
+    if (!signRole) return
+    const current = selected.qcSignoff ?? { qa: false, security: false, pm: false }
+    const nextSignoff = { ...current, [signRole]: !current[signRole] }
+    const label = { qa: 'QC', security: '보안', pm: 'PM' }[signRole]
+    await patchSelectedProject(
+      { qcSignoff: nextSignoff },
+      `${label} 검토를 ${nextSignoff[signRole] ? '완료' : '취소'} 처리했습니다.`,
+    )
+    void notifyGoogleChat('task.status', `QC/보안/PM 검토 ${nextSignoff[signRole] ? '완료' : '취소'}: ${label}`, { 프로젝트: selected.title })
+  }
+
+  // #8 요청자 확인 (완료보고 단계)
+  async function confirmByRequester() {
+    if (!selected || selected.status !== 'completion') return
+    const next = !selected.requesterConfirmed
+    await patchSelectedProject(
+      { requesterConfirmed: next, nextAction: next ? '요청자 확인 완료 · 게시 가능' : '요청자 확인 대기' },
+      next ? '요청자가 결과물을 확인했습니다.' : '요청자 확인을 취소했습니다.',
+    )
+    void notifyGoogleChat('project.approve', `요청자 확인 ${next ? '완료' : '취소'}`, { 프로젝트: selected.title })
+  }
+
+  // 목표2: 단계별 문의 댓글 등록
+  async function addProjectComment(message: string) {
+    if (!selected) return
+    const trimmed = message.trim()
+    if (!trimmed) return
+    const comment = {
+      id: crypto.randomUUID(),
+      at: new Date().toISOString(),
+      actor: roleLabels[role],
+      role,
+      stage: selected.status,
+      message: trimmed,
+    }
+    const nextComments = [...(selected.comments ?? []), comment]
+    await patchSelectedProject({ comments: nextComments }, `[${statusLabels[selected.status]}] 문의/의견을 남겼습니다.`)
+    void notifyGoogleChat('task.comment', `[${statusLabels[selected.status]}] 문의: ${selected.title}`, { 작성자: roleLabels[role], 내용: trimmed })
   }
 
   async function submitRequest(event: FormEvent<HTMLFormElement>) {
@@ -1326,15 +1473,6 @@ function App() {
             <Plus size={17} />
             <span>새 요청</span>
           </button>
-          <button
-            className={`navItem ${viewMode === 'task_create' ? 'active' : ''}`}
-            type="button"
-            onClick={() => setViewMode('task_create')}
-            title="태스크(일감) 생성"
-          >
-            <ListChecks size={17} />
-            <span>태스크(일감) 생성</span>
-          </button>
           {role === 'admin' && (
             <button className={`navItem ${viewMode === 'settings' ? 'active' : ''}`} type="button" title="설정" onClick={() => setViewMode('settings')}>
               <SlidersHorizontal size={17} />
@@ -1397,12 +1535,6 @@ function App() {
 
         {viewMode === 'request' ? (
           <RequestIntakePanel form={requestForm} serviceOptions={serviceOptions} setForm={setRequestForm} onSubmit={submitRequest} />
-        ) : viewMode === 'task_create' ? (
-          <NewTaskPanel
-            projects={projects}
-            currentRole={role}
-            onCreate={(projectId, task) => void addTaskToProject(projectId, task)}
-          />
         ) : viewMode === 'settings' && role === 'admin' ? (
           <SettingsPanel
             serviceOptions={serviceOptions}
@@ -1561,9 +1693,9 @@ function App() {
             <section className="requirementsPanel numberedSection sectionSrsSds">
               <div className="panelHeader compact">
                 <h3>② PM이 등록한 기획 문서 (SRS · SDS)</h3>
-                <span>{role === 'pm' ? 'PM 작성 · 항목별 입력 · 첨부 가능' : 'PM이 작성하는 영역 · 읽기 전용'}</span>
+                <span>{selected.docsLocked ? '승인 완료 · 잠김 (수정하려면 이전 단계로 회송)' : role === 'pm' ? 'PM 작성 · 항목별 입력 · 첨부 가능' : 'PM이 작성하는 영역 · 읽기 전용'}</span>
               </div>
-              {role === 'pm' ? (
+              {role === 'pm' && !selected.docsLocked ? (
                 <>
                   <div className="srsSdsRow">
                     <section className="requirementsPanel docCard srsCard">
@@ -1702,11 +1834,23 @@ function App() {
                 project={selected}
                 onStatusChange={changeTaskStatus}
                 onAddComment={(taskId, message) => void addTaskComment(taskId, message)}
+                onAddTask={(task) => void addTaskToProject(selected.id, task)}
                 onPreviewAttachment={setPreviewAttachment}
                 currentRole={role}
               />
             </section>
 
+            <section className="requirementsPanel numberedSection sectionInquiry">
+              <div className="panelHeader compact">
+                <h3>④ 단계별 문의 / 논의</h3>
+                <span>현재 단계: {statusLabels[selected.status]} · 전 역할 작성 가능</span>
+              </div>
+              <StageInquiryPanel
+                project={selected}
+                currentRole={role}
+                onAddComment={(message) => void addProjectComment(message)}
+              />
+            </section>
 
             {selected.onHold && (
               <div className="holdBanner" role="status">
@@ -1745,6 +1889,26 @@ function App() {
                       : `남은 승인 역할: ${pendingApprovalRoles.map((item) => approvalStepLabels[item]).join(', ')} · 요청자와 PM이 등록한 내용을 검토한 뒤 승인합니다.`}
                   </span>
                 )}
+                {selected.status === 'qc_security' && (
+                  <div className="qcSignoffRow">
+                    {(['qa', 'security', 'pm'] as const).map((r) => (
+                      <span key={r} className={`qcSignoffChip ${qcSignoff[r] ? 'done' : 'pending'}`}>
+                        {{ qa: 'QC', security: '보안', pm: 'PM' }[r]} {qcSignoff[r] ? '✓' : '대기'}
+                      </span>
+                    ))}
+                    <span className="approvalGuide">
+                      {qcAllSignedOff ? 'QC·보안·PM 검토 완료 · 다음 단계 진행 가능' : `검토 대기: ${qcPendingRoles.map((r) => ({ qa: 'QC', security: '보안', pm: 'PM' }[r])).join(', ')}`}
+                    </span>
+                  </div>
+                )}
+                {selected.status === 'completion' && (
+                  <span className="approvalGuide">
+                    {selected.requesterConfirmed ? '요청자 확인 완료 · 게시 가능' : '요청자 확인 대기 중입니다. 요청자가 결과물을 확인해야 게시할 수 있습니다.'}
+                  </span>
+                )}
+                {selected.status === 'rejected' && (
+                  <span className="approvalGuide">반려됨 ({selected.rejectedFromStatus ? statusLabels[selected.rejectedFromStatus] : ''} 단계) · 사유: {selected.rejectedReason}</span>
+                )}
               </div>
               <div className="actionButtons">
                 {canApproveCurrentRole && (
@@ -1752,15 +1916,35 @@ function App() {
                     {approvalStepLabels[role]} {approvalButtonLabels[role] ?? '승인'}
                   </button>
                 )}
+                {canQcSignoff && (
+                  <button className="miniButton approveButton" type="button" onClick={() => void toggleQcSignoff()}>
+                    {myQcSignoffRole ? `${{ qa: 'QC', security: '보안', pm: 'PM' }[myQcSignoffRole]} 검토 ${qcSignoff[myQcSignoffRole] ? '취소' : '완료'}` : 'QC 사인오프(대행)'}
+                  </button>
+                )}
+                {selected.status === 'completion' && (role === 'requester' || role === 'admin') && (
+                  <button className="miniButton approveButton" type="button" onClick={() => void confirmByRequester()}>
+                    요청자 확인 {selected.requesterConfirmed ? '취소' : '완료'}
+                  </button>
+                )}
                 <button
                   className="primaryButton"
                   type="button"
                   onClick={() => void advanceSelectedProject()}
-                  disabled={!canAct || selected.status === 'published' || selected.onHold || isStepAdvanceBlocked}
+                  disabled={!canAct || selected.status === 'published' || selected.status === 'rejected' || selected.onHold || isStepAdvanceBlocked}
                 >
                   <Send size={16} />
                   단계 진행
                 </button>
+                {['pm', 'admin'].includes(role) && !['published', 'rejected'].includes(selected.status) && currentStep > 0 && (
+                  <button className="miniButton" type="button" onClick={() => void revertSelectedProject()}>
+                    이전 단계로
+                  </button>
+                )}
+                {canAct && !['published', 'rejected'].includes(selected.status) && (
+                  <button className="miniButton rejectButton" type="button" onClick={() => void rejectSelectedProject()}>
+                    반려
+                  </button>
+                )}
                 <button
                   className="miniButton"
                   type="button"
@@ -2072,18 +2256,46 @@ function ProjectTasksPanel({
   project,
   onStatusChange,
   onAddComment,
+  onAddTask,
   onPreviewAttachment,
   currentRole,
 }: {
   project: Project
   onStatusChange: (taskId: string, status: TaskStatus, statusNote: string) => void
   onAddComment: (taskId: string, message: string) => void
+  onAddTask?: (task: ProjectTask) => void
   onPreviewAttachment?: (attachment: { name: string; type: string; dataUrl?: string; size: number }) => void
   currentRole: Role
 }) {
   const [statusDrafts, setStatusDrafts] = useState<Record<string, { status: TaskStatus; note: string }>>({})
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({})
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({})
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newTask, setNewTask] = useState({ title: '', type: 'task' as IssueType, owner: '', priority: 'normal' as Priority, dueDate: '', note: '' })
+
+  function submitNewTask() {
+    if (!onAddTask || !newTask.title.trim()) return
+    onAddTask({
+      id: crypto.randomUUID(),
+      key: `${project.code}-${project.tasks.length + 1}`,
+      type: newTask.type,
+      title: newTask.title.trim(),
+      owner: newTask.owner.trim() || roleLabels[currentRole],
+      reporter: roleLabels[currentRole],
+      priority: newTask.priority,
+      stage: project.status,
+      output: '',
+      acceptanceCriteria: '',
+      estimate: 1,
+      dueDate: newTask.dueDate || project.dueDate,
+      status: 'todo',
+      statusNote: newTask.note.trim(),
+      statusChangedAt: new Date().toISOString(),
+      attachments: [],
+    })
+    setNewTask({ title: '', type: 'task', owner: '', priority: 'normal', dueDate: '', note: '' })
+    setShowAddForm(false)
+  }
 
   function taskDraft(task: ProjectTask) {
     return statusDrafts[task.id] ?? { status: task.status, note: '' }
@@ -2124,8 +2336,42 @@ function ProjectTasksPanel({
           <h3>태스크(일감) 목록</h3>
           <p>계획된 작업과 이슈·티켓을 모두 태스크로 관리합니다. 누구나 댓글로 의견을 남길 수 있습니다.</p>
         </div>
-        <span className="taskTotal">{project.tasks.length}개</span>
+        <div className="taskHeaderRight">
+          <span className="taskTotal">{project.tasks.length}개</span>
+          {onAddTask && (
+            <button className="miniButton" type="button" onClick={() => setShowAddForm((v) => !v)}>
+              {showAddForm ? '닫기' : '+ 태스크 추가'}
+            </button>
+          )}
+        </div>
       </div>
+
+      {showAddForm && onAddTask && (
+        <div className="inlineTaskForm">
+          <div className="inlineTaskGrid">
+            <input placeholder="태스크 제목" value={newTask.title} onChange={(e) => setNewTask((s) => ({ ...s, title: e.target.value }))} />
+            <select value={newTask.type} onChange={(e) => setNewTask((s) => ({ ...s, type: e.target.value as IssueType }))}>
+              <option value="task">Task</option>
+              <option value="story">Story</option>
+              <option value="bug">Bug</option>
+              <option value="change">Change</option>
+              <option value="epic">Epic</option>
+            </select>
+            <input placeholder={`담당자 (기본: ${roleLabels[currentRole]})`} value={newTask.owner} onChange={(e) => setNewTask((s) => ({ ...s, owner: e.target.value }))} />
+            <select value={newTask.priority} onChange={(e) => setNewTask((s) => ({ ...s, priority: e.target.value as Priority }))}>
+              <option value="low">낮음</option>
+              <option value="normal">보통</option>
+              <option value="high">높음</option>
+              <option value="urgent">긴급</option>
+            </select>
+            <input type="date" value={newTask.dueDate} onChange={(e) => setNewTask((s) => ({ ...s, dueDate: e.target.value }))} />
+          </div>
+          <input className="inlineTaskNote" placeholder="작업 내용 / 메모" value={newTask.note} onChange={(e) => setNewTask((s) => ({ ...s, note: e.target.value }))} />
+          <div className="inlineTaskActions">
+            <button className="primaryButton" type="button" onClick={submitNewTask} disabled={!newTask.title.trim()}>등록</button>
+          </div>
+        </div>
+      )}
 
       <div className="taskSummary" aria-label="task summary">
         <span>대기 {taskSummary.todo}</span>
@@ -2136,7 +2382,7 @@ function ProjectTasksPanel({
 
       {project.tasks.length === 0 && (
         <p className="dashboardEmpty">
-          이 프로젝트에 등록된 태스크가 없습니다. 좌측 메뉴 "태스크(일감) 생성"에서 등록하세요.
+          이 프로젝트에 등록된 태스크가 없습니다. 상단 "+ 태스크 추가"로 등록하세요.
         </p>
       )}
 
@@ -2519,191 +2765,72 @@ function DocAttachmentField({
   )
 }
 
-function NewTaskPanel({
-  projects,
+function StageInquiryPanel({
+  project,
   currentRole,
-  onCreate,
+  onAddComment,
 }: {
-  projects: Project[]
+  project: Project
   currentRole: Role
-  onCreate: (projectId: string, task: ProjectTask) => void
+  onAddComment: (message: string) => void
 }) {
-  const typeOptions: Array<{ value: IssueType; label: string }> = [
-    { value: 'task', label: 'Task — 단위 작업' },
-    { value: 'story', label: 'Story — 사용자 스토리' },
-    { value: 'bug', label: 'Bug — 버그·오류' },
-    { value: 'change', label: 'Change — 변경 요청' },
-    { value: 'epic', label: 'Epic — 대형 작업' },
-  ]
-  const activeProjects = projects.filter((project) => !['published', 'rejected'].includes(project.status))
-  const [projectId, setProjectId] = useState(activeProjects[0]?.id ?? '')
-  const [title, setTitle] = useState('')
-  const [owner, setOwner] = useState('')
-  const [taskType, setTaskType] = useState<IssueType>('task')
-  const [priority, setPriority] = useState<Priority>('normal')
-  const [dueDate, setDueDate] = useState('')
-  const [status, setStatus] = useState<TaskStatus>('todo')
-  const [workNote, setWorkNote] = useState('')
-  const [output, setOutput] = useState('')
-  const [attachments, setAttachments] = useState<TaskAttachment[]>([])
-
-  async function handleFiles(files: FileList | null) {
-    if (!files?.length) return
-    const next = await Promise.all(
-      Array.from(files).map(async (file) => ({
-        id: crypto.randomUUID(),
-        name: file.name,
-        size: file.size,
-        type: file.type || 'application/octet-stream',
-        dataUrl: await readFileAsDataUrl(file),
-        uploadedAt: new Date().toISOString(),
-      })),
-    )
-    setAttachments((current) => [...current, ...next])
-  }
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!projectId || !title.trim()) return
-    const project = projects.find((p) => p.id === projectId)
-    if (!project) return
-    const task: ProjectTask = {
-      id: crypto.randomUUID(),
-      key: `${project.code}-${project.tasks.length + 1}`,
-      type: taskType,
-      title: title.trim(),
-      owner: owner.trim() || roleLabels[currentRole],
-      reporter: roleLabels[currentRole],
-      priority,
-      stage: project.status,
-      output: output.trim(),
-      acceptanceCriteria: '',
-      estimate: 1,
-      dueDate: dueDate || project.dueDate,
-      status,
-      statusNote: workNote.trim(),
-      statusChangedAt: new Date().toISOString(),
-      attachments,
-    }
-    onCreate(projectId, task)
-    setTitle('')
-    setOwner('')
-    setWorkNote('')
-    setOutput('')
-    setAttachments([])
-  }
+  const [draft, setDraft] = useState('')
+  const [stageFilter, setStageFilter] = useState<'all' | ProjectStatus>('all')
+  const comments = project.comments ?? []
+  const filtered = stageFilter === 'all' ? comments : comments.filter((c) => c.stage === stageFilter)
+  const stagesWithComments = Array.from(new Set(comments.map((c) => c.stage)))
 
   return (
-    <section className="requestPanel settingsPanel">
-      <div className="requestIntro">
-        <p className="eyebrow">New Task</p>
-        <h2>태스크(일감) 생성</h2>
-        <p>프로젝트에 일감을 등록합니다. 작업 계획(Task/Story/Epic)이든 이슈·티켓(Bug/Change)이든 모두 태스크로 관리하며, 등록 후 누구나 의견을 댓글로 달 수 있습니다.</p>
+    <div className="stageInquiry">
+      <div className="inquiryFilterRow">
+        <button type="button" className={stageFilter === 'all' ? 'active' : ''} onClick={() => setStageFilter('all')}>
+          전체 {comments.length}
+        </button>
+        {stagesWithComments.map((stage) => (
+          <button key={stage} type="button" className={stageFilter === stage ? 'active' : ''} onClick={() => setStageFilter(stage)}>
+            {statusLabels[stage]} {comments.filter((c) => c.stage === stage).length}
+          </button>
+        ))}
       </div>
 
-      <form className="settingsSection requestForm" onSubmit={submit}>
-        <div className="formGrid two">
-          <label>
-            <span>관련 프로젝트</span>
-            <select value={projectId} onChange={(event) => setProjectId(event.target.value)} required>
-              <option value="">프로젝트 선택</option>
-              {activeProjects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  [{statusLabels[project.status]}] {project.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>태스크 유형</span>
-            <select value={taskType} onChange={(event) => setTaskType(event.target.value as IssueType)}>
-              {typeOptions.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>제목</span>
-            <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="예: 결제 API 토스 연동 구현" required />
-          </label>
-          <label>
-            <span>담당자</span>
-            <input value={owner} onChange={(event) => setOwner(event.target.value)} placeholder={`기본: ${roleLabels[currentRole]}`} />
-          </label>
-          <label>
-            <span>우선순위</span>
-            <select value={priority} onChange={(event) => setPriority(event.target.value as Priority)}>
-              <option value="low">낮음</option>
-              <option value="normal">보통</option>
-              <option value="high">높음</option>
-              <option value="urgent">긴급</option>
-            </select>
-          </label>
-          <label>
-            <span>마감일</span>
-            <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
-          </label>
-          <label>
-            <span>현재 상태</span>
-            <select value={status} onChange={(event) => setStatus(event.target.value as TaskStatus)}>
-              <option value="todo">대기</option>
-              <option value="doing">진행</option>
-              <option value="blocked">보류</option>
-              <option value="done">완료</option>
-            </select>
-          </label>
-        </div>
+      <div className="inquiryList">
+        {filtered.length === 0 ? (
+          <p className="docAttachmentEmpty">아직 등록된 문의가 없습니다. 단계 진행 중 궁금한 점을 남겨보세요.</p>
+        ) : (
+          filtered
+            .slice()
+            .reverse()
+            .map((comment) => (
+              <div key={comment.id} className="inquiryItem">
+                <div className="inquiryMeta">
+                  <span className={`statusPill ${comment.stage}`}>{statusLabels[comment.stage]}</span>
+                  <strong>{comment.actor}</strong>
+                  <em>{roleLabels[comment.role]}</em>
+                  <span className="inquiryTime">{formatDateTime(comment.at)}</span>
+                </div>
+                <p>{comment.message}</p>
+              </div>
+            ))
+        )}
+      </div>
 
-        <label>
-          <span>설명 / 진행 내용</span>
-          <textarea
-            value={workNote}
-            onChange={(event) => setWorkNote(event.target.value)}
-            placeholder={'작업 내용을 적거나, 이슈라면 재현 방법·환경·증상을 단계별로 기록하세요.'}
-            rows={5}
-          />
-        </label>
-
-        <label>
-          <span>산출물 / 영향 범위</span>
-          <textarea
-            value={output}
-            onChange={(event) => setOutput(event.target.value)}
-            placeholder={'결과물·링크 또는 영향받는 범위, 기대 동작 등'}
-            rows={3}
-          />
-        </label>
-
-        <div className="docAttachmentField">
-          <div className="docAttachmentHeader">
-            <strong>첨부 파일</strong>
-            <label className="miniButton uploadButton">
-              파일 추가
-              <input type="file" multiple hidden onChange={(event) => { void handleFiles(event.target.files); event.target.value = '' }} />
-            </label>
-          </div>
-          {attachments.length === 0 ? (
-            <p className="docAttachmentEmpty">첨부 파일이 없습니다.</p>
-          ) : (
-            <ul className="docAttachmentList">
-              {attachments.map((file) => (
-                <li key={file.id}>
-                  <a href={file.dataUrl} download={file.name}>{file.name}</a>
-                  <span>{formatBytes(file.size)}</span>
-                  <button type="button" className="miniButton" onClick={() => setAttachments((current) => current.filter((item) => item.id !== file.id))}>삭제</button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="docSaveBar">
-          <button className="primaryButton" type="submit" disabled={!projectId || !title.trim()}>
-            <Plus size={16} /> 태스크 등록
-          </button>
-        </div>
+      <form
+        className="inquiryForm"
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (!draft.trim()) return
+          onAddComment(draft)
+          setDraft('')
+        }}
+      >
+        <input
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder={`[${statusLabels[project.status]}] 단계 기준 · ${roleLabels[currentRole]}로 문의/의견 남기기`}
+        />
+        <button className="primaryButton" type="submit" disabled={!draft.trim()}>등록</button>
       </form>
-    </section>
+    </div>
   )
 }
 
@@ -2950,15 +3077,6 @@ function formatDateTime(date: string) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(date))
-}
-
-function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result))
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
 }
 
 export default App

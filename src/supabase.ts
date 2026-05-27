@@ -104,6 +104,12 @@ export function mapProjectRow(row: ProjectRow): Project {
     row.logs?.find((log) => log.meta?.securityReview)?.meta?.securityReview ?? defaultSecurityReview
   const reviewDocs =
     row.logs?.find((log) => log.meta?.reviewDocs)?.meta?.reviewDocs ?? defaultReviewDocs
+  // 신규 상태 필드: 가장 최근 로그 meta에서 복원
+  const comments = row.logs?.find((log) => log.meta?.comments)?.meta?.comments ?? []
+  const qcSignoff = row.logs?.find((log) => log.meta?.qcSignoff)?.meta?.qcSignoff ?? { qa: false, security: false, pm: false }
+  const requesterConfirmed = row.logs?.find((log) => log.meta?.requesterConfirmed !== undefined)?.meta?.requesterConfirmed ?? false
+  const docsLocked = row.logs?.find((log) => log.meta?.docsLocked !== undefined)?.meta?.docsLocked ?? false
+  const rejectedMeta = row.logs?.find((log) => log.meta?.rejectedReason)?.meta
   const baselineRoles = approvalRolesByRequestType[requestType]
   const approvalState = {
     requiredRoles: baselineRoles,
@@ -159,5 +165,11 @@ export function mapProjectRow(row: ProjectRow): Project {
     reviewDocs,
     tasks: row.tasks ?? [],
     logs: row.logs ?? [],
+    comments,
+    qcSignoff,
+    requesterConfirmed,
+    docsLocked,
+    rejectedReason: rejectedMeta?.rejectedReason,
+    rejectedFromStatus: rejectedMeta?.rejectedFromStatus,
   }
 }
