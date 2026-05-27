@@ -400,6 +400,11 @@ const planningRequiredByType: Record<ProjectRequestType, boolean> = {
   infra_performance: false,
 }
 
+// 프로젝트별 기획 필요 여부: workflowConfig 토글이 있으면 우선, 없으면 분류 기본값
+function isPlanningRequired(project: Pick<Project, 'requestType' | 'workflowConfig'>): boolean {
+  return project.workflowConfig?.requiresPlanning ?? planningRequiredByType[project.requestType]
+}
+
 const approvalRolesByRequestType: Record<ProjectRequestType, Role[]> = {
   improvement: fullApprovalRoles,
   new_service: fullApprovalRoles,
@@ -452,6 +457,8 @@ function isProjectAssignedToRole(project: Project, role: Role) {
 
 function isProjectRelevantToRole(project: Project, role: Role) {
   if (role === 'admin') return true
+  // 요청자는 요청·기획 단계 프로젝트를 계속 열람/수정할 수 있어야 함
+  if (role === 'requester' && ['request', 'planning'].includes(project.status)) return true
   if (project.status === 'dept_review') return project.approvalState.requiredRoles.includes(role)
   return isProjectAssignedToRole(project, role)
 }
@@ -683,7 +690,7 @@ function App() {
   const selectedApprovalState = selected?.approvalState ?? { requiredRoles: [], approvedRoles: [] }
   const selectedWorkflow = selected ? workflow.filter((item) => {
     if (item.status === 'qc_security') return selected.workflowConfig.requiresQcSecurity
-    if (item.status === 'planning') return planningRequiredByType[selected.requestType]
+    if (item.status === 'planning') return isPlanningRequired(selected)
     return true
   }) : workflow
   const metrics = useMemo(() => {
@@ -1070,6 +1077,7 @@ function App() {
     // 컬럼이 없는 신규 필드는 로그 meta 스냅샷으로 보존
     const stateMeta = {
       approvalState: merged.approvalState,
+      workflowConfig: merged.workflowConfig,
       qcSignoff: merged.qcSignoff,
       requesterConfirmed: merged.requesterConfirmed,
       docsLocked: merged.docsLocked,
@@ -1398,6 +1406,18 @@ function App() {
     if (error) setLoadState('error')
   }
 
+  // PM/관리자: 기획 단계 필요 여부 토글
+  async function togglePlanningRequired() {
+    if (!selected) return
+    if (!['pm', 'admin'].includes(role)) return
+    if (selected.status !== 'request') { window.alert('기획 단계 설정은 요청 단계에서만 변경할 수 있습니다.'); return }
+    const next = !isPlanningRequired(selected)
+    await patchSelectedProject(
+      { workflowConfig: { ...selected.workflowConfig, requiresPlanning: next } },
+      `기획(SRS/SDS) 단계를 ${next ? '포함' : '생략'}으로 설정했습니다.`,
+    )
+  }
+
   // 관리자: 프로젝트 삭제
   async function deleteProject(projectId: string) {
     setProjects((current) => current.filter((project) => project.id !== projectId))
@@ -1662,7 +1682,7 @@ function App() {
 
           </div>
 
-          {selected && role !== 'admin' && !canAct && !isProjectAssignedToRole(selected, role) ? (
+          {selected && role !== 'admin' && !canAct && !isProjectAssignedToRole(selected, role) && !(role === 'requester' && ['request', 'planning'].includes(selected.status)) ? (
           <div className="detailPanel emptyStatePanel">
             <strong>{roleLabels[role]} 역할의 작업이 없습니다.</strong>
             <span>이 프로젝트의 현재 단계는 {statusLabels[selected.status]}이며, {roleLabels[role]} 차례가 아닙니다.</span>
@@ -1941,6 +1961,11 @@ function App() {
                   <Send size={16} />
                   단계 진행
                 </button>
+                {['pm', 'admin'].includes(role) && selected.status === 'request' && (
+                  <button className="miniButton" type="button" onClick={() => void togglePlanningRequired()}>
+                    {isPlanningRequired(selected) ? '기획 생략' : '기획 포함'}
+                  </button>
+                )}
                 {['pm', 'admin'].includes(role) && !['published', 'rejected'].includes(selected.status) && currentStep > 0 && (
                   <button className="miniButton" type="button" onClick={() => void revertSelectedProject()}>
                     이전 단계로

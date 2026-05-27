@@ -39,6 +39,7 @@ export type TaskAttachment = {
 
 export type WorkflowConfig = {
   requiresQcSecurity: boolean
+  requiresPlanning?: boolean
 }
 
 export type ApprovalState = {
