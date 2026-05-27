@@ -360,7 +360,7 @@ const defaultWorkflowConfig: WorkflowConfig = {
   requiresQcSecurity: true,
 }
 
-const fullApprovalRoles: Role[] = ['pm', 'cem', 'security', 'infra', 'qa', 'patent', 'admin']
+const fullApprovalRoles: Role[] = ['pm', 'cem', 'developer', 'security', 'infra', 'qa', 'patent', 'admin']
 
 const requestFieldRules: Record<
   ProjectRequestType,

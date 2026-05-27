@@ -34,7 +34,7 @@ const defaultSchedule: ScheduleInfo = {
   note: '',
 }
 
-const fullApprovalRoles: Project['approvalState']['requiredRoles'] = ['pm', 'cem', 'security', 'infra', 'qa', 'patent', 'admin']
+const fullApprovalRoles: Project['approvalState']['requiredRoles'] = ['pm', 'cem', 'developer', 'security', 'infra', 'qa', 'patent', 'admin']
 
 const approvalRolesByRequestType: Record<Project['requestType'], Project['approvalState']['requiredRoles']> = {
   improvement: fullApprovalRoles,

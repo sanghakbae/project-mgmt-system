@@ -3160,7 +3160,7 @@ h3 {
   font-weight: 800;
 }
 
-.requestForm input,
+.requestForm input:not([type="checkbox"]):not([type="radio"]),
 .requestForm textarea,
 .requestForm select {
   width: 100%;
@@ -3183,7 +3183,7 @@ h3 {
   -webkit-appearance: none;
 }
 
-.requestForm input,
+.requestForm input:not([type="checkbox"]):not([type="radio"]),
 .requestForm select {
   height: 42px;
   padding: 0 11px;
