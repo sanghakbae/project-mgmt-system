@@ -1203,6 +1203,23 @@ function App() {
     await addProjectCommentForStage(selected.status, message, parentId)
   }
 
+  // 댓글 수정 (작성자 역할 또는 관리자)
+  async function editProjectComment(id: string, message: string, sectionPrefix?: string) {
+    if (!selected) return
+    const trimmed = message.trim()
+    if (!trimmed) return
+    const finalMsg = sectionPrefix ? `${sectionPrefix} ${trimmed}` : trimmed
+    const nextComments = (selected.comments ?? []).map((c) => (c.id === id ? { ...c, message: finalMsg } : c))
+    await patchSelectedProject({ comments: nextComments }, '문의/답변을 수정했습니다.')
+  }
+
+  // 댓글 삭제 (해당 문의의 답변도 함께 삭제)
+  async function deleteProjectComment(id: string) {
+    if (!selected) return
+    const nextComments = (selected.comments ?? []).filter((c) => c.id !== id && c.parentId !== id)
+    await patchSelectedProject({ comments: nextComments }, '문의/답변을 삭제했습니다.')
+  }
+
   async function submitRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!supabase) {
@@ -1715,9 +1732,12 @@ function App() {
 
             <RequesterContentPanel
               project={selected}
+              currentRole={role}
               canEdit={(role === 'requester' || role === 'admin') && ['request', 'planning'].includes(selected.status)}
               onSave={(patch) => void updateRequesterContent(patch)}
               onInquire={(message, parentId) => void addProjectComment(message, parentId)}
+              onEditInquiry={(id, msg, prefix) => void editProjectComment(id, msg, prefix)}
+              onDeleteInquiry={(id) => void deleteProjectComment(id)}
             />
 
             {!planningRequiredByType[selected.requestType] ? (
@@ -1861,7 +1881,14 @@ function App() {
                   </section>
                 </div>
               )}
-              <SectionInquiryBox sectionLabel="SRS/SDS" comments={selected.comments} onAdd={(message, parentId) => void addProjectComment(message, parentId)} />
+              <SectionInquiryBox
+                sectionLabel="SRS/SDS"
+                comments={selected.comments}
+                currentRole={role}
+                onAdd={(message, parentId) => void addProjectComment(message, parentId)}
+                onEdit={(id, msg, prefix) => void editProjectComment(id, msg, prefix)}
+                onDelete={(id) => void deleteProjectComment(id)}
+              />
             </section>
             )}
 
@@ -1888,6 +1915,9 @@ function App() {
               <StageInquiryPanel
                 project={selected}
                 workflow={selectedWorkflow}
+                currentRole={role}
+                onEdit={(id, msg) => void editProjectComment(id, msg)}
+                onDelete={(id) => void deleteProjectComment(id)}
               />
             </section>
 
@@ -2854,7 +2884,66 @@ function SrsReadView({ srs }: { srs: string }) {
   )
 }
 
-function SectionInquiryBox({ sectionLabel, comments, onAdd }: { sectionLabel: string; comments?: import('./types').ProjectComment[]; onAdd: (message: string, parentId?: string) => void }) {
+// 댓글 한 행: 왼쪽 작성자/시각, 오른쪽 내용 + 작성자 수정/삭제
+function CommentItem({
+  comment,
+  kind,
+  currentRole,
+  stripPrefix,
+  onEdit,
+  onDelete,
+}: {
+  comment: import('./types').ProjectComment
+  kind: 'q' | 'a'
+  currentRole: Role
+  stripPrefix?: string
+  onEdit?: (id: string, message: string) => void
+  onDelete?: (id: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const display = stripPrefix ? comment.message.replace(`${stripPrefix} `, '') : comment.message
+  const [draft, setDraft] = useState(display)
+  const canManage = (comment.role === currentRole || currentRole === 'admin') && (onEdit || onDelete)
+  return (
+    <div className={`commentRow ${kind === 'a' ? 'reply' : ''}`}>
+      <div className="commentRowLeft">
+        <span className={`qaBadge ${kind}`}>{kind === 'q' ? '문의' : '답변'}</span>
+        <strong>{comment.actor}</strong>
+        <em>{roleLabels[comment.role]}</em>
+        <span className="commentRowTime">{formatDateTime(comment.at)}</span>
+      </div>
+      <div className="commentRowRight">
+        {editing ? (
+          <form
+            className="inquiryForm"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!draft.trim() || !onEdit) return
+              onEdit(comment.id, draft)
+              setEditing(false)
+            }}
+          >
+            <input value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus />
+            <button className="primaryButton" type="submit" disabled={!draft.trim()}>저장</button>
+            <button className="miniButton" type="button" onClick={() => { setDraft(display); setEditing(false) }}>취소</button>
+          </form>
+        ) : (
+          <>
+            <p>{display}</p>
+            {canManage && (
+              <div className="commentRowActions">
+                {onEdit && <button type="button" onClick={() => { setDraft(display); setEditing(true) }}>수정</button>}
+                {onDelete && <button type="button" className="danger" onClick={() => { if (window.confirm('삭제할까요?')) onDelete(comment.id) }}>삭제</button>}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SectionInquiryBox({ sectionLabel, comments, currentRole, onAdd, onEdit, onDelete }: { sectionLabel: string; comments?: import('./types').ProjectComment[]; currentRole: Role; onAdd: (message: string, parentId?: string) => void; onEdit?: (id: string, message: string, sectionPrefix?: string) => void; onDelete?: (id: string) => void }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
   const [replyTo, setReplyTo] = useState<string | null>(null)
@@ -2862,7 +2951,6 @@ function SectionInquiryBox({ sectionLabel, comments, onAdd }: { sectionLabel: st
   const all = (comments ?? []).filter((c) => c.message.startsWith(`[${sectionLabel}]`))
   const threads = all.filter((c) => !c.parentId)
   const repliesOf = (id: string) => all.filter((c) => c.parentId === id)
-  const strip = (m: string) => m.replace(`[${sectionLabel}] `, '')
   return (
     <div className="sectionInquiryBox">
       <button type="button" className="sectionInquiryToggle" onClick={() => setOpen((v) => !v)}>
@@ -2871,20 +2959,31 @@ function SectionInquiryBox({ sectionLabel, comments, onAdd }: { sectionLabel: st
       {open && (
         <div className="sectionInquiryBody">
           {threads.length > 0 && (
-            <ul className="sectionInquiryList">
+            <div className="commentThreadList">
               {threads.slice().reverse().map((q) => (
-                <li key={q.id}>
-                  <div className="stageCommentMeta"><span className="qaBadge q">문의</span><strong>{q.actor}</strong><span>{formatDateTime(q.at)}</span></div>
-                  <p>{strip(q.message)}</p>
+                <div key={q.id} className="commentThread">
+                  <CommentItem
+                    comment={q}
+                    kind="q"
+                    currentRole={currentRole}
+                    stripPrefix={`[${sectionLabel}]`}
+                    onEdit={onEdit ? (id, msg) => onEdit(id, msg, `[${sectionLabel}]`) : undefined}
+                    onDelete={onDelete}
+                  />
                   {repliesOf(q.id).map((a) => (
-                    <div key={a.id} className="qaReply">
-                      <div className="stageCommentMeta"><span className="qaBadge a">답변</span><strong>{a.actor}</strong><span>{formatDateTime(a.at)}</span></div>
-                      <p>{strip(a.message)}</p>
-                    </div>
+                    <CommentItem
+                      key={a.id}
+                      comment={a}
+                      kind="a"
+                      currentRole={currentRole}
+                      stripPrefix={`[${sectionLabel}]`}
+                      onEdit={onEdit ? (id, msg) => onEdit(id, msg, `[${sectionLabel}]`) : undefined}
+                      onDelete={onDelete}
+                    />
                   ))}
                   {replyTo === q.id ? (
                     <form
-                      className="inquiryForm"
+                      className="inquiryForm replyForm"
                       onSubmit={(e) => {
                         e.preventDefault()
                         if (!replyDraft.trim()) return
@@ -2899,9 +2998,9 @@ function SectionInquiryBox({ sectionLabel, comments, onAdd }: { sectionLabel: st
                   ) : (
                     <button type="button" className="qaReplyBtn" onClick={() => { setReplyTo(q.id); setReplyDraft('') }}>답변 달기</button>
                   )}
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
           <form
             className="inquiryForm"
@@ -2923,14 +3022,20 @@ function SectionInquiryBox({ sectionLabel, comments, onAdd }: { sectionLabel: st
 
 function RequesterContentPanel({
   project,
+  currentRole,
   canEdit,
   onSave,
   onInquire,
+  onEditInquiry,
+  onDeleteInquiry,
 }: {
   project: Project
+  currentRole: Role
   canEdit: boolean
   onSave: (patch: Partial<Project>) => void
   onInquire?: (message: string, parentId?: string) => void
+  onEditInquiry?: (id: string, message: string, sectionPrefix?: string) => void
+  onDeleteInquiry?: (id: string) => void
 }) {
   const cfg = requestTypeOptions.find((item) => item.type === project.requestType)
   const [editing, setEditing] = useState(false)
@@ -3031,7 +3136,7 @@ function RequesterContentPanel({
             <RequirementBlock label={cfg?.audienceLabel ?? '영향 사용자/부서'} value={project.affectedUsers || '(요청자 미입력)'} />
             <RequirementBlock label="리스크/검토 사항" value={project.risk || '(요청자 미입력)'} />
           </div>
-          {onInquire && <SectionInquiryBox sectionLabel="요청내용" comments={project.comments} onAdd={onInquire} />}
+          {onInquire && <SectionInquiryBox sectionLabel="요청내용" comments={project.comments} currentRole={currentRole} onAdd={onInquire} onEdit={onEditInquiry} onDelete={onDeleteInquiry} />}
         </>
       )}
     </section>
@@ -3042,9 +3147,15 @@ function RequesterContentPanel({
 function StageInquiryPanel({
   project,
   workflow: stages,
+  currentRole,
+  onEdit,
+  onDelete,
 }: {
   project: Project
   workflow: Array<{ status: ProjectStatus; label: string }>
+  currentRole: Role
+  onEdit?: (id: string, message: string) => void
+  onDelete?: (id: string) => void
 }) {
   const comments = project.comments ?? []
   const threads = comments.filter((c) => !c.parentId)
@@ -3067,31 +3178,17 @@ function StageInquiryPanel({
                 <span className="stageGroupCount">문의 {stageThreads.length}</span>
               </div>
               <div className="stageGroupBody">
-                <ul className="stageCommentList">
+                <div className="commentThreadList">
                   {stageThreads.slice().reverse().map((q) => (
-                    <li key={q.id}>
-                      <div className="stageCommentMeta">
-                        <span className="qaBadge q">문의</span>
-                        <strong>{q.actor}</strong>
-                        <em>{roleLabels[q.role]}</em>
-                        <span>{formatDateTime(q.at)}</span>
-                      </div>
-                      <p>{q.message}</p>
+                    <div key={q.id} className="commentThread">
+                      <CommentItem comment={q} kind="q" currentRole={currentRole} onEdit={onEdit} onDelete={onDelete} />
                       {repliesOf(q.id).map((a) => (
-                        <div key={a.id} className="qaReply">
-                          <div className="stageCommentMeta">
-                            <span className="qaBadge a">답변</span>
-                            <strong>{a.actor}</strong>
-                            <em>{roleLabels[a.role]}</em>
-                            <span>{formatDateTime(a.at)}</span>
-                          </div>
-                          <p>{a.message}</p>
-                        </div>
+                        <CommentItem key={a.id} comment={a} kind="a" currentRole={currentRole} onEdit={onEdit} onDelete={onDelete} />
                       ))}
                       {repliesOf(q.id).length === 0 && <p className="qaNoReply">답변 대기 중</p>}
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             </div>
           )
@@ -3265,11 +3362,14 @@ function Metric({ icon, label, value, tone, onClick }: { icon: ReactNode; label:
 }
 
 function Artifact({ label, state }: { label: string; state: string }) {
+  const doneStates = ['승인됨', '게시 준비', '완료', '게시됨']
+  const isDone = doneStates.includes(state)
+  const isPending = state === '대기'
   return (
-    <div className="artifact">
+    <div className={`artifact ${isDone ? 'done' : isPending ? 'pending' : 'progress'}`}>
       <FileText size={16} />
       <span>{label}</span>
-      <strong>{state}</strong>
+      <strong>{isDone ? `✓ ${state}` : state}</strong>
       <ChevronRight size={15} />
     </div>
   )

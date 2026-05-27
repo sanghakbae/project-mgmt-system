@@ -4031,14 +4031,133 @@ h3 {
   border-radius: 7px;
 }
 
+.artifact.done {
+  border-color: #a9d3b8;
+  background: #f3faf5;
+}
+
+.artifact.pending {
+  background: #fafbfc;
+  opacity: 0.7;
+}
+
 .artifact span {
   flex: 1;
   font-size: 14px;
 }
 
+.artifact.pending span {
+  color: #98a0aa;
+}
+
 .artifact strong {
   color: #606772;
   font-size: 12px;
+}
+
+.artifact.done strong {
+  color: #198247;
+  font-weight: 800;
+}
+
+.artifact.pending strong {
+  color: #b3b7be;
+}
+
+/* 댓글 행: 좌측 작성자/시각, 우측 내용 */
+.commentThreadList {
+  display: grid;
+  gap: 8px;
+}
+
+.commentThread {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid #e8ebef;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.commentRow {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 4px 0;
+}
+
+.commentRow.reply {
+  border-top: 1px dashed #eef0f3;
+  margin-top: 4px;
+  padding-top: 8px;
+}
+
+.commentRowLeft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.commentRowLeft strong {
+  font-size: 12px;
+}
+
+.commentRowLeft em {
+  font-style: normal;
+  color: #7b818b;
+  font-size: 11px;
+}
+
+.commentRowTime {
+  width: 100%;
+  color: #98a0aa;
+  font-size: 10px;
+}
+
+.commentRowRight {
+  min-width: 0;
+}
+
+.commentRowRight > p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #2a2f37;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.commentRowActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.commentRowActions button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: 11px;
+  color: #7b818b;
+  cursor: pointer;
+}
+
+.commentRowActions button:hover {
+  text-decoration: underline;
+}
+
+.commentRowActions button.danger {
+  color: #c0392b;
+}
+
+@media (max-width: 768px) {
+  .commentRow {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
 }
 
 .logList div {
