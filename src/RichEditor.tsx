@@ -1,5 +1,9 @@
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import { Table } from '@tiptap/extension-table'
+import { TableRow } from '@tiptap/extension-table-row'
+import { TableHeader } from '@tiptap/extension-table-header'
+import { TableCell } from '@tiptap/extension-table-cell'
 import { useEffect } from 'react'
 
 type RichEditorProps = {
@@ -11,7 +15,13 @@ type RichEditorProps = {
 
 export function RichEditor({ value, onChange, placeholder, minHeight = 100 }: RichEditorProps) {
   const editor = useEditor({
-    extensions: [StarterKit.configure({ heading: { levels: [1, 2, 3] } })],
+    extensions: [
+      StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
+    ],
     content: value || '',
     onUpdate({ editor }) {
       const html = editor.getHTML()
@@ -48,6 +58,18 @@ export function RichEditor({ value, onChange, placeholder, minHeight = 100 }: Ri
         <button type="button" onClick={() => editor?.chain().focus().toggleOrderedList().run()} className={editor?.isActive('orderedList') ? 'active' : ''} title="번호 목록">1.</button>
         <button type="button" onClick={() => editor?.chain().focus().toggleCodeBlock().run()} className={editor?.isActive('codeBlock') ? 'active' : ''} title="코드">{'</>'}</button>
         <button type="button" onClick={() => editor?.chain().focus().toggleBlockquote().run()} className={editor?.isActive('blockquote') ? 'active' : ''} title="인용">”</button>
+        <span className="divider" />
+        <button type="button" onClick={() => editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title="표 삽입 (3×3)">▦</button>
+        {editor?.isActive('table') && (
+          <>
+            <button type="button" onClick={() => editor?.chain().focus().addColumnAfter().run()} title="열 추가">⊞열</button>
+            <button type="button" onClick={() => editor?.chain().focus().addRowAfter().run()} title="행 추가">⊞행</button>
+            <button type="button" onClick={() => editor?.chain().focus().deleteColumn().run()} title="열 삭제">⊟열</button>
+            <button type="button" onClick={() => editor?.chain().focus().deleteRow().run()} title="행 삭제">⊟행</button>
+            <button type="button" onClick={() => editor?.chain().focus().toggleHeaderRow().run()} title="헤더 행 토글">H행</button>
+            <button type="button" onClick={() => editor?.chain().focus().deleteTable().run()} title="표 삭제">✕표</button>
+          </>
+        )}
         <span className="divider" />
         <button type="button" onClick={() => editor?.chain().focus().undo().run()} title="실행 취소">↶</button>
         <button type="button" onClick={() => editor?.chain().focus().redo().run()} title="다시 실행">↷</button>
