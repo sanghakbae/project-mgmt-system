@@ -6,60 +6,69 @@ mermaid.initialize({
   theme: 'base',
   securityLevel: 'loose',
   fontFamily: 'inherit',
-  flowchart: { curve: 'basis', nodeSpacing: 45, rankSpacing: 55, padding: 12, useMaxWidth: true },
+  flowchart: { curve: 'linear', nodeSpacing: 55, rankSpacing: 70, padding: 16, useMaxWidth: true, htmlLabels: true },
   themeVariables: {
     fontSize: '15px',
-    primaryColor: '#eef2ff',
+    primaryColor: '#ffffff',
     primaryBorderColor: '#5b6bd6',
     primaryTextColor: '#1d2330',
-    lineColor: '#9aa1ad',
-    tertiaryColor: '#fff',
+    lineColor: '#b0b6c0',
+    clusterBkg: '#f7f9fc',
+    clusterBorder: '#dfe4ee',
   },
 })
 
-const flowDefinition = `flowchart TD
-    A([요청자: 새 요청 등록]):::start --> B{기획 단계 필요?}
+const flowDefinition = `flowchart TB
+    A(["새 요청 등록<br/><b>요청자</b>"]):::start
 
-    B -- "필요" --> C[기획 SRS+SDS 작성<br/>담당: PM]
+    subgraph PH1["1 · 기획"]
+      direction TB
+      B{"기획 단계<br/>필요 여부"}:::gate
+      C["기획 문서 작성<br/>SRS + SDS<br/><b>PM</b>"]:::step
+    end
+
+    subgraph PH2["2 · 부서 검토 · 승인"]
+      direction TB
+      D["승인 의견 취합<br/><b>PM · CEM · 개발 · 정보보호</b><br/><b>인프라 · QA · 특허 · 최종</b>"]:::step
+    end
+
+    subgraph PH3["3 · 일정 · 개발 · 품질"]
+      direction TB
+      E["일정 확정<br/><b>기획 · 개발 협의</b>"]:::step --> F["개발 진행<br/><b>개발자</b>"]:::step --> G["QC · 보안 · PM 검토<br/><b>3자 사인오프</b>"]:::step
+    end
+
+    subgraph PH4["4 · 완료 · 게시"]
+      direction TB
+      H["완료 보고<br/><b>관리자</b>"]:::step
+      I(["게시 완료"]):::done
+    end
+
+    A ==> B
+    B -- "필요" --> C
     B -- "생략" --> D
+    C ==> D
+    D == "역할 전원 확인" ==> E
+    G == "3자 검토 완료" ==> H
+    H == "요청자 결과 확인" ==> I
 
-    C --> C1{SRS·SDS 모두 작성?}:::gate
-    C1 -- 아니오 --> C
-    C1 -- 예 --> D[부서 검토 · 승인 의견 취합<br/>PM·CEM·개발·정보보호·인프라·QA·특허·최종]
+    D -. "반려" .-> R(["반려"]):::stop
+    G -. "반려" .-> R
+    R -. "재요청" .-> A
 
-    D --> D1{각 역할 확인 완료?}:::gate
-    D1 -- 일부 대기 --> D
-    D1 -- "전원 확인 → 자동 진행" --> E[개발 준비 · 일정 확정<br/>일정 조율: 기획·개발 협의]
-
-    E --> F[개발<br/>담당: 개발자]
-    F --> G[QC · 보안 · PM 검토<br/>3자 사인오프 게이트]
-
-    G --> G1{QA·보안·PM 모두 완료?}:::gate
-    G1 -- 일부 대기 --> G
-    G1 -- 전원 완료 --> H[완료 보고<br/>담당: 관리자]
-
-    H --> H1{요청자 결과 확인?}:::gate
-    H1 -- 미확인 --> H
-    H1 -- 확인 완료 --> I([게시 / Published]):::done
-
-    D -. 반려 .-> R([반려 / Rejected]):::stop
-    E -. 반려 .-> R
-    F -. 반려 .-> R
-    G -. 반려 .-> R
-    R -. 재요청 .-> A
-
-    C -. 보류 .-> P[보류 / On Hold<br/>PM·관리자 해제 시까지 잠금]:::hold
-    D -. 보류 .-> P
-    E -. 보류 .-> P
-    F -. 보류 .-> P
-    G -. 보류 .-> P
-    P -. 해제 .-> D
+    C -. "보류" .-> Z(["보류<br/>(해제 시 재개)"]):::hold
+    D -. "보류" .-> Z
+    F -. "보류" .-> Z
 
     classDef start fill:#e9f2ff,stroke:#3b5bdb,color:#1b3a8f,font-weight:700;
+    classDef step fill:#ffffff,stroke:#5b6bd6,color:#1d2330;
     classDef done fill:#e9f7ef,stroke:#1c7a4d,color:#14532d,font-weight:700;
     classDef stop fill:#fdecea,stroke:#c0392b,color:#7a1d12,font-weight:700;
     classDef hold fill:#fff4e0,stroke:#c98a1a,color:#6b4500,font-weight:700;
-    classDef gate fill:#fff8d6,stroke:#a8860a,color:#5a4500;`
+    classDef gate fill:#fff8d6,stroke:#a8860a,color:#5a4500;
+
+    linkStyle 2,5,6,7,8 stroke:#1c7a4d,stroke-width:2.5px;
+    linkStyle 9,10,11 stroke:#c0392b,stroke-width:1.5px;
+    linkStyle 12,13,14 stroke:#c98a1a,stroke-width:1.5px;`
 
 const legend = [
   { color: '#e9f2ff', border: '#3b5bdb', label: '시작 (요청)' },
