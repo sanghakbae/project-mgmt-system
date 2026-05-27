@@ -2692,13 +2692,6 @@ h3 {
   font-size: 11px;
 }
 
-.commentThread {
-  margin-top: 8px;
-  padding: 10px;
-  border: 1px solid #e3e5e9;
-  border-radius: 6px;
-  background: #fafbfc;
-}
 
 .commentList {
   list-style: none;
@@ -4163,13 +4156,13 @@ h3 {
 
 .commentThreadList {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .commentThread {
   display: grid;
-  gap: 8px;
-  padding: 14px 16px;
+  gap: 2px;
+  padding: 10px 12px;
   border: 1px solid #e8ebef;
   border-radius: 8px;
   background: #fff;
@@ -4179,14 +4172,16 @@ h3 {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 0;
+  padding: 3px 0;
 }
 
+/* 답변: 바로 위 문의에 붙여 한 쌍처럼 */
 .commentRow.reply {
-  border-top: 1px dashed #eef0f3;
-  margin-top: 8px;
-  padding-top: 12px;
-  padding-left: 16px;
+  margin: 2px 0 0 18px;
+  padding: 8px 10px;
+  border-left: 2px solid #a9d3b8;
+  background: #f5fbf7;
+  border-radius: 0 6px 6px 0;
 }
 
 .commentRow .qaBadge {
