@@ -1373,6 +1373,15 @@ function App() {
     }
   }
 
+  // 관리자: 프로젝트 삭제
+  async function deleteProject(projectId: string) {
+    setProjects((current) => current.filter((project) => project.id !== projectId))
+    setSelectedId((current) => (current === projectId ? '' : current))
+    if (!supabase) return
+    const { error } = await supabase.from('pms_projects').delete().eq('id', projectId)
+    if (error) setLoadState('error')
+  }
+
   async function addTaskComment(taskId: string, message: string) {
     if (!selected) return
     const trimmed = message.trim()
@@ -1542,6 +1551,7 @@ function App() {
             projects={projects}
             onToggleHold={toggleHoldProject}
             onPurgeDemoTasks={purgeDemoTasksExceptKeys}
+            onDeleteProject={deleteProject}
           />
         ) : viewMode === 'dashboard' ? (
           <DashboardOverview
@@ -2849,12 +2859,14 @@ function SettingsPanel({
   projects,
   onToggleHold,
   onPurgeDemoTasks,
+  onDeleteProject,
 }: {
   serviceOptions: string[]
   setServiceOptions: (nextOptions: string[]) => void
   projects: Project[]
   onToggleHold: (projectId: string) => void
   onPurgeDemoTasks: (keepKeys: string[]) => void
+  onDeleteProject: (projectId: string) => void
 }) {
   const [draft, setDraft] = useState('')
   const [holdFilter, setHoldFilter] = useState<'all' | 'onHold' | 'active'>('all')
@@ -2916,8 +2928,8 @@ function SettingsPanel({
       <div className="settingsSection">
         <div className="panelHeader compact">
           <div>
-            <h3>프로젝트 보류 관리</h3>
-            <p>전체 프로젝트({projects.length}개)에서 보류 여부를 직접 토글합니다. 보류 중 단계 진행이 차단됩니다.</p>
+            <h3>프로젝트 관리</h3>
+            <p>전체 프로젝트({projects.length}개)의 보류 토글 및 삭제를 관리합니다. 삭제는 되돌릴 수 없습니다.</p>
           </div>
           <div className="filterChips">
             {([
@@ -2958,14 +2970,27 @@ function SettingsPanel({
                     <small>{project.serviceName} · {project.ownerTeam} · D-{Math.max(0, daysUntil(project.dueDate, demoToday))}</small>
                     {project.onHold && project.holdReason && <em>사유: {project.holdReason}</em>}
                   </div>
-                  <button
-                    className="miniButton"
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => onToggleHold(project.id)}
-                  >
-                    {project.onHold ? '보류 해제' : '보류'}
-                  </button>
+                  <div className="projectManageActions">
+                    <button
+                      className="miniButton"
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => onToggleHold(project.id)}
+                    >
+                      {project.onHold ? '보류 해제' : '보류'}
+                    </button>
+                    <button
+                      className="miniButton rejectButton"
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm(`"${project.title}" 프로젝트를 삭제합니다. 되돌릴 수 없습니다. 계속할까요?`)) {
+                          onDeleteProject(project.id)
+                        }
+                      }}
+                    >
+                      삭제
+                    </button>
+                  </div>
                 </div>
               )
             })}

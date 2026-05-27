@@ -2001,6 +2001,12 @@ h3 {
   gap: 8px;
 }
 
+.projectManageActions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .inlineTaskForm {
   display: grid;
   gap: 8px;
