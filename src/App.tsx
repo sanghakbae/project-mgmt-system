@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react'
 import {
   AlertTriangle,
   BarChart3,
@@ -20,10 +20,13 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Users,
+  Workflow,
 } from 'lucide-react'
 import './App.css'
 import { RichEditor, RichTextView } from './RichEditor'
 import { notifyGoogleChat } from './notify'
+
+const SystemFlowPanel = lazy(() => import('./SystemFlowPanel').then((m) => ({ default: m.SystemFlowPanel })))
 import { roleLabels, workflow } from './data'
 import { hasSupabaseConfig, mapProjectRow, supabase } from './supabase'
 import type { ApprovalState, IssueType, Priority, Project, ProjectRequestType, ProjectStatus, ProjectTask, ReviewDocs, Role, ScheduleInfo, SecurityReview, TaskStatus, WorkflowConfig } from './types'
@@ -411,7 +414,7 @@ const approvalRolesByRequestType: Record<ProjectRequestType, Role[]> = {
 const activeRoles: Role[] = ['requester', 'pm', 'cem', 'developer', 'security', 'infra', 'qa', 'patent', 'admin']
 const demoToday = new Date('2026-05-17T09:00:00+09:00')
 
-type ViewMode = 'dashboard' | 'request' | 'pipeline' | 'settings'
+type ViewMode = 'dashboard' | 'request' | 'pipeline' | 'flow' | 'settings'
 type StatusFilter = ProjectStatus | 'all' | 'active' | 'dueSoon' | 'mine' | 'risk' | 'blocked'
 
 type RequestFormState = {
@@ -1615,6 +1618,15 @@ function App() {
             <Plus size={17} />
             <span>새 요청</span>
           </button>
+          <button
+            className={`navItem ${viewMode === 'flow' ? 'active' : ''}`}
+            type="button"
+            onClick={() => setViewMode('flow')}
+            title="시스템 흐름도"
+          >
+            <Workflow size={17} />
+            <span>시스템 흐름도</span>
+          </button>
           {role === 'admin' && (
             <button className={`navItem ${viewMode === 'settings' ? 'active' : ''}`} type="button" title="설정" onClick={() => setViewMode('settings')}>
               <SlidersHorizontal size={17} />
@@ -1671,6 +1683,10 @@ function App() {
 
         {viewMode === 'request' ? (
           <RequestIntakePanel form={requestForm} serviceOptions={serviceOptions} setForm={setRequestForm} onSubmit={submitRequest} />
+        ) : viewMode === 'flow' ? (
+          <Suspense fallback={<div className="flowPanel"><p className="flowLoading">흐름도를 불러오는 중…</p></div>}>
+            <SystemFlowPanel />
+          </Suspense>
         ) : viewMode === 'settings' && role === 'admin' ? (
           <SettingsPanel
             serviceOptions={serviceOptions}

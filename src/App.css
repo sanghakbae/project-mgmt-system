@@ -1182,6 +1182,93 @@ h3 {
   border-radius: 8px;
 }
 
+/* 시스템 흐름도 */
+.flowPanel {
+  background: #fff;
+  border: 1px solid #dcdfe4;
+  border-radius: 12px;
+  padding: 22px 24px 28px;
+}
+
+.flowPanelHead h2 {
+  font-size: 20px;
+  font-weight: 800;
+  color: #14171c;
+}
+
+.flowPanelHead p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.55;
+}
+
+.flowLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin: 16px 0 10px;
+  padding: 12px 14px;
+  border: 1px solid #eceef2;
+  border-radius: 10px;
+  background: #fafbfc;
+}
+
+.flowLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #4b515c;
+}
+
+.flowLegendItem i {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  border: 1.5px solid;
+  flex-shrink: 0;
+}
+
+.flowDiagram {
+  margin-top: 10px;
+  padding: 16px;
+  border: 1px solid #eceef2;
+  border-radius: 10px;
+  background:
+    linear-gradient(#f4f6f9 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(90deg, #f4f6f9 1px, transparent 1px) 0 0 / 22px 22px,
+    #fff;
+  overflow-x: auto;
+}
+
+.flowSvgWrap {
+  display: flex;
+  justify-content: center;
+}
+
+.flowSvgWrap svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.flowSvgWrap .edgeLabel {
+  font-size: 12px;
+}
+
+.flowLoading,
+.flowError {
+  text-align: center;
+  padding: 40px 0;
+  color: #8a9099;
+  font-size: 13px;
+}
+
+.flowError {
+  color: #c0392b;
+}
+
 .queuePanel {
   padding: 18px;
   font-size: 12px;
