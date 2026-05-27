@@ -1240,7 +1240,7 @@ h3 {
     linear-gradient(#f4f6f9 1px, transparent 1px) 0 0 / 22px 22px,
     linear-gradient(90deg, #f4f6f9 1px, transparent 1px) 0 0 / 22px 22px,
     #fff;
-  overflow-x: auto;
+  overflow: hidden;
 }
 
 .flowSvgWrap {
@@ -1250,6 +1250,7 @@ h3 {
 
 .flowSvgWrap svg {
   max-width: 100%;
+  width: 100%;
   height: auto;
 }
 
