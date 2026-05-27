@@ -438,6 +438,7 @@ type RequestFormState = {
   successMetric: string
   affectedUsers: string
   risk: string
+  skipPlanning?: boolean
   securityReview: SecurityReview
 }
 
@@ -831,7 +832,7 @@ function App() {
 
     const baseLogEntry = {
       id: crypto.randomUUID(),
-      at: '방금 전',
+      at: logStamp(),
       actor: roleLabels[role],
       message,
       // 승인 완료로 진행되면 문서 잠금 스냅샷 포함 (#12)
@@ -840,7 +841,7 @@ function App() {
     const advanceLogEntry = shouldAdvance
       ? {
           id: crypto.randomUUID(),
-          at: '방금 전',
+          at: logStamp(),
           actor: roleLabels[role],
           message: `모든 승인 완료 → ${statusLabels[advancedStatus]} 단계로 자동 진행했습니다.`,
         }
@@ -889,7 +890,7 @@ function App() {
     const nextLogs = [
       {
         id: crypto.randomUUID(),
-        at: '방금 전',
+        at: logStamp(),
         actor: roleLabels[role],
         message: 'PM이 기획 문서(SRS+SDS)를 업데이트했습니다.',
         meta: { reviewDocs: currentReviewDocsDraft },
@@ -962,7 +963,7 @@ function App() {
     const nextLogs = [
       {
         id: crypto.randomUUID(),
-        at: '방금 전',
+        at: logStamp(),
         actor: roleLabels[role],
         message: willHold
           ? `프로젝트를 보류 처리했습니다.${reason ? ` 사유: ${reason}` : ''}`
@@ -1021,7 +1022,7 @@ function App() {
     const nextLogs = [
       {
         id: crypto.randomUUID(),
-        at: '방금 전',
+        at: logStamp(),
         actor: roleLabels[role],
         message: `${statusLabels[targetStatus]} 단계로 이동했습니다.`,
         meta: selected.status === 'planning' ? { reviewDocs: currentReviewDocsDraft } : undefined,
@@ -1088,7 +1089,7 @@ function App() {
       comments: merged.comments,
     }
     const nextLogs = [
-      { id: crypto.randomUUID(), at: '방금 전', actor: roleLabels[role], message: logMessage, meta: stateMeta },
+      { id: crypto.randomUUID(), at: logStamp(), actor: roleLabels[role], message: logMessage, meta: stateMeta },
       ...selected.logs,
     ]
     merged.logs = nextLogs
@@ -1215,6 +1216,7 @@ function App() {
       requiredRoles: approvalRolesByRequestType[requestForm.requestType],
       approvedRoles: [],
     }
+    const newWorkflowConfig = { ...defaultWorkflowConfig, requiresPlanning: !(requestForm.skipPlanning ?? !planningRequiredByType[requestForm.requestType]) }
     const newProject: Project = {
       id: crypto.randomUUID(),
       code: projectCode,
@@ -1238,7 +1240,7 @@ function App() {
       progress: 5,
       nextAction: '요청 내용 확인 후 SRS/SDS 문서를 등록해야 합니다.',
       assigneeRole: 'pm',
-      workflowConfig: defaultWorkflowConfig,
+      workflowConfig: newWorkflowConfig,
       approvalState: initialApprovalState,
       securityReview: requestForm.securityReview,
       reviewDocs: emptyReviewDocs,
@@ -1246,12 +1248,12 @@ function App() {
       logs: [
         {
           id: crypto.randomUUID(),
-          at: '방금 전',
+          at: logStamp(),
           actor: requestForm.requester,
           message: requestTypeConfig.createdLog,
           meta: {
             requestType: requestForm.requestType,
-            workflowConfig: defaultWorkflowConfig,
+            workflowConfig: newWorkflowConfig,
             approvalState: initialApprovalState,
             securityReview: requestForm.securityReview,
             reviewDocs: emptyReviewDocs,
@@ -1318,7 +1320,7 @@ function App() {
     const nextLogs = [
       {
         id: crypto.randomUUID(),
-        at: '방금 전',
+        at: logStamp(),
         actor: roleLabels[role],
         message: logMessage,
       },
@@ -1356,7 +1358,7 @@ function App() {
     const nextLogs = [
       {
         id: crypto.randomUUID(),
-        at: '방금 전',
+        at: logStamp(),
         actor: roleLabels[role],
         message: `새 일감을 등록했습니다: ${task.title}`,
       },
@@ -1389,7 +1391,7 @@ function App() {
   async function updateRequesterContent(patch: Partial<Project>) {
     if (!selected) return
     const nextLogs = [
-      { id: crypto.randomUUID(), at: '방금 전', actor: roleLabels[role], message: '요청자가 요청 내용을 수정했습니다.' },
+      { id: crypto.randomUUID(), at: logStamp(), actor: roleLabels[role], message: '요청자가 요청 내용을 수정했습니다.' },
       ...selected.logs,
     ]
     const merged: Project = { ...selected, ...patch, logs: nextLogs, updatedAt: new Date().toISOString() }
@@ -2624,6 +2626,17 @@ function RequestIntakePanel({
             </div>
             <p className="approvalGuide">이 요청 유형은 위 역할의 승인 완료 후 다음 단계로 진행됩니다.</p>
           </div>
+          <label className="planningSkipToggle">
+            <input
+              type="checkbox"
+              checked={form.skipPlanning ?? !planningRequiredByType[form.requestType]}
+              onChange={(event) => updateField('skipPlanning', event.target.checked)}
+            />
+            <span>
+              <strong>기획 단계(SRS/SDS) 생략</strong>
+              <em>체크하면 기획 문서 작성 없이 요청 → 승인으로 바로 진행합니다. (분류 기본값 자동 적용, 필요 시 변경)</em>
+            </span>
+          </label>
         </fieldset>
 
         <fieldset>
@@ -3291,6 +3304,13 @@ function nextActionFor(status: ProjectStatus) {
 function daysUntil(date: string, from: Date) {
   const target = new Date(`${date}T23:59:59+09:00`)
   return Math.ceil((target.getTime() - from.getTime()) / 86_400_000)
+}
+
+// 로그용 타임스탬프: 'YYYY-MM-DD HH:mm'
+function logStamp() {
+  const d = new Date()
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
 function formatDate(date: string) {
