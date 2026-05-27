@@ -41,6 +41,19 @@ const approvalRolesByRequestType: Record<Project['requestType'], Project['approv
   infra_performance: fullApprovalRoles,
 }
 
+// App.tsx의 planningRequiredByType와 동기화 (가벼운 요청은 기획 단계 생략)
+const planningRequiredByType: Record<Project['requestType'], boolean> = {
+  improvement: true,
+  new_service: true,
+  new_feature: true,
+  integration_api: true,
+  security_permission: true,
+  bug_fix: false,
+  policy_change: false,
+  data_report: false,
+  infra_performance: false,
+}
+
 function inferRequestType(row: Pick<ProjectRow, 'title' | 'summary' | 'service_area'>): Project['requestType'] {
   const text = `${row.title} ${row.summary} ${row.service_area}`.toLowerCase()
 
@@ -126,10 +139,15 @@ export function mapProjectRow(row: ProjectRow): Project {
       ? 'planning'
       : (legacyRaw as Project['status']))
   // 문서 작성 상태에 따라 단계 정규화: 기획 문서(SRS+SDS) 미완료 시 'planning' 단계로 강제
+  // 단, 기획 단계를 생략하는 요청 분류는 강제하지 않음
   const docsGatedStatuses: Project['status'][] = ['dept_review', 'schedule', 'development', 'qc_security', 'completion', 'published']
   let normalizedStatus: Project['status'] = legacyMappedStatus
-  if (docsGatedStatuses.includes(legacyMappedStatus) && !hasReviewDocs) {
+  if (planningRequiredByType[requestType] && docsGatedStatuses.includes(legacyMappedStatus) && !hasReviewDocs) {
     normalizedStatus = 'planning'
+  }
+  // 기획 생략 유형인데 legacy로 planning에 있으면 dept_review로 승격
+  if (!planningRequiredByType[requestType] && normalizedStatus === 'planning') {
+    normalizedStatus = 'dept_review'
   }
 
   return {

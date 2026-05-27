@@ -386,6 +386,20 @@ const requestFieldRules: Record<
   infra_performance: { dueDateOptional: true },
 }
 
+// 요청 분류별 기획(SRS/SDS) 단계 필요 여부.
+// 가벼운 요청(버그/운영변경/데이터·리포트/인프라)은 기획 문서 없이 바로 승인으로 진행.
+const planningRequiredByType: Record<ProjectRequestType, boolean> = {
+  improvement: true,
+  new_service: true,
+  new_feature: true,
+  integration_api: true,
+  security_permission: true,
+  bug_fix: false,
+  policy_change: false,
+  data_report: false,
+  infra_performance: false,
+}
+
 const approvalRolesByRequestType: Record<ProjectRequestType, Role[]> = {
   improvement: fullApprovalRoles,
   new_service: fullApprovalRoles,
@@ -669,6 +683,7 @@ function App() {
   const selectedApprovalState = selected?.approvalState ?? { requiredRoles: [], approvedRoles: [] }
   const selectedWorkflow = selected ? workflow.filter((item) => {
     if (item.status === 'qc_security') return selected.workflowConfig.requiresQcSecurity
+    if (item.status === 'planning') return planningRequiredByType[selected.requestType]
     return true
   }) : workflow
   const metrics = useMemo(() => {
@@ -1672,6 +1687,14 @@ function App() {
               onSave={(patch) => void updateRequesterContent(patch)}
             />
 
+            {!planningRequiredByType[selected.requestType] ? (
+            <section className="requirementsPanel numberedSection sectionSrsSds">
+              <div className="panelHeader compact">
+                <h3>② 기획 문서 (생략)</h3>
+                <span>{requestTypeLabels[selected.requestType]} 유형은 SRS/SDS 없이 바로 승인 단계로 진행합니다.</span>
+              </div>
+            </section>
+            ) : (
             <section className="requirementsPanel numberedSection sectionSrsSds">
               <div className="panelHeader compact">
                 <h3>② PM이 등록한 기획 문서 (SRS · SDS)</h3>
@@ -1806,6 +1829,7 @@ function App() {
                 </div>
               )}
             </section>
+            )}
 
             <section className="requirementsPanel numberedSection sectionTasks">
               <div className="panelHeader compact">
