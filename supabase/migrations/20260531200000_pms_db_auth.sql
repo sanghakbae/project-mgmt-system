@@ -38,7 +38,7 @@ create or replace function public.pms_register(
 returns json
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   v_email text := lower(trim(p_email));
@@ -77,7 +77,7 @@ create or replace function public.pms_authenticate(
 returns json
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   v_email text := lower(trim(p_email));
@@ -131,3 +131,7 @@ create policy "pms_projects delete (app)"
   on public.pms_projects for delete
   to anon, authenticated
   using (true);
+
+-- ─────────────────────────────────────────────────────────────
+-- 5) PostgREST 스키마 캐시 갱신 (새 RPC 함수 즉시 인식)
+notify pgrst, 'reload schema';
