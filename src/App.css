@@ -463,6 +463,254 @@ button {
   font-weight: 800;
 }
 
+/* ───────────── 인증(로그인/가입) 화면 ───────────── */
+.authShell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #f4f5f7;
+}
+
+.authLoading {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.authCard {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px;
+  background: #fff;
+  border: 1px solid #dcdfe4;
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.1);
+}
+
+.authBrand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 2px;
+}
+
+.authBrandMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #d4f0df, #aee0c1);
+  color: #0f5132;
+}
+
+.authBrand strong {
+  display: block;
+  font-size: 15px;
+  color: #1d2330;
+}
+
+.authBrand span {
+  font-size: 12px;
+  color: #7b818b;
+}
+
+.authTabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  background: #f1f3f6;
+  border-radius: 9px;
+}
+
+.authTabs button {
+  padding: 8px 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.authTabs button.active {
+  background: #fff;
+  color: #1d2330;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.authField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.authField span {
+  font-size: 12px;
+  font-weight: 700;
+  color: #4b5563;
+}
+
+.authField input,
+.authField select {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #cfd3da;
+  border-radius: 8px;
+  background: #fff;
+  color: #1d2330;
+  font-size: 14px;
+}
+
+.authField input:focus,
+.authField select:focus {
+  outline: none;
+  border-color: #1c7a4d;
+  box-shadow: 0 0 0 3px rgba(28, 122, 77, 0.15);
+}
+
+.authError {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fdecea;
+  color: #b3261e;
+  font-size: 12.5px;
+}
+
+.authNotice {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #e7f8ee;
+  color: #0f5132;
+  font-size: 12.5px;
+}
+
+.authSubmit {
+  height: 44px;
+  border: 0;
+  border-radius: 9px;
+  background: #1c7a4d;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.authSubmit:hover {
+  background: #176540;
+}
+
+.authSubmit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.authHint {
+  margin: 0;
+  font-size: 11.5px;
+  color: #7b818b;
+  line-height: 1.5;
+}
+
+/* ───────────── 계정 메뉴(로그인 후 상단) ───────────── */
+.accountMenu {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.accountMenuBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid #d9dce2;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.accountRoleBadge {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #d4f0df, #aee0c1);
+  color: #0f5132;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.accountEmail {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #2a2f37;
+}
+
+.accountMenuPanel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 60;
+  min-width: 220px;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid #dcdfe4;
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+  display: grid;
+  gap: 8px;
+}
+
+.accountMenuInfo {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px 10px;
+  border-bottom: 1px solid #eceef2;
+}
+
+.accountMenuInfo strong {
+  font-size: 13px;
+  color: #1d2330;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountMenuInfo span {
+  font-size: 12px;
+  color: #7b818b;
+}
+
+.accountLogout {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #f0d3d0;
+  border-radius: 7px;
+  background: #fdecea;
+  color: #b3261e;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.accountLogout:hover {
+  background: #fbdedb;
+}
+
 .serviceFilterControl {
   min-width: 170px;
   min-height: 42px;
@@ -4138,7 +4386,10 @@ h3 {
 }
 
 .flowStepper.projectFlowStepper {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  /* 단계 개수가 5개(기획 생략)·6개로 달라져도 항상 가로 100%를 균등 분할 */
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 12px;
   width: 100%;
 }

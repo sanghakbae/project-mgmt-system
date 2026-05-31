@@ -11,6 +11,8 @@ export const workflow: Array<{ status: ProjectStatus; label: string; owner: stri
 
 export const roleLabels: Record<Role, string> = {
   requester: '요청자',
+  sales: '영업',
+  marketing: '마케팅',
   pm: 'PM',
   cem: 'CEM',
   developer: '개발자',

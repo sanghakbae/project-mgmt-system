@@ -28,6 +28,7 @@ import { notifyGoogleChat } from './notify'
 const SystemFlowPanel = lazy(() => import('./SystemFlowPanel').then((m) => ({ default: m.SystemFlowPanel })))
 import { roleLabels, workflow } from './data'
 import { hasSupabaseConfig, mapProjectRow, supabase } from './supabase'
+import type { Session } from '@supabase/supabase-js'
 import type { ApprovalState, IssueType, Priority, Project, ProjectRequestType, ProjectStatus, ProjectTask, ReviewDocs, Role, ScheduleInfo, SecurityReview, TaskStatus, WorkflowConfig } from './types'
 
 const statusLabels: Record<ProjectStatus, string> = {
@@ -42,6 +43,8 @@ const statusLabels: Record<ProjectStatus, string> = {
 
 const approvalStepLabels: Record<Role, string> = {
   requester: '요청자',
+  sales: '영업',
+  marketing: '마케팅',
   pm: 'PM',
   cem: 'CEM',
   developer: '개발',
@@ -407,7 +410,13 @@ const approvalRolesByRequestType: Record<ProjectRequestType, Role[]> = {
   infra_performance: fullApprovalRoles,
 }
 
-const activeRoles: Role[] = ['requester', 'pm', 'cem', 'developer', 'security', 'infra', 'qa', 'patent', 'admin']
+// 가입 시 선택 가능한 역할 — '요청자'는 별도 선택지로 두지 않음(영업·마케팅이 요청자 역할을 겸함)
+const activeRoles: Role[] = ['sales', 'marketing', 'pm', 'cem', 'developer', 'security', 'infra', 'qa', 'patent', 'admin']
+// 요청자 성격의 역할 — 영업·마케팅은 주로 요청자이며, 요청자와 동일하게 요청을 만들고 추적함
+const requesterRoles: Role[] = ['requester', 'sales', 'marketing']
+function isRequesterRole(role: Role) {
+  return requesterRoles.includes(role)
+}
 const demoToday = new Date('2026-05-17T09:00:00+09:00')
 
 type ViewMode = 'dashboard' | 'requestFlow' | 'pipeline' | 'flow' | 'settings'
@@ -439,7 +448,12 @@ function isProjectAssignedToRole(project: Project, role: Role) {
     // 이미 승인한 역할은 더 이상 '내 할 일'이 아님 — 미승인 필수 역할에게만 노출
     return project.approvalState.requiredRoles.includes(role) && !project.approvalState.approvedRoles.includes(role)
   }
-  return project.assigneeRole === role || (project.status === 'qc_security' && (role === 'qa' || role === 'security' || role === 'pm'))
+  return (
+    project.assigneeRole === role ||
+    // 요청자에게 배정된 단계는 영업·마케팅도 본인 할 일로 봄
+    (project.assigneeRole === 'requester' && isRequesterRole(role)) ||
+    (project.status === 'qc_security' && (role === 'qa' || role === 'security' || role === 'pm'))
+  )
 }
 
 // 단계별로 해당 역할이 실제로 '처리'하는 차례인지 — 대시보드 단계 컬럼 활성화 기준
@@ -447,9 +461,9 @@ function roleActsOnStatus(role: Role, status: ProjectStatus): boolean {
   if (role === 'admin') return status === 'completion'
   switch (status) {
     case 'request':
-      return role === 'requester'
+      return isRequesterRole(role)
     case 'planning':
-      return role === 'pm' || role === 'requester'
+      return role === 'pm' || isRequesterRole(role)
     case 'dept_review':
       return fullApprovalRoles.includes(role)
     case 'development':
@@ -465,8 +479,8 @@ function roleActsOnStatus(role: Role, status: ProjectStatus): boolean {
 
 function isProjectRelevantToRole(project: Project, role: Role) {
   if (role === 'admin') return true
-  // 요청자는 요청·기획 단계 프로젝트를 계속 열람/수정할 수 있어야 함
-  if (role === 'requester' && ['request', 'planning'].includes(project.status)) return true
+  // 요청자(영업·마케팅 포함)는 요청·기획 단계 프로젝트를 계속 열람/수정할 수 있어야 함
+  if (isRequesterRole(role) && ['request', 'planning'].includes(project.status)) return true
   if (project.status === 'dept_review') return project.approvalState.requiredRoles.includes(role)
   return isProjectAssignedToRole(project, role)
 }
@@ -641,12 +655,106 @@ function App() {
   const [srsCollapsed, setSrsCollapsed] = useState(false)
   const [sdsCollapsed, setSdsCollapsed] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  // 인증 상태 — 로그인 세션과 프로필(계정당 고정 역할)
+  const [session, setSession] = useState<Session | null>(null)
+  const [authReady, setAuthReady] = useState(!hasSupabaseConfig)
+  const [profile, setProfile] = useState<{ email: string; fullName: string; role: Role } | null>(null)
+  // 작성자 표기 — "이름(역할)" 형식. 이름이 없으면 역할만 표시
+  const authorName = profile?.fullName?.trim()
+  const authorLabel = authorName ? `${authorName}(${roleLabels[role]})` : roleLabels[role]
   const requestTypeConfig = requestTypeOptions.find((item) => item.type === requestForm.requestType) ?? requestTypeOptions[0]
 
+  // 로그인 세션 추적: 초기 세션 조회 + 이후 변화 구독
   useEffect(() => {
     if (!supabase) {
+      setAuthReady(true)
       return
     }
+    let active = true
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return
+      setSession(data.session)
+      setAuthReady(true)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession)
+    })
+    return () => {
+      active = false
+      sub.subscription.unsubscribe()
+    }
+  }, [])
+
+  // 세션 타임아웃 60분 고정: 로그인 시점 기준 60분이 지나면 강제 로그아웃
+  // (Supabase는 토큰을 자동 갱신해 세션을 무한 유지하므로 절대 만료를 직접 강제한다)
+  useEffect(() => {
+    if (!supabase) return
+    if (!session) {
+      window.localStorage.removeItem('pms-session-start')
+      return
+    }
+    const SESSION_MAX_MS = 60 * 60 * 1000 // 60분
+    const now = Date.now()
+    const storedRaw = window.localStorage.getItem('pms-session-start')
+    const stored = storedRaw ? Number(storedRaw) : NaN
+    // 저장값이 없거나 비정상(미래/만료초과)이면 지금을 시작점으로 재설정
+    const start = Number.isFinite(stored) && stored <= now && now - stored < SESSION_MAX_MS ? stored : now
+    if (String(start) !== storedRaw) {
+      window.localStorage.setItem('pms-session-start', String(start))
+    }
+    const remaining = start + SESSION_MAX_MS - now
+    if (remaining <= 0) {
+      window.localStorage.removeItem('pms-session-start')
+      supabase.auth.signOut()
+      return
+    }
+    const timer = window.setTimeout(() => {
+      window.localStorage.removeItem('pms-session-start')
+      supabase?.auth.signOut()
+      window.alert('세션이 만료되었습니다(60분). 다시 로그인해 주세요.')
+    }, remaining)
+    return () => window.clearTimeout(timer)
+  }, [session])
+
+  // 세션이 생기면 프로필(고정 역할)을 불러와 역할에 반영
+  useEffect(() => {
+    if (!supabase || !session) {
+      setProfile(null)
+      return
+    }
+    let active = true
+    supabase
+      .from('pms_profiles')
+      .select('email, full_name, role')
+      .eq('id', session.user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!active) return
+        const metaRole = (session.user.user_metadata?.role as Role) ?? 'requester'
+        const metaName = (session.user.user_metadata?.full_name as string) ?? ''
+        const nextRole = (data?.role as Role) ?? metaRole
+        setProfile({
+          email: data?.email ?? session.user.email ?? '',
+          fullName: data?.full_name ?? metaName,
+          role: nextRole,
+        })
+        setRole(nextRole)
+        // 관리자가 아닌데 설정 화면에 있으면 대시보드로 이동
+        if (nextRole !== 'admin') {
+          setViewMode((mode) => (mode === 'settings' ? 'dashboard' : mode))
+        }
+      })
+    return () => {
+      active = false
+    }
+  }, [session])
+
+  // 프로젝트 로드 — 로그인(세션) 이후에만 (RLS로 비로그인 접근 차단됨)
+  useEffect(() => {
+    if (!supabase || !session) {
+      return
+    }
+    setLoadState('loading')
 
     supabase
       .from('pms_projects')
@@ -667,7 +775,7 @@ function App() {
         )
         setLoadState('live')
       })
-  }, [])
+  }, [session])
 
   useEffect(() => {
     window.localStorage.setItem(serviceOptionsStorageKey, JSON.stringify(serviceOptions))
@@ -874,7 +982,7 @@ function App() {
     const baseLogEntry = {
       id: crypto.randomUUID(),
       at: logStamp(),
-      actor: roleLabels[role],
+      actor: authorLabel,
       message,
       // 승인 완료로 진행되면 문서 잠금 스냅샷 포함 (#12)
       meta: { approvalState, ...(shouldAdvance ? { docsLocked: true } : {}) },
@@ -883,7 +991,7 @@ function App() {
       ? {
           id: crypto.randomUUID(),
           at: logStamp(),
-          actor: roleLabels[role],
+          actor: authorLabel,
           message: `모든 승인 완료 → ${statusLabels[advancedStatus]} 단계로 자동 진행했습니다.`,
         }
       : null
@@ -932,7 +1040,7 @@ function App() {
       {
         id: crypto.randomUUID(),
         at: logStamp(),
-        actor: roleLabels[role],
+        actor: authorLabel,
         message: 'PM이 기획 문서(SRS+SDS)를 업데이트했습니다.',
         meta: { reviewDocs: currentReviewDocsDraft },
       },
@@ -979,7 +1087,7 @@ function App() {
       {
         id: crypto.randomUUID(),
         at: logStamp(),
-        actor: roleLabels[role],
+        actor: authorLabel,
         message: `${roleLabels[role]}이(가) 일정 조율 정보를 업데이트했습니다.`,
         meta: { schedule: currentScheduleDraft },
       },
@@ -1030,7 +1138,7 @@ function App() {
       approvedRoles: [...selectedApprovalState.approvedRoles, role],
       memos: {
         ...(selectedApprovalState.memos ?? {}),
-        [role]: { at: logStamp(), actor: roleLabels[role], message: trimmedMemo },
+        [role]: { at: logStamp(), actor: authorLabel, message: trimmedMemo },
       },
     }
 
@@ -1063,7 +1171,7 @@ function App() {
       {
         id: crypto.randomUUID(),
         at: logStamp(),
-        actor: roleLabels[role],
+        actor: authorLabel,
         message: willHold
           ? `프로젝트를 보류 처리했습니다.${reason ? ` 사유: ${reason}` : ''}`
           : '프로젝트 보류를 해제했습니다.',
@@ -1122,7 +1230,7 @@ function App() {
       {
         id: crypto.randomUUID(),
         at: logStamp(),
-        actor: roleLabels[role],
+        actor: authorLabel,
         message: `${statusLabels[targetStatus]} 단계로 이동했습니다.`,
         meta: selected.status === 'planning' ? { reviewDocs: currentReviewDocsDraft } : undefined,
       },
@@ -1188,7 +1296,7 @@ function App() {
       comments: merged.comments,
     }
     const nextLogs = [
-      { id: crypto.randomUUID(), at: logStamp(), actor: roleLabels[role], message: logMessage, meta: stateMeta },
+      { id: crypto.randomUUID(), at: logStamp(), actor: authorLabel, message: logMessage, meta: stateMeta },
       ...selected.logs,
     ]
     merged.logs = nextLogs
@@ -1246,7 +1354,7 @@ function App() {
     const comment = {
       id: crypto.randomUUID(),
       at: new Date().toISOString(),
-      actor: roleLabels[role],
+      actor: authorLabel,
       role,
       stage,
       message: trimmed,
@@ -1393,7 +1501,7 @@ function App() {
       {
         id: crypto.randomUUID(),
         at: logStamp(),
-        actor: roleLabels[role],
+        actor: authorLabel,
         message: logMessage,
       },
       ...selected.logs,
@@ -1431,7 +1539,7 @@ function App() {
       {
         id: crypto.randomUUID(),
         at: logStamp(),
-        actor: roleLabels[role],
+        actor: authorLabel,
         message: `새 일감을 등록했습니다: ${task.title}`,
       },
       ...target.logs,
@@ -1463,7 +1571,7 @@ function App() {
   async function updateRequesterContent(patch: Partial<Project>) {
     if (!selected) return
     const nextLogs = [
-      { id: crypto.randomUUID(), at: logStamp(), actor: roleLabels[role], message: '요청자가 요청 내용을 수정했습니다.' },
+      { id: crypto.randomUUID(), at: logStamp(), actor: authorLabel, message: '요청자가 요청 내용을 수정했습니다.' },
       ...selected.logs,
     ]
     const merged: Project = { ...selected, ...patch, logs: nextLogs, updatedAt: new Date().toISOString() }
@@ -1528,7 +1636,7 @@ function App() {
     const newComment = {
       id: crypto.randomUUID(),
       at: new Date().toISOString(),
-      actor: roleLabels[role],
+      actor: authorLabel,
       message: trimmed,
     }
     const nextTasks = selected.tasks.map((task) =>
@@ -1563,6 +1671,18 @@ function App() {
       프로젝트: selected.title,
       사유: statusNote,
     })
+  }
+
+  // 인증 게이트: Supabase가 설정된 경우 로그인 전에는 앱 셸을 렌더링하지 않음
+  if (hasSupabaseConfig && !authReady) {
+    return (
+      <div className="authShell">
+        <div className="authLoading">불러오는 중…</div>
+      </div>
+    )
+  }
+  if (hasSupabaseConfig && !session) {
+    return <AuthGate />
   }
 
   return (
@@ -1644,16 +1764,9 @@ function App() {
         <header className="topbar">
           <div />
           <div className="topbarActions">
-            <RoleSwitcher
-              role={role}
-              roles={activeRoles}
-              onSelect={(next) => {
-                setRole(next)
-                if (next !== 'admin' && viewMode === 'settings') {
-                  setViewMode('dashboard')
-                }
-              }}
-            />
+            {session ? (
+              <AccountMenu email={profile?.email ?? session.user.email ?? ''} role={role} />
+            ) : null}
             <div className={`connection ${loadState}`}>
               <Database size={16} />
               {loadState === 'live' ? 'Supabase 연결됨' : loadState === 'loading' ? 'DB 불러오는 중' : 'Supabase 연결 필요'}
@@ -2380,7 +2493,135 @@ function AttachmentPreviewModal({
   )
 }
 
-function RoleSwitcher({ role, roles, onSelect }: { role: Role; roles: Role[]; onSelect: (next: Role) => void }) {
+// 비밀번호 정책: 영문·숫자·특수문자 혼용, 8자 이상
+function validatePasswordPolicy(password: string): string | null {
+  if (password.length < 8) return '비밀번호는 8자 이상이어야 합니다.'
+  if (!/[A-Za-z]/.test(password)) return '비밀번호에 영문자를 포함해야 합니다.'
+  if (!/[0-9]/.test(password)) return '비밀번호에 숫자를 포함해야 합니다.'
+  if (!/[^A-Za-z0-9]/.test(password)) return '비밀번호에 특수문자를 포함해야 합니다.'
+  return null
+}
+
+function translateAuthError(message: string): string {
+  const m = message.toLowerCase()
+  if (m.includes('invalid login credentials')) return '이메일 또는 비밀번호가 올바르지 않습니다.'
+  if (m.includes('email not confirmed')) return '이메일 인증이 완료되지 않았습니다. 받은 메일의 인증 링크를 확인하세요.'
+  if (m.includes('user already registered') || m.includes('already been registered')) return '이미 가입된 이메일입니다. 로그인해 주세요.'
+  if (m.includes('password should be at least')) return '비밀번호는 6자 이상이어야 합니다.'
+  if (m.includes('unable to validate email') || m.includes('invalid email')) return '이메일 형식이 올바르지 않습니다.'
+  return message
+}
+
+// 가입/로그인 화면 — Supabase Auth(이메일+비밀번호)
+function AuthGate() {
+  const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [signupRole, setSignupRole] = useState<Role>('sales')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    if (!supabase || busy) return
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      if (mode === 'login') {
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+        if (error) setError(translateAuthError(error.message))
+        // 성공 시 onAuthStateChange가 앱을 갱신
+      } else {
+        const pwError = validatePasswordPolicy(password)
+        if (pwError) {
+          setError(pwError)
+          return
+        }
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: { data: { full_name: fullName.trim(), role: signupRole } },
+        })
+        if (error) {
+          setError(translateAuthError(error.message))
+        } else if (!data.session) {
+          // 이메일 인증을 끈 환경: 가입 직후 세션이 없으면 곧바로 로그인 시도
+          const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+          if (signInError) setError(translateAuthError(signInError.message))
+          // 성공 시 onAuthStateChange가 앱을 갱신
+        }
+        // data.session이 있으면 자동 로그인됨
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="authShell">
+      <form className="authCard" onSubmit={handleSubmit}>
+        <div className="authBrand">
+          <div className="authBrandMark"><ClipboardList size={22} /></div>
+          <div>
+            <strong>프로젝트 관리 시스템</strong>
+            <span>Workflow PMO</span>
+          </div>
+        </div>
+
+        <div className="authTabs" role="tablist">
+          <button type="button" role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); setError(''); setNotice('') }}>로그인</button>
+          <button type="button" role="tab" aria-selected={mode === 'signup'} className={mode === 'signup' ? 'active' : ''} onClick={() => { setMode('signup'); setError(''); setNotice('') }}>가입</button>
+        </div>
+
+        {mode === 'signup' && (
+          <label className="authField">
+            <span>이름</span>
+            <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="홍길동" autoComplete="name" required />
+          </label>
+        )}
+
+        <label className="authField">
+          <span>이메일</span>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" autoComplete="email" required />
+        </label>
+
+        <label className="authField">
+          <span>비밀번호</span>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={mode === 'signup' ? '영문+숫자+특수문자 8자 이상' : '비밀번호'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={mode === 'signup' ? 8 : undefined} required />
+          {mode === 'signup' && <small className="authHint">영문·숫자·특수문자를 모두 포함해 8자 이상으로 입력하세요.</small>}
+        </label>
+
+        {mode === 'signup' && (
+          <label className="authField">
+            <span>역할</span>
+            <select value={signupRole} onChange={(e) => setSignupRole(e.target.value as Role)}>
+              {activeRoles.map((item) => (
+                <option key={item} value={item}>{roleLabels[item]}</option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {error && <p className="authError">{error}</p>}
+        {notice && <p className="authNotice">{notice}</p>}
+
+        <button type="submit" className="authSubmit" disabled={busy}>
+          {busy ? '처리 중…' : mode === 'login' ? '로그인' : '가입하기'}
+        </button>
+
+        {mode === 'signup' && (
+          <p className="authHint">가입 후 역할은 계정에 고정됩니다. 변경이 필요하면 관리자에게 문의하세요.</p>
+        )}
+      </form>
+    </div>
+  )
+}
+
+// 계정 메뉴 — 로그인 사용자 이메일·고정 역할 표시 + 로그아웃
+function AccountMenu({ email, role }: { email: string; role: Role }) {
   const [open, setOpen] = useState(false)
   useEffect(() => {
     if (!open) return
@@ -2389,27 +2630,21 @@ function RoleSwitcher({ role, roles, onSelect }: { role: Role; roles: Role[]; on
     return () => window.removeEventListener('click', close)
   }, [open])
   return (
-    <div className="roleControl roleSwitcher" onClick={(e) => e.stopPropagation()}>
-      <span>현재 역할</span>
-      <button type="button" className="roleSwitcherBtn" onClick={() => setOpen((v) => !v)} aria-haspopup="listbox" aria-expanded={open}>
-        {roleLabels[role]}
+    <div className="roleControl accountMenu" onClick={(e) => e.stopPropagation()}>
+      <button type="button" className="accountMenuBtn" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open}>
+        <span className="accountRoleBadge">{roleLabels[role]}</span>
+        <span className="accountEmail">{email}</span>
         <span className="roleSwitcherChevron">{open ? '▴' : '▾'}</span>
       </button>
       {open && (
-        <div className="roleSwitcherMenu" role="listbox">
-          {roles.map((item) => (
-            <button
-              key={item}
-              type="button"
-              role="option"
-              aria-selected={item === role}
-              className={item === role ? 'active' : ''}
-              onClick={() => { onSelect(item); setOpen(false) }}
-            >
-              {roleLabels[item]}
-              {item === role && <span className="roleCheck">✓</span>}
-            </button>
-          ))}
+        <div className="accountMenuPanel" role="menu">
+          <div className="accountMenuInfo">
+            <strong>{email}</strong>
+            <span>역할: {roleLabels[role]}</span>
+          </div>
+          <button type="button" className="accountLogout" onClick={() => { void supabase?.auth.signOut() }}>
+            로그아웃
+          </button>
         </div>
       )}
     </div>

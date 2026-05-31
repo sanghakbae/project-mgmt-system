@@ -1,4 +1,4 @@
-export type Role = 'requester' | 'pm' | 'cem' | 'developer' | 'qa' | 'security' | 'infra' | 'patent' | 'admin'
+export type Role = 'requester' | 'sales' | 'marketing' | 'pm' | 'cem' | 'developer' | 'qa' | 'security' | 'infra' | 'patent' | 'admin'
 
 export type Priority = 'low' | 'normal' | 'high' | 'urgent'
 
