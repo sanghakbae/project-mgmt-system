@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react'
 import {
   AlertTriangle,
   BarChart3,
@@ -28,7 +28,6 @@ import { notifyGoogleChat } from './notify'
 const SystemFlowPanel = lazy(() => import('./SystemFlowPanel').then((m) => ({ default: m.SystemFlowPanel })))
 import { roleLabels, workflow } from './data'
 import { hasSupabaseConfig, mapProjectRow, supabase } from './supabase'
-import type { Session } from '@supabase/supabase-js'
 import type { ApprovalState, IssueType, Priority, Project, ProjectRequestType, ProjectStatus, ProjectTask, ReviewDocs, Role, ScheduleInfo, SecurityReview, TaskStatus, WorkflowConfig } from './types'
 
 const statusLabels: Record<ProjectStatus, string> = {
@@ -72,6 +71,43 @@ const taskLabels: Record<TaskStatus, string> = {
 const defaultServiceOptions = ['카피킬러', '프리즘', '몬스터']
 const serviceOptionsStorageKey = 'pms-service-options'
 const sessionStateStorageKey = 'pms-session-state'
+
+// ── DB 계정 인증 ──────────────────────────────────────────────
+// 로그인한 계정 정보 (비밀번호는 보관하지 않음)
+export type Account = { id: string; email: string; fullName: string; role: Role }
+const accountStorageKey = 'pms-account'
+const sessionStartStorageKey = 'pms-session-start'
+const SESSION_MAX_MS = 60 * 60 * 1000 // 세션 타임아웃 60분 고정
+
+// localStorage에서 계정 복원. 로그인 60분이 지났으면 만료 처리하고 null 반환.
+function loadStoredAccount(): Account | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(accountStorageKey)
+    if (!raw) return null
+    const startRaw = window.localStorage.getItem(sessionStartStorageKey)
+    const start = startRaw ? Number(startRaw) : NaN
+    if (!Number.isFinite(start) || Date.now() - start >= SESSION_MAX_MS) {
+      window.localStorage.removeItem(accountStorageKey)
+      window.localStorage.removeItem(sessionStartStorageKey)
+      return null
+    }
+    return JSON.parse(raw) as Account
+  } catch {
+    return null
+  }
+}
+
+// 로그인 성공 시 계정 + 세션 시작 시각 저장
+function storeAccount(account: Account) {
+  window.localStorage.setItem(accountStorageKey, JSON.stringify(account))
+  window.localStorage.setItem(sessionStartStorageKey, String(Date.now()))
+}
+
+function clearStoredAccount() {
+  window.localStorage.removeItem(accountStorageKey)
+  window.localStorage.removeItem(sessionStartStorageKey)
+}
 
 function readSessionState(): { viewMode?: ViewMode; role?: Role; selectedId?: string } {
   if (typeof window === 'undefined') return {}
@@ -655,103 +691,48 @@ function App() {
   const [srsCollapsed, setSrsCollapsed] = useState(false)
   const [sdsCollapsed, setSdsCollapsed] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
-  // 인증 상태 — 로그인 세션과 프로필(계정당 고정 역할)
-  const [session, setSession] = useState<Session | null>(null)
-  const [authReady, setAuthReady] = useState(!hasSupabaseConfig)
-  const [profile, setProfile] = useState<{ email: string; fullName: string; role: Role } | null>(null)
+  // 인증 상태 — DB 계정 기반 로그인(계정당 고정 역할). localStorage에 60분 세션 보관.
+  const [account, setAccount] = useState<Account | null>(() => loadStoredAccount())
   // 작성자 표기 — "이름(역할)" 형식. 이름이 없으면 역할만 표시
-  const authorName = profile?.fullName?.trim()
+  const authorName = account?.fullName?.trim()
   const authorLabel = authorName ? `${authorName}(${roleLabels[role]})` : roleLabels[role]
   const requestTypeConfig = requestTypeOptions.find((item) => item.type === requestForm.requestType) ?? requestTypeOptions[0]
 
-  // 로그인 세션 추적: 초기 세션 조회 + 이후 변화 구독
+  // 로그인하면 계정의 고정 역할을 적용. 관리자가 아니면 설정 화면에서 대시보드로 이동.
   useEffect(() => {
-    if (!supabase) {
-      setAuthReady(true)
-      return
+    if (!account) return
+    setRole(account.role)
+    if (account.role !== 'admin') {
+      setViewMode((mode) => (mode === 'settings' ? 'dashboard' : mode))
     }
-    let active = true
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return
-      setSession(data.session)
-      setAuthReady(true)
-    })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession)
-    })
-    return () => {
-      active = false
-      sub.subscription.unsubscribe()
-    }
+  }, [account])
+
+  // 로그아웃: 저장된 계정·세션을 비운다
+  const handleLogout = useCallback(() => {
+    clearStoredAccount()
+    setAccount(null)
   }, [])
 
   // 세션 타임아웃 60분 고정: 로그인 시점 기준 60분이 지나면 강제 로그아웃
-  // (Supabase는 토큰을 자동 갱신해 세션을 무한 유지하므로 절대 만료를 직접 강제한다)
   useEffect(() => {
-    if (!supabase) return
-    if (!session) {
-      window.localStorage.removeItem('pms-session-start')
-      return
-    }
-    const SESSION_MAX_MS = 60 * 60 * 1000 // 60분
-    const now = Date.now()
-    const storedRaw = window.localStorage.getItem('pms-session-start')
-    const stored = storedRaw ? Number(storedRaw) : NaN
-    // 저장값이 없거나 비정상(미래/만료초과)이면 지금을 시작점으로 재설정
-    const start = Number.isFinite(stored) && stored <= now && now - stored < SESSION_MAX_MS ? stored : now
-    if (String(start) !== storedRaw) {
-      window.localStorage.setItem('pms-session-start', String(start))
-    }
-    const remaining = start + SESSION_MAX_MS - now
+    if (!account) return
+    const startRaw = window.localStorage.getItem(sessionStartStorageKey)
+    const start = startRaw ? Number(startRaw) : Date.now()
+    const remaining = start + SESSION_MAX_MS - Date.now()
     if (remaining <= 0) {
-      window.localStorage.removeItem('pms-session-start')
-      supabase.auth.signOut()
+      handleLogout()
       return
     }
     const timer = window.setTimeout(() => {
-      window.localStorage.removeItem('pms-session-start')
-      supabase?.auth.signOut()
+      handleLogout()
       window.alert('세션이 만료되었습니다(60분). 다시 로그인해 주세요.')
     }, remaining)
     return () => window.clearTimeout(timer)
-  }, [session])
+  }, [account, handleLogout])
 
-  // 세션이 생기면 프로필(고정 역할)을 불러와 역할에 반영
+  // 프로젝트 로드 — 로그인(계정) 이후에만
   useEffect(() => {
-    if (!supabase || !session) {
-      setProfile(null)
-      return
-    }
-    let active = true
-    supabase
-      .from('pms_profiles')
-      .select('email, full_name, role')
-      .eq('id', session.user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!active) return
-        const metaRole = (session.user.user_metadata?.role as Role) ?? 'requester'
-        const metaName = (session.user.user_metadata?.full_name as string) ?? ''
-        const nextRole = (data?.role as Role) ?? metaRole
-        setProfile({
-          email: data?.email ?? session.user.email ?? '',
-          fullName: data?.full_name ?? metaName,
-          role: nextRole,
-        })
-        setRole(nextRole)
-        // 관리자가 아닌데 설정 화면에 있으면 대시보드로 이동
-        if (nextRole !== 'admin') {
-          setViewMode((mode) => (mode === 'settings' ? 'dashboard' : mode))
-        }
-      })
-    return () => {
-      active = false
-    }
-  }, [session])
-
-  // 프로젝트 로드 — 로그인(세션) 이후에만 (RLS로 비로그인 접근 차단됨)
-  useEffect(() => {
-    if (!supabase || !session) {
+    if (!supabase || !account) {
       return
     }
     setLoadState('loading')
@@ -775,7 +756,7 @@ function App() {
         )
         setLoadState('live')
       })
-  }, [session])
+  }, [account])
 
   useEffect(() => {
     window.localStorage.setItem(serviceOptionsStorageKey, JSON.stringify(serviceOptions))
@@ -1674,15 +1655,8 @@ function App() {
   }
 
   // 인증 게이트: Supabase가 설정된 경우 로그인 전에는 앱 셸을 렌더링하지 않음
-  if (hasSupabaseConfig && !authReady) {
-    return (
-      <div className="authShell">
-        <div className="authLoading">불러오는 중…</div>
-      </div>
-    )
-  }
-  if (hasSupabaseConfig && !session) {
-    return <AuthGate />
+  if (hasSupabaseConfig && !account) {
+    return <AuthGate onAuthenticated={(next) => { storeAccount(next); setAccount(next) }} />
   }
 
   return (
@@ -1764,8 +1738,8 @@ function App() {
         <header className="topbar">
           <div />
           <div className="topbarActions">
-            {session ? (
-              <AccountMenu email={profile?.email ?? session.user.email ?? ''} role={role} />
+            {account ? (
+              <AccountMenu email={account.email} role={role} onLogout={handleLogout} />
             ) : null}
             <div className={`connection ${loadState}`}>
               <Database size={16} />
@@ -2504,16 +2478,20 @@ function validatePasswordPolicy(password: string): string | null {
 
 function translateAuthError(message: string): string {
   const m = message.toLowerCase()
+  if (m.includes('email_taken')) return '이미 가입된 이메일입니다. 로그인해 주세요.'
+  if (m.includes('weak_password')) return '비밀번호는 8자 이상이어야 합니다.'
+  if (m.includes('invalid_email')) return '이메일 형식이 올바르지 않습니다.'
   if (m.includes('invalid login credentials')) return '이메일 또는 비밀번호가 올바르지 않습니다.'
-  if (m.includes('email not confirmed')) return '이메일 인증이 완료되지 않았습니다. 받은 메일의 인증 링크를 확인하세요.'
-  if (m.includes('user already registered') || m.includes('already been registered')) return '이미 가입된 이메일입니다. 로그인해 주세요.'
-  if (m.includes('password should be at least')) return '비밀번호는 6자 이상이어야 합니다.'
-  if (m.includes('unable to validate email') || m.includes('invalid email')) return '이메일 형식이 올바르지 않습니다.'
   return message
 }
 
-// 가입/로그인 화면 — Supabase Auth(이메일+비밀번호)
-function AuthGate() {
+// RPC가 돌려준 계정 JSON을 Account로 변환
+function toAccount(row: { id: string; email: string; full_name?: string; role: string }): Account {
+  return { id: row.id, email: row.email, fullName: row.full_name ?? '', role: row.role as Role }
+}
+
+// 가입/로그인 화면 — DB 계정(pms_accounts) + RPC(pms_register / pms_authenticate)
+function AuthGate({ onAuthenticated }: { onAuthenticated: (account: Account) => void }) {
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -2526,34 +2504,42 @@ function AuthGate() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     if (!supabase || busy) return
-    setBusy(true)
     setError('')
     setNotice('')
+    if (mode === 'signup') {
+      const pwError = validatePasswordPolicy(password)
+      if (pwError) {
+        setError(pwError)
+        return
+      }
+    }
+    setBusy(true)
     try {
       if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
-        if (error) setError(translateAuthError(error.message))
-        // 성공 시 onAuthStateChange가 앱을 갱신
-      } else {
-        const pwError = validatePasswordPolicy(password)
-        if (pwError) {
-          setError(pwError)
-          return
-        }
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: { data: { full_name: fullName.trim(), role: signupRole } },
+        const { data, error } = await supabase.rpc('pms_authenticate', {
+          p_email: email.trim(),
+          p_password: password,
         })
         if (error) {
           setError(translateAuthError(error.message))
-        } else if (!data.session) {
-          // 이메일 인증을 끈 환경: 가입 직후 세션이 없으면 곧바로 로그인 시도
-          const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
-          if (signInError) setError(translateAuthError(signInError.message))
-          // 성공 시 onAuthStateChange가 앱을 갱신
+        } else if (!data) {
+          setError('이메일 또는 비밀번호가 올바르지 않습니다.')
+        } else {
+          onAuthenticated(toAccount(data))
         }
-        // data.session이 있으면 자동 로그인됨
+      } else {
+        const { data, error } = await supabase.rpc('pms_register', {
+          p_email: email.trim(),
+          p_password: password,
+          p_full_name: fullName.trim(),
+          p_role: signupRole,
+        })
+        if (error) {
+          setError(translateAuthError(error.message))
+        } else if (data) {
+          // 가입 즉시 로그인 처리
+          onAuthenticated(toAccount(data))
+        }
       }
     } finally {
       setBusy(false)
@@ -2621,7 +2607,7 @@ function AuthGate() {
 }
 
 // 계정 메뉴 — 로그인 사용자 이메일·고정 역할 표시 + 로그아웃
-function AccountMenu({ email, role }: { email: string; role: Role }) {
+function AccountMenu({ email, role, onLogout }: { email: string; role: Role; onLogout: () => void }) {
   const [open, setOpen] = useState(false)
   useEffect(() => {
     if (!open) return
@@ -2642,7 +2628,7 @@ function AccountMenu({ email, role }: { email: string; role: Role }) {
             <strong>{email}</strong>
             <span>역할: {roleLabels[role]}</span>
           </div>
-          <button type="button" className="accountLogout" onClick={() => { void supabase?.auth.signOut() }}>
+          <button type="button" className="accountLogout" onClick={onLogout}>
             로그아웃
           </button>
         </div>

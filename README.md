@@ -23,22 +23,25 @@ cp .env.example .env.local
 npm run dev
 ```
 
-## 인증 + 권한(RLS)
+## 인증 (DB 계정 기반)
 
-로그인한 사용자만 데이터에 접근할 수 있습니다. 가입 시 선택한 역할이 계정에 고정됩니다.
+이메일/비밀번호를 Supabase Auth가 아니라 **앱 전용 계정 테이블(`pms_accounts`)에 직접 저장**하고,
+RPC 함수로 가입·로그인을 처리합니다. **이메일 인증(Confirm email)·인증 메일이 전혀 필요 없습니다.**
 
-1. Supabase SQL Editor에서 `supabase/migrations/20260531190000_add_pms_auth_rls.sql`을 실행합니다.
-   - `pms_profiles`(사용자 역할) 테이블, 가입 트리거, `pms_current_role()` 헬퍼 생성
-   - `pms_projects`의 익명(anon) 접근 제거 → 로그인 사용자만 조회/생성/수정, 삭제는 관리자만
-2. **이메일 인증 사용**: **Authentication → Providers → Email**에서 "Confirm email"을 켜둡니다.
-   가입 후 받은 메일의 인증 링크를 클릭해야 로그인할 수 있습니다(앱이 "메일 인증 후 로그인"
-   안내를 표시합니다).
-3. 가입 시 본인 역할을 선택합니다(영업·마케팅 포함). 영업·마케팅은 기본적으로 요청자 역할이며,
-   모든 역할이 새 요청을 등록할 수 있습니다. 역할은 계정에 고정되며 변경은 관리자가
-   `pms_profiles.role`을 직접 수정합니다.
+1. Supabase SQL Editor에서 **`supabase/migrations/20260531200000_pms_db_auth.sql`** 을 한 번 실행합니다.
+   - `pgcrypto` 확장 + `pms_accounts` 테이블 생성(비밀번호는 bcrypt 해시로 저장)
+   - `pms_register()` / `pms_authenticate()` RPC 함수 생성(SECURITY DEFINER, 직접 테이블 접근은 RLS로 차단)
+   - `pms_projects` 정책을 anon 포함으로 복원(Supabase Auth 세션을 쓰지 않으므로)
+2. 그게 끝입니다. 앱에서 **가입 → 즉시 로그인**됩니다. 대시보드 토글이나 메일 확인 단계 없음.
 
-> ⚠️ RLS 적용 후에는 anon 키만 쓰는 `scripts/seed.ts` 시드가 막힙니다.
-> 시드는 RLS 적용 전에 끝내두거나, 이후에는 service_role 키로만 가능합니다.
+- 가입 시 본인 역할을 선택합니다(요청자 제외, 영업·마케팅 포함). 모든 역할이 새 요청을 등록할 수 있습니다.
+- 역할은 계정에 고정되며, 변경은 `pms_accounts.role`을 직접 수정합니다.
+- 비밀번호 정책: 영문·숫자·특수문자 혼용 8자 이상.
+- 세션 타임아웃 60분 고정(로그인 60분 경과 시 자동 로그아웃).
+
+> 참고: 자체 계정 인증이므로 `pms_projects`는 anon 키로 접근 가능합니다(공개 번들의 anon 키로 데이터
+> 접근 가능). 더 강한 보호가 필요하면 Supabase Auth로 다시 전환하세요.
+> 이전 `20260531190000_add_pms_auth_rls.sql`(Supabase Auth 방식)은 이 방식과 함께 쓰지 않습니다.
 
 ## 주요 화면
 
