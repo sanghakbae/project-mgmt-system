@@ -17,7 +17,6 @@ import {
   Plus,
   Search,
   Send,
-  ShieldCheck,
   SlidersHorizontal,
   Users,
   Workflow,
@@ -32,27 +31,13 @@ import { hasSupabaseConfig, mapProjectRow, supabase } from './supabase'
 import type { ApprovalState, IssueType, Priority, Project, ProjectRequestType, ProjectStatus, ProjectTask, ReviewDocs, Role, ScheduleInfo, SecurityReview, TaskStatus, WorkflowConfig } from './types'
 
 const statusLabels: Record<ProjectStatus, string> = {
-  request: '요청',
-  dept_review: '승인',
-  planning: '기획',
-  schedule: '개발 준비/일정 확정',
-  development: '개발',
-  qc_security: 'QC/보안/PM',
-  completion: '완료보고',
-  published: '게시',
+  request: '요청 단계',
+  dept_review: '승인 단계',
+  planning: '기획 단계',
+  development: '개발 단계',
+  qc_security: '검토 단계',
+  completion: '완료 보고',
   rejected: '반려',
-}
-
-const statusOwnerRoles: Record<ProjectStatus, Role> = {
-  request: 'requester',
-  dept_review: 'pm',
-  planning: 'pm',
-  schedule: 'pm',
-  development: 'developer',
-  qc_security: 'qa',
-  completion: 'admin',
-  published: 'admin',
-  rejected: 'requester',
 }
 
 const approvalStepLabels: Record<Role, string> = {
@@ -83,6 +68,17 @@ const taskLabels: Record<TaskStatus, string> = {
 
 const defaultServiceOptions = ['카피킬러', '프리즘', '몬스터']
 const serviceOptionsStorageKey = 'pms-service-options'
+const sessionStateStorageKey = 'pms-session-state'
+
+function readSessionState(): { viewMode?: ViewMode; role?: Role; selectedId?: string } {
+  if (typeof window === 'undefined') return {}
+  try {
+    const saved = window.localStorage.getItem(sessionStateStorageKey)
+    return saved ? JSON.parse(saved) : {}
+  } catch {
+    return {}
+  }
+}
 type ServiceFilter = 'all' | string
 
 const issueTypeLabels: Record<IssueType, string> = {
@@ -363,7 +359,7 @@ const defaultWorkflowConfig: WorkflowConfig = {
   requiresQcSecurity: true,
 }
 
-const fullApprovalRoles: Role[] = ['pm', 'cem', 'developer', 'security', 'infra', 'qa', 'patent', 'admin']
+const fullApprovalRoles: Role[] = ['cem', 'developer', 'security', 'infra', 'qa', 'patent']
 
 const requestFieldRules: Record<
   ProjectRequestType,
@@ -414,7 +410,7 @@ const approvalRolesByRequestType: Record<ProjectRequestType, Role[]> = {
 const activeRoles: Role[] = ['requester', 'pm', 'cem', 'developer', 'security', 'infra', 'qa', 'patent', 'admin']
 const demoToday = new Date('2026-05-17T09:00:00+09:00')
 
-type ViewMode = 'dashboard' | 'request' | 'pipeline' | 'flow' | 'settings'
+type ViewMode = 'dashboard' | 'requestFlow' | 'pipeline' | 'flow' | 'settings'
 type StatusFilter = ProjectStatus | 'all' | 'active' | 'dueSoon' | 'mine' | 'risk' | 'blocked'
 
 type RequestFormState = {
@@ -436,18 +432,35 @@ type RequestFormState = {
   securityReview: SecurityReview
 }
 
-function roleOwnsStatus(status: ProjectStatus, role: Role) {
-  if (status === 'dept_review') {
-    return fullApprovalRoles.includes(role)
+function isProjectAssignedToRole(project: Project, role: Role) {
+  // 관리자의 실제 처리 차례는 '완료 보고' 단계뿐 — 그 외 단계는 내 할 일이 아님
+  if (role === 'admin') return project.status === 'completion'
+  if (project.status === 'dept_review') {
+    // 이미 승인한 역할은 더 이상 '내 할 일'이 아님 — 미승인 필수 역할에게만 노출
+    return project.approvalState.requiredRoles.includes(role) && !project.approvalState.approvedRoles.includes(role)
   }
-  return statusOwnerRoles[status] === role || (status === 'qc_security' && (role === 'qa' || role === 'security' || role === 'pm'))
+  return project.assigneeRole === role || (project.status === 'qc_security' && (role === 'qa' || role === 'security' || role === 'pm'))
 }
 
-function isProjectAssignedToRole(project: Project, role: Role) {
-  if (project.status === 'dept_review') {
-    return role === 'admin' || project.approvalState.requiredRoles.includes(role)
+// 단계별로 해당 역할이 실제로 '처리'하는 차례인지 — 대시보드 단계 컬럼 활성화 기준
+function roleActsOnStatus(role: Role, status: ProjectStatus): boolean {
+  if (role === 'admin') return status === 'completion'
+  switch (status) {
+    case 'request':
+      return role === 'requester'
+    case 'planning':
+      return role === 'pm' || role === 'requester'
+    case 'dept_review':
+      return fullApprovalRoles.includes(role)
+    case 'development':
+      return role === 'pm' || role === 'developer'
+    case 'qc_security':
+      return role === 'qa' || role === 'security' || role === 'pm'
+    case 'completion':
+      return role === 'pm'
+    default:
+      return false
   }
-  return role === 'admin' || project.assigneeRole === role || (project.status === 'qc_security' && (role === 'qa' || role === 'security' || role === 'pm'))
 }
 
 function isProjectRelevantToRole(project: Project, role: Role) {
@@ -593,9 +606,10 @@ function serializeSrsSections(map: Record<SrsSectionKey, string>): string {
 
 
 function App() {
+  const restoredSession = readSessionState()
   const [projects, setProjects] = useState<Project[]>([])
-  const [selectedId, setSelectedId] = useState('')
-  const [role, setRole] = useState<Role>('requester')
+  const [selectedId, setSelectedId] = useState(restoredSession.selectedId ?? '')
+  const [role, setRole] = useState<Role>(restoredSession.role ?? 'requester')
   const [serviceOptions, setServiceOptions] = useState<string[]>(() => {
     if (typeof window === 'undefined') return defaultServiceOptions
     try {
@@ -607,10 +621,19 @@ function App() {
     }
   })
   const [serviceFilter, setServiceFilter] = useState<ServiceFilter>('all')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  // 프로젝트 목록은 항상 '내 할 일'만 보여주므로 필터 값은 더 이상 사용하지 않음 (setter는 네비게이션 호환용 유지)
+  const [, setStatusFilter] = useState<StatusFilter>('mine')
   const [query, setQuery] = useState('')
   const [loadState, setLoadState] = useState<'loading' | 'live' | 'error'>(hasSupabaseConfig ? 'loading' : 'error')
-  const [viewMode, setViewMode] = useState<ViewMode>('dashboard')
+  const [viewMode, setViewMode] = useState<ViewMode>(restoredSession.viewMode ?? 'dashboard')
+  // 프로젝트 상세에서 스텝퍼 클릭으로 보고 있는 단계(실제 프로젝트 상태와 별개)
+  const [viewedStageIndex, setViewedStageIndex] = useState<number | null>(null)
+  // 승인 단계에서 각 담당자가 확인하며 남길 메모 임시 입력
+  const [approvalMemoDraft, setApprovalMemoDraft] = useState('')
+  // 인라인 승인 입력창 열림 여부 (확인 버튼 클릭 시 토글)
+  const [approvalInlineOpen, setApprovalInlineOpen] = useState(false)
+  // 승인 이력 내 임시 댓글 입력
+  const [approvalCommentInput, setApprovalCommentInput] = useState('')
   const [requestForm, setRequestForm] = useState<RequestFormState>(emptyRequestForm)
   const [reviewDocsDrafts, setReviewDocsDrafts] = useState<Record<string, ReviewDocs>>({})
   const [scheduleDrafts, setScheduleDrafts] = useState<Record<string, ScheduleInfo>>({})
@@ -637,7 +660,11 @@ function App() {
 
         const liveProjects = (data ?? []).map((row) => mapProjectRow(row))
         setProjects(liveProjects)
-        setSelectedId(liveProjects[0]?.id ?? '')
+        setSelectedId((current) =>
+          current && liveProjects.some((project) => project.id === current)
+            ? current
+            : liveProjects[0]?.id ?? '',
+        )
         setLoadState('live')
       })
   }, [])
@@ -645,6 +672,11 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(serviceOptionsStorageKey, JSON.stringify(serviceOptions))
   }, [serviceOptions])
+
+  // 새로고침 시 마지막으로 보던 화면·역할·선택 프로젝트 복원
+  useEffect(() => {
+    window.localStorage.setItem(sessionStateStorageKey, JSON.stringify({ viewMode, role, selectedId }))
+  }, [viewMode, role, selectedId])
 
   function replaceServiceOptions(nextOptions: string[]) {
     const normalized = Array.from(new Set(nextOptions.map((item) => item.trim()).filter(Boolean)))
@@ -693,20 +725,26 @@ function App() {
       if (timeoutId) window.clearTimeout(timeoutId)
     }
   }, [queueScopedProjects, selectedId, serviceScopedProjects, viewMode])
-  const selectedApprovalState = selected?.approvalState ?? { requiredRoles: [], approvedRoles: [] }
+  const rawApprovalState = selected?.approvalState ?? { requiredRoles: [] as Role[], approvedRoles: [] as Role[] }
+  // 옛 데이터에 'pm'/'admin' 같은 더 이상 쓰지 않는 승인 역할이 남아 있을 수 있으니 항상 현재 fullApprovalRoles 기준으로 정리
+  const selectedApprovalState = {
+    ...rawApprovalState,
+    requiredRoles: rawApprovalState.requiredRoles.filter((r) => fullApprovalRoles.includes(r)),
+    approvedRoles: rawApprovalState.approvedRoles.filter((r) => fullApprovalRoles.includes(r)),
+  }
   const selectedWorkflow = selected ? workflow.filter((item) => {
     if (item.status === 'qc_security') return selected.workflowConfig.requiresQcSecurity
     if (item.status === 'planning') return isPlanningRequired(selected)
     return true
   }) : workflow
   const metrics = useMemo(() => {
-    const active = serviceScopedProjects.filter((project) => !['published', 'rejected'].includes(project.status))
-    const dueSoon = serviceScopedProjects.filter((project) => daysUntil(project.dueDate, demoToday) <= 5 && project.status !== 'published')
+    const active = serviceScopedProjects.filter((project) => !['rejected'].includes(project.status))
+    const dueSoon = serviceScopedProjects.filter((project) => daysUntil(project.dueDate, demoToday) <= 5 && true)
     const blocked = serviceScopedProjects.reduce((count, project) => count + project.tasks.filter((task) => task.status === 'blocked').length, 0)
     const myQueue = serviceScopedProjects.filter((project) => isProjectAssignedToRole(project, role))
     const relevantProjects = serviceScopedProjects.filter((project) => isProjectRelevantToRole(project, role))
-    const relevantActive = relevantProjects.filter((project) => !['published', 'rejected'].includes(project.status))
-    const relevantDueSoon = relevantProjects.filter((project) => daysUntil(project.dueDate, demoToday) <= 5 && project.status !== 'published')
+    const relevantActive = relevantProjects.filter((project) => !['rejected'].includes(project.status))
+    const relevantDueSoon = relevantProjects.filter((project) => daysUntil(project.dueDate, demoToday) <= 5 && true)
     const relevantBlocked = relevantProjects.reduce((count, project) => count + project.tasks.filter((task) => task.status === 'blocked').length, 0)
 
     return {
@@ -724,17 +762,10 @@ function App() {
 
   const filteredProjects = useMemo(() => {
     return queueScopedProjects
-      .filter((project) => {
-        if (statusFilter === 'mine') return isProjectAssignedToRole(project, role)
-        if (statusFilter === 'risk') return project.priority === 'urgent' || project.tasks.some((task) => task.status === 'blocked')
-        if (statusFilter === 'blocked') return project.tasks.some((task) => task.status === 'blocked')
-        if (statusFilter === 'active') return !['published', 'rejected'].includes(project.status)
-        if (statusFilter === 'dueSoon') return daysUntil(project.dueDate, demoToday) <= 5 && project.status !== 'published'
-        if (statusFilter === 'all') return true
-        return project.status === statusFilter
-      })
+      // 프로젝트 목록은 항상 '내 할 일'(현재 역할이 처리하는 프로젝트)만 표시 (admin은 전체)
+      .filter((project) => isProjectAssignedToRole(project, role))
       .filter((project) => `${project.title} ${project.summary} ${project.code}`.toLowerCase().includes(query.toLowerCase()))
-  }, [query, queueScopedProjects, role, statusFilter])
+  }, [query, queueScopedProjects, role])
 
   const dashboardSummary = useMemo(() => {
     const taskStatus = serviceScopedProjects.reduce(
@@ -765,7 +796,7 @@ function App() {
         .slice(0, 6),
     }))
     const dueSoon = serviceScopedProjects
-      .filter((project) => daysUntil(project.dueDate, demoToday) <= 10 && project.status !== 'published')
+      .filter((project) => daysUntil(project.dueDate, demoToday) <= 10 && true)
       .sort((a, b) => daysUntil(a.dueDate, demoToday) - daysUntil(b.dueDate, demoToday))
       .slice(0, 5)
     const recent = [...serviceScopedProjects].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 5)
@@ -779,6 +810,13 @@ function App() {
     0,
     selectedWorkflow.findIndex((item) => item.status === selected?.status),
   )
+  // 클릭으로 보고 있는 단계 (null이면 현재 단계와 동일)
+  const viewedStep = viewedStageIndex ?? currentStep
+  const viewedStatus: ProjectStatus = selectedWorkflow[viewedStep]?.status ?? (selected?.status ?? 'request')
+  // 프로젝트가 바뀌면 viewedStageIndex 초기화
+  useEffect(() => {
+    setViewedStageIndex(null)
+  }, [selectedId])
   const canAct = Boolean(
     selected && (
       role === 'admin' ||
@@ -831,7 +869,7 @@ function App() {
       ? nextActionFor(advancedStatus)
       : allApproved
         ? '필수 승인 완료, 다음 단계 진행 가능'
-        : `승인 대기: ${approvalState.requiredRoles.filter((item) => !approvalState.approvedRoles.includes(item)).map((item) => approvalStepLabels[item]).join(', ')}`
+        : '승인 단계'
 
     const baseLogEntry = {
       id: crypto.randomUUID(),
@@ -983,20 +1021,29 @@ function App() {
     if (error) setLoadState('error')
   }
 
-  async function approveCurrentRole() {
+  async function approveCurrentRole(memo: string = '') {
     if (!selected || !canApproveCurrentRole) return
 
+    const trimmedMemo = memo.trim()
     const approvalState: ApprovalState = {
       ...selectedApprovalState,
       approvedRoles: [...selectedApprovalState.approvedRoles, role],
+      memos: {
+        ...(selectedApprovalState.memos ?? {}),
+        [role]: { at: logStamp(), actor: roleLabels[role], message: trimmedMemo },
+      },
     }
 
-    await updateApprovalState(approvalState, `${roleLabels[role]} 승인을 완료했습니다.`)
+    const logMessage = trimmedMemo
+      ? `${roleLabels[role]} 확인 완료 — 메모: ${trimmedMemo}`
+      : `${roleLabels[role]} 확인을 완료했습니다.`
+    await updateApprovalState(approvalState, logMessage)
     const allApproved = approvalState.requiredRoles.every((item) => approvalState.approvedRoles.includes(item))
-    void notifyGoogleChat('project.approve', `${roleLabels[role]}이(가) 승인했습니다.`, {
+    void notifyGoogleChat('project.approve', `${roleLabels[role]}이(가) 확인했습니다.`, {
       프로젝트: selected.title,
       코드: selected.code,
-      ...(allApproved ? { 상태: '모든 승인 완료 → 다음 단계 자동 진행' } : { 남은승인: approvalState.requiredRoles.filter((r) => !approvalState.approvedRoles.includes(r)).map((r) => approvalStepLabels[r]).join(', ') }),
+      ...(trimmedMemo ? { 메모: trimmedMemo } : {}),
+      ...(allApproved ? { 상태: '모든 확인 완료 → 다음 단계 자동 진행' } : { 남은확인: approvalState.requiredRoles.filter((r) => !approvalState.approvedRoles.includes(r)).map((r) => approvalStepLabels[r]).join(', ') }),
     })
   }
 
@@ -1004,7 +1051,7 @@ function App() {
     if (!['pm', 'admin'].includes(role)) return
     const target = projects.find((project) => project.id === projectId)
     if (!target) return
-    if (['published', 'rejected'].includes(target.status)) return
+    if (['rejected'].includes(target.status)) return
 
     const willHold = !target.onHold
     let reason = ''
@@ -1156,44 +1203,6 @@ function App() {
     if (error) setLoadState('error')
   }
 
-  // #1 반려: 현재 단계에서 요청을 반려 처리
-  async function rejectSelectedProject() {
-    if (!selected || !canAct) return
-    if (['published', 'rejected'].includes(selected.status)) return
-    const reason = (window.prompt('반려 사유를 입력하세요.') ?? '').trim()
-    if (!reason) return
-    await patchSelectedProject(
-      { status: 'rejected', rejectedReason: reason, rejectedFromStatus: selected.status, assigneeRole: 'requester', nextAction: '반려됨 · 요청자 보완 후 재요청 필요' },
-      `${roleLabels[role]}이(가) 반려했습니다. 사유: ${reason}`,
-    )
-    void notifyGoogleChat('project.hold', `프로젝트가 반려되었습니다: ${selected.title}`, { 사유: reason, 처리: roleLabels[role] })
-  }
-
-  // #2 회송(되돌리기): 이전 단계로 되돌림 (PM/admin)
-  async function revertSelectedProject() {
-    if (!selected) return
-    if (!['pm', 'admin'].includes(role)) { window.alert('PM 또는 관리자만 이전 단계로 되돌릴 수 있습니다.'); return }
-    const idx = selectedWorkflow.findIndex((item) => item.status === selected.status)
-    if (idx <= 0) { window.alert('첫 단계라 되돌릴 수 없습니다.'); return }
-    const prevStatus = selectedWorkflow[idx - 1].status
-    const reason = (window.prompt(`"${statusLabels[prevStatus]}" 단계로 되돌립니다. 사유를 입력하세요.`) ?? '').trim()
-    if (!reason) return
-    const patch: Partial<Project> = {
-      status: prevStatus,
-      assigneeRole: nextRoleFor(prevStatus),
-      nextAction: `${statusLabels[prevStatus]} 단계 재작업 (회송 사유: ${reason})`,
-      progress: Math.max(0, selected.progress - 12),
-    }
-    // 승인 단계로 되돌아가면 승인 초기화 + 문서 잠금 해제
-    if (prevStatus === 'dept_review' || prevStatus === 'planning') {
-      patch.approvalState = { requiredRoles: selected.approvalState.requiredRoles, approvedRoles: [] }
-      patch.docsLocked = false
-    }
-    if (prevStatus !== 'qc_security') patch.qcSignoff = { qa: false, security: false, pm: false }
-    await patchSelectedProject(patch, `${roleLabels[role]}이(가) ${statusLabels[prevStatus]} 단계로 회송했습니다. 사유: ${reason}`)
-    void notifyGoogleChat('project.advance', `회송: ${statusLabels[prevStatus]} 단계로 되돌림`, { 프로젝트: selected.title, 사유: reason })
-  }
-
   // #4 QC/보안/PM 3자 사인오프 토글
   async function toggleQcSignoff() {
     if (!selected || selected.status !== 'qc_security') return
@@ -1247,12 +1256,6 @@ function App() {
     const verb = parentId ? '답변을' : '문의/의견을'
     await patchSelectedProject({ comments: nextComments }, `[${statusLabels[stage]}] ${verb} 남겼습니다.`)
     void notifyGoogleChat('task.comment', `[${statusLabels[stage]}] ${parentId ? '답변' : '문의'}: ${selected.title}`, { 작성자: roleLabels[role], 내용: trimmed })
-  }
-
-  // 현재 단계 기준 댓글 (섹션 문의 박스용)
-  async function addProjectComment(message: string, parentId?: string) {
-    if (!selected) return
-    await addProjectCommentForStage(selected.status, message, parentId)
   }
 
   // 댓글 수정 (작성자 역할 또는 관리자)
@@ -1573,15 +1576,6 @@ function App() {
             <strong>프로젝트 관리 시스템</strong>
             <span>Workflow PMO</span>
           </div>
-          <button
-            className="sidebarToggle"
-            type="button"
-            onClick={() => setIsSidebarCollapsed((current) => !current)}
-            aria-label={isSidebarCollapsed ? '사이드 메뉴 펼치기' : '사이드 메뉴 접기'}
-            title={isSidebarCollapsed ? '사이드 메뉴 펼치기' : '사이드 메뉴 접기'}
-          >
-            {isSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-          </button>
         </div>
 
         <nav className="navGroup" aria-label="main">
@@ -1602,7 +1596,7 @@ function App() {
             type="button"
             onClick={() => {
               setViewMode('pipeline')
-              setStatusFilter('all')
+              setStatusFilter('mine')
             }}
             title="프로젝트"
           >
@@ -1610,9 +1604,9 @@ function App() {
             <span>프로젝트</span>
           </button>
           <button
-            className={`navItem ${viewMode === 'request' ? 'active' : ''}`}
+            className={`navItem ${viewMode === 'requestFlow' ? 'active' : ''}`}
             type="button"
-            onClick={() => setViewMode('request')}
+            onClick={() => setViewMode('requestFlow')}
             title="새 요청"
           >
             <Plus size={17} />
@@ -1622,10 +1616,10 @@ function App() {
             className={`navItem ${viewMode === 'flow' ? 'active' : ''}`}
             type="button"
             onClick={() => setViewMode('flow')}
-            title="시스템 흐름도"
+            title="프로젝트 흐름도"
           >
             <Workflow size={17} />
-            <span>시스템 흐름도</span>
+            <span>프로젝트 흐름도</span>
           </button>
           {role === 'admin' && (
             <button className={`navItem ${viewMode === 'settings' ? 'active' : ''}`} type="button" title="설정" onClick={() => setViewMode('settings')}>
@@ -1636,11 +1630,19 @@ function App() {
         </nav>
       </aside>
 
+      <button
+        className="sidebarToggleEdge"
+        type="button"
+        onClick={() => setIsSidebarCollapsed((current) => !current)}
+        aria-label={isSidebarCollapsed ? '사이드 메뉴 펼치기' : '사이드 메뉴 접기'}
+        title={isSidebarCollapsed ? '사이드 메뉴 펼치기' : '사이드 메뉴 접기'}
+      >
+        {isSidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+      </button>
+
       <main className="main">
         <header className="topbar">
-          <div>
-            <p className="eyebrow">2026. 5. 17. 운영 현황</p>
-          </div>
+          <div />
           <div className="topbarActions">
             <RoleSwitcher
               role={role}
@@ -1681,8 +1683,8 @@ function App() {
           </section>
         )}
 
-        {viewMode === 'request' ? (
-          <RequestIntakePanel form={requestForm} serviceOptions={serviceOptions} setForm={setRequestForm} onSubmit={submitRequest} />
+        {viewMode === 'requestFlow' ? (
+          <RequestFlowPanel form={requestForm} serviceOptions={serviceOptions} setForm={setRequestForm} onSubmit={submitRequest} />
         ) : viewMode === 'flow' ? (
           <Suspense fallback={<div className="flowPanel"><p className="flowLoading">흐름도를 불러오는 중…</p></div>}>
             <SystemFlowPanel />
@@ -1699,6 +1701,7 @@ function App() {
         ) : viewMode === 'dashboard' ? (
           <DashboardOverview
             role={role}
+            projects={projects}
             serviceFilter={serviceFilter}
             serviceOptions={serviceOptions}
             summary={dashboardSummary}
@@ -1714,49 +1717,17 @@ function App() {
           />
         ) : (
         <section className="workArea">
+          <div className="topStickyArea">
           <div className="queuePanel">
-            <div className="panelHeader">
-              <div>
-                <p className="eyebrow">Action Queue</p>
-                <h2>처리 대기 목록</h2>
-              </div>
-            </div>
-
             <div className="searchFilterRow">
               <div className="searchBox">
                 <Search size={17} />
                 <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="프로젝트 검색" />
               </div>
 
-              <div className="filterChips" aria-label="filters">
-              <button className={statusFilter === 'all' ? 'active' : ''} type="button" onClick={() => setStatusFilter('all')}>
-                전체
-              </button>
-              <button className={statusFilter === 'active' ? 'active' : ''} type="button" onClick={() => setStatusFilter('active')}>
-                진행 중
-              </button>
-              <button className={statusFilter === 'dueSoon' ? 'active' : ''} type="button" onClick={() => setStatusFilter('dueSoon')}>
-                마감 임박
-              </button>
-              <button className={statusFilter === 'mine' ? 'active' : ''} type="button" onClick={() => setStatusFilter('mine')}>
-                내 할 일
-              </button>
-              <button className={statusFilter === 'risk' ? 'active' : ''} type="button" onClick={() => setStatusFilter('risk')}>
-                위험
-              </button>
-              <button className={statusFilter === 'blocked' ? 'active' : ''} type="button" onClick={() => setStatusFilter('blocked')}>
-                보류
-              </button>
-              </div>
             </div>
 
             <div className="projectList">
-              {filteredProjects.length === 0 && (
-                <div className="emptyList">
-                  <strong>현재 역할과 관련된 프로젝트가 없습니다.</strong>
-                  <span>선택한 서비스와 역할 기준으로 확인할 항목만 보여줍니다.</span>
-                </div>
-              )}
               {filteredProjects.map((project) => (
                 <button
                   key={project.id}
@@ -1778,6 +1749,47 @@ function App() {
 
           </div>
 
+          {selected && !(role !== 'admin' && !canAct && !isProjectAssignedToRole(selected, role) && !(role === 'requester' && ['request', 'planning'].includes(selected.status))) && (
+            <div className="detailHeaderPanel">
+              <div className="flowRequestHead">
+                <div>
+                  <p className="eyebrow">Project · {selected.code}</p>
+                  <h2>{selected.title}</h2>
+                </div>
+                <div className="flowHeadActions">
+                  <span className={`statusPill ${selected.status}`}>{statusLabels[selected.status]}</span>
+                  <span className="flowCurrentStep">현재 단계 {currentStep + 1}. {selectedWorkflow[currentStep]?.label}</span>
+                </div>
+              </div>
+
+              <ol className="flowStepper projectFlowStepper detailStepper" aria-label="프로젝트 진행 단계">
+                {selectedWorkflow.map((item, index) => {
+                  const state = index < currentStep ? 'done' : index === currentStep ? 'current' : 'pending'
+                  const viewing = index === viewedStep
+                  return (
+                    <li key={item.status} className={`flowStepperItem ${state} ${viewing ? 'viewing' : ''}`}>
+                      <button
+                        type="button"
+                        className="flowStepperBtn"
+                        onClick={() => setViewedStageIndex(index)}
+                        title={`${item.label} 단계 보기`}
+                      >
+                        <span className="flowStepNum">{state === 'done' ? <Check size={13} /> : index + 1}</span>
+                        <span className="flowStepText">
+                          <strong>{item.label}</strong>
+                          <em>{item.owner}</em>
+                        </span>
+                      </button>
+                      {index < selectedWorkflow.length - 1 && <span className="flowStepConn" aria-hidden="true" />}
+                    </li>
+                  )
+                })}
+              </ol>
+            </div>
+          )}
+
+          </div>
+
           {selected && role !== 'admin' && !canAct && !isProjectAssignedToRole(selected, role) && !(role === 'requester' && ['request', 'planning'].includes(selected.status)) ? (
           <div className="detailPanel emptyStatePanel">
             <strong>{roleLabels[role]} 역할의 작업이 없습니다.</strong>
@@ -1785,40 +1797,31 @@ function App() {
           </div>
           ) : selected ? (
           <div className="detailPanel">
-            <div className="workflowStrip">
-              {selectedWorkflow.map((item, index) => {
-                const state = index < currentStep ? 'done' : index === currentStep ? 'current' : 'next'
-                return (
-                  <div key={item.status} className={`step ${state}`}>
-                    <div className="stepDot">{state === 'done' ? <Check size={13} /> : index + 1}</div>
-                    <span>{item.label}</span>
-                  </div>
-                )
-              })}
-            </div>
 
+            {viewedStatus === 'request' && (
             <RequesterContentPanel
               project={selected}
               currentRole={role}
               highlight={role === 'requester' && selected.status === 'request'}
               canEdit={(role === 'requester' || role === 'admin') && ['request', 'planning'].includes(selected.status)}
               onSave={(patch) => void updateRequesterContent(patch)}
-              onInquire={(message, parentId) => void addProjectComment(message, parentId)}
               onEditInquiry={(id, msg, prefix) => void editProjectComment(id, msg, prefix)}
               onDeleteInquiry={(id) => void deleteProjectComment(id)}
             />
+            )}
 
-            {!planningRequiredByType[selected.requestType] ? (
-            <section className="requirementsPanel numberedSection sectionSrsSds">
+            {viewedStatus === 'planning' && (
+            !planningRequiredByType[selected.requestType] ? (
+            <section className="requirementsPanel numberedSection sectionSrsSds" data-section="기획" data-section-tone="planning">
               <div className="panelHeader compact">
-                <h3>② 기획 문서 (생략)</h3>
+                <h3>기획 문서 (생략)</h3>
                 <span>{requestTypeLabels[selected.requestType]} 유형은 SRS/SDS 없이 바로 승인 단계로 진행합니다.</span>
               </div>
             </section>
             ) : (
-            <section className={`requirementsPanel numberedSection sectionSrsSds ${role === 'pm' && !selected.docsLocked && selected.status === 'planning' ? 'neonHighlight' : ''}`}>
+            <section className={`requirementsPanel numberedSection sectionSrsSds ${role === 'pm' && !selected.docsLocked && selected.status === 'planning' ? 'neonHighlight' : ''}`} data-section="기획 (SRS+SDS)" data-section-tone="planning">
               <div className="panelHeader compact">
-                <h3>② PM이 등록한 기획 문서 (SRS · SDS){role === 'pm' && !selected.docsLocked && selected.status === 'planning' && <span className="neonTag">작성 필요</span>}</h3>
+                <h3>PM이 등록한 기획 문서 (SRS · SDS){role === 'pm' && !selected.docsLocked && selected.status === 'planning' && <span className="neonTag">작성 필요</span>}</h3>
                 <span>{selected.docsLocked ? '승인 완료 · 잠김 (수정하려면 이전 단계로 회송)' : role === 'pm' ? 'PM 작성 · 항목별 입력 · 첨부 가능' : 'PM이 작성하는 영역 · 읽기 전용'}</span>
               </div>
               {role === 'pm' && !selected.docsLocked ? (
@@ -1949,142 +1952,11 @@ function App() {
                   </section>
                 </div>
               )}
-              <SectionInquiryBox
-                sectionLabel="SRS/SDS"
-                comments={selected.comments}
-                currentRole={role}
-                onAdd={(message, parentId) => void addProjectComment(message, parentId)}
-                onEdit={(id, msg, prefix) => void editProjectComment(id, msg, prefix)}
-                onDelete={(id) => void deleteProjectComment(id)}
-              />
             </section>
-            )}
+            ))}
 
-            <section className="requirementsPanel numberedSection sectionTasks">
-              <div className="panelHeader compact">
-                <h3>③ 태스크(일감) 목록</h3>
-                <span>계획된 작업·이슈·티켓 · 의견 댓글</span>
-              </div>
-              <ProjectTasksPanel
-                project={selected}
-                onStatusChange={changeTaskStatus}
-                onAddComment={(taskId, message) => void addTaskComment(taskId, message)}
-                onAddTask={(task) => void addTaskToProject(selected.id, task)}
-                onPreviewAttachment={setPreviewAttachment}
-                currentRole={role}
-              />
-            </section>
-
-            <section className="requirementsPanel numberedSection sectionInquiry">
-              <div className="panelHeader compact">
-                <h3>단계별 문의 / 논의</h3>
-                <span>각 단계 아래에 문의/의견을 남길 수 있습니다 · 전 역할 작성 가능</span>
-              </div>
-              <StageInquiryPanel
-                project={selected}
-                workflow={selectedWorkflow}
-                currentRole={role}
-                onEdit={(id, msg) => void editProjectComment(id, msg)}
-                onDelete={(id) => void deleteProjectComment(id)}
-              />
-            </section>
-
-            {selected.onHold && (
-              <div className="holdBanner" role="status">
-                <strong>보류 중</strong>
-                <span>{selected.holdReason || '진행이 일시 중단된 상태입니다. PM 또는 관리자가 해제할 때까지 단계 진행이 잠깁니다.'}</span>
-              </div>
-            )}
-
-            <div className={`actionBanner ${canAct && !selected.onHold && selected.status !== 'published' ? 'neonHighlight' : ''}`}>
-              <div className={canAct ? 'actionIcon active' : 'actionIcon'}>
-                {canAct ? <Check size={18} /> : <ShieldCheck size={18} />}
-              </div>
-              <div>
-                <strong>{canAct ? selected.nextAction : `${roleLabels[role]} 역할은 현재 단계에서 대기 상태입니다.`}</strong>
-                <span>담당: {selected.status === 'qc_security' ? 'QC · 보안 · PM' : roleLabels[selected.assigneeRole]} · 마감 {formatDate(selected.dueDate)}</span>
-                {selected.status === 'dept_review' && (
-                  <span className="approvalGuide">
-                    {pendingApprovalRoles.length === 0
-                      ? '모든 역할이 확인을 완료했습니다. 다음 단계로 자동 진행됩니다.'
-                      : `확인 대기: ${pendingApprovalRoles.map((item) => approvalStepLabels[item]).join(', ')} · 각 역할 담당자가 확인을 누르면 자동으로 다음 단계로 진행됩니다.`}
-                  </span>
-                )}
-                {selected.status === 'qc_security' && (
-                  <div className="qcSignoffRow">
-                    {(['qa', 'security', 'pm'] as const).map((r) => (
-                      <span key={r} className={`qcSignoffChip ${qcSignoff[r] ? 'done' : 'pending'}`}>
-                        {{ qa: 'QC', security: '보안', pm: 'PM' }[r]} {qcSignoff[r] ? '✓' : '대기'}
-                      </span>
-                    ))}
-                    <span className="approvalGuide">
-                      {qcAllSignedOff ? 'QC·보안·PM 검토 완료 · 다음 단계 진행 가능' : `검토 대기: ${qcPendingRoles.map((r) => ({ qa: 'QC', security: '보안', pm: 'PM' }[r])).join(', ')}`}
-                    </span>
-                  </div>
-                )}
-                {selected.status === 'completion' && (
-                  <span className="approvalGuide">
-                    {selected.requesterConfirmed ? '요청자 확인 완료 · 게시 가능' : '요청자 확인 대기 중입니다. 요청자가 결과물을 확인해야 게시할 수 있습니다.'}
-                  </span>
-                )}
-                {selected.status === 'rejected' && (
-                  <span className="approvalGuide">반려됨 ({selected.rejectedFromStatus ? statusLabels[selected.rejectedFromStatus] : ''} 단계) · 사유: {selected.rejectedReason}</span>
-                )}
-              </div>
-              <div className="actionButtons">
-                {canApproveCurrentRole && (
-                  <button className="miniButton approveButton" type="button" onClick={() => void approveCurrentRole()}>
-                    {approvalStepLabels[role]} 확인
-                  </button>
-                )}
-                {canQcSignoff && (
-                  <button className="miniButton approveButton" type="button" onClick={() => void toggleQcSignoff()}>
-                    {myQcSignoffRole ? `${{ qa: 'QC', security: '보안', pm: 'PM' }[myQcSignoffRole]} 검토 ${qcSignoff[myQcSignoffRole] ? '취소' : '완료'}` : 'QC 사인오프(대행)'}
-                  </button>
-                )}
-                {selected.status === 'completion' && (role === 'requester' || role === 'admin') && (
-                  <button className="miniButton approveButton" type="button" onClick={() => void confirmByRequester()}>
-                    요청자 확인 {selected.requesterConfirmed ? '취소' : '완료'}
-                  </button>
-                )}
-                {selected.status !== 'dept_review' && (
-                  <button
-                    className="primaryButton"
-                    type="button"
-                    onClick={() => void advanceSelectedProject()}
-                    disabled={!canAct || selected.status === 'published' || selected.status === 'rejected' || selected.onHold || isStepAdvanceBlocked}
-                  >
-                    <Send size={16} />
-                    단계 진행
-                  </button>
-                )}
-                {['pm', 'admin'].includes(role) && selected.status === 'request' && (
-                  <button className="miniButton" type="button" onClick={() => void togglePlanningRequired()}>
-                    {isPlanningRequired(selected) ? '기획 생략' : '기획 포함'}
-                  </button>
-                )}
-                {['pm', 'admin'].includes(role) && !['published', 'rejected'].includes(selected.status) && currentStep > 0 && (
-                  <button className="miniButton" type="button" onClick={() => void revertSelectedProject()}>
-                    이전 단계로
-                  </button>
-                )}
-                {canAct && !['published', 'rejected'].includes(selected.status) && (
-                  <button className="miniButton rejectButton" type="button" onClick={() => void rejectSelectedProject()}>
-                    반려
-                  </button>
-                )}
-                <button
-                  className="miniButton"
-                  type="button"
-                  onClick={() => void toggleHoldSelectedProject()}
-                  disabled={!['pm', 'admin'].includes(role) || ['published', 'rejected'].includes(selected.status)}
-                >
-                  {selected.onHold ? '보류 해제' : '보류'}
-                </button>
-              </div>
-            </div>
-
-            <section className={`requirementsPanel numberedSection sectionSchedule ${['pm', 'developer', 'admin'].includes(role) && selected.status === 'schedule' ? 'neonHighlight' : ''}`}>
+            {viewedStatus === 'development' && ['pm', 'developer', 'admin'].includes(role) && (
+            <section className={`requirementsPanel numberedSection sectionSchedule ${selected.status === 'development' && viewedStep === currentStep ? 'neonHighlight' : ''}`} data-section="일정 조율" data-section-tone="schedule">
               <div className="panelHeader compact">
                 <h3>일정 조율</h3>
                 <span>요청자 희망 완료일 {formatDate(selected.dueDate)} 기준으로 기획(PM)과 개발이 협의해 실제 일정을 확정합니다.</span>
@@ -2151,15 +2023,249 @@ function App() {
                   <div className="scheduleReadBlock"><span>일정 협의 메모</span><RichTextView html={selected.schedule?.note ?? ''} fallback="아직 등록된 협의 메모가 없습니다." /></div>
                 </div>
               )}
-              <SectionInquiryBox
-                sectionLabel="일정 조율"
-                comments={selected.comments}
-                currentRole={role}
-                onAdd={(message, parentId) => void addProjectComment(message, parentId)}
-                onEdit={(id, msg, prefix) => void editProjectComment(id, msg, prefix)}
-                onDelete={(id) => void deleteProjectComment(id)}
-              />
             </section>
+            )}
+
+            {(viewedStatus === 'development' || viewedStatus === 'qc_security') && (() => {
+              const taskLabel = viewedStatus === 'qc_security' ? '검토 태스크(일감) 등록' : '개발 태스크(일감) 등록'
+              return (
+                <ProjectTasksPanel
+                  project={selected}
+                  onStatusChange={changeTaskStatus}
+                  onAddComment={(taskId, message) => void addTaskComment(taskId, message)}
+                  onAddTask={(task) => void addTaskToProject(selected.id, task)}
+                  onPreviewAttachment={setPreviewAttachment}
+                  currentRole={role}
+                  label={taskLabel}
+                />
+              )
+            })()}
+
+            {/* 단계 문의 / 논의 — 승인 단계 제외한 모든 단계의 하단에 표시 */}
+            {viewedStatus !== 'dept_review' && viewedStatus !== 'rejected' && (
+              <section className="requirementsPanel numberedSection sectionInquiry" data-section="단계 문의" data-section-tone="inquiry">
+                <div className="panelHeader compact">
+                  <h3>{statusLabels[viewedStatus]} 문의 / 논의</h3>
+                  <span>이 단계와 관련된 문의·의견 · 전 역할 작성 가능</span>
+                </div>
+                <SectionInquiryBox
+                  sectionLabel={statusLabels[viewedStatus]}
+                  comments={selected.comments?.filter((c) => c.stage === viewedStatus)}
+                  currentRole={role}
+                  onAdd={(msg, parentId) => void addProjectCommentForStage(viewedStatus, msg, parentId)}
+                  onEdit={(id, msg, prefix) => void editProjectComment(id, msg, prefix)}
+                  onDelete={(id) => void deleteProjectComment(id)}
+                />
+              </section>
+            )}
+
+            {selected.onHold && (
+              <div className="holdBanner" role="status">
+                <strong>보류 중</strong>
+                <span>{selected.holdReason || '진행이 일시 중단된 상태입니다. PM 또는 관리자가 해제할 때까지 단계 진행이 잠깁니다.'}</span>
+              </div>
+            )}
+
+            {viewedStep === currentStep && ['dept_review', 'qc_security', 'completion', 'rejected'].includes(viewedStatus) && (
+            <div className={`actionBanner ${canAct && !selected.onHold ? 'neonHighlight' : ''}`} data-section="현재 단계 액션" data-section-tone="approval">
+              <div>
+                <strong>{selected.status === 'dept_review' ? '승인 단계' : (canAct ? selected.nextAction : `${roleLabels[role]} 역할은 현재 단계에서 대기 상태입니다.`)}</strong>
+                <span>담당: {selected.status === 'qc_security' ? 'QC · 보안 · PM' : roleLabels[selected.assigneeRole]} · 마감 {formatDate(selected.dueDate)}</span>
+                {selected.status === 'dept_review' && (
+                  <div className="approvalGrid" style={{ ['--cols' as string]: selectedApprovalState.requiredRoles.length }}>
+                    <div className="approvalGridHead">
+                      {selectedApprovalState.requiredRoles.map((r) => (
+                        <div key={r} className="approvalGridHeadCell">{approvalStepLabels[r]}</div>
+                      ))}
+                    </div>
+                    <div className="approvalGridBody">
+                      {selectedApprovalState.requiredRoles.map((r) => {
+                        const done = selectedApprovalState.approvedRoles.includes(r)
+                        const isMine = r === role && !done && canApproveCurrentRole
+                        return (
+                          <button
+                            key={r}
+                            type="button"
+                            className={`approvalCellPill ${done ? 'done' : isMine ? 'mine' : 'pending'}`}
+                            disabled={!isMine && !done}
+                            onClick={() => { if (isMine) setApprovalInlineOpen((v) => !v) }}
+                            title={done ? '확인 완료' : isMine ? '내 차례 — 클릭하면 의견·승인/보류 입력' : '대기'}
+                          >
+                            {done ? '완료' : isMine ? '확인' : '승인'}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <div className="approvalGridFoot">
+                      <span><b>{selectedApprovalState.approvedRoles.length}</b> / {selectedApprovalState.requiredRoles.length} 완료</span>
+                      {pendingApprovalRoles.length === 0 && <span className="doneAll">모든 역할 확인 완료 · 자동 진행</span>}
+                    </div>
+
+                    {approvalInlineOpen && canApproveCurrentRole && (
+                      <div className="approvalInlineComposer">
+                        <label className="approvalInlineLabel">
+                          <span>{approvalStepLabels[role]} 의견 (선택)</span>
+                          <textarea
+                            rows={3}
+                            placeholder="검토 의견·이유·조건을 적어 주세요. 빈 칸으로 두고 승인할 수도 있습니다."
+                            value={approvalMemoDraft}
+                            onChange={(e) => setApprovalMemoDraft(e.target.value)}
+                          />
+                        </label>
+                        <div className="approvalInlineActions">
+                          <button
+                            type="button"
+                            className="approveBtn"
+                            onClick={() => { void approveCurrentRole(approvalMemoDraft); setApprovalMemoDraft(''); setApprovalInlineOpen(false) }}
+                          >
+                            승인
+                          </button>
+                          <button
+                            type="button"
+                            className="holdBtn"
+                            onClick={() => { void toggleHoldSelectedProject(); setApprovalInlineOpen(false) }}
+                          >
+                            보류
+                          </button>
+                          <button
+                            type="button"
+                            className="closeBtn"
+                            onClick={() => setApprovalInlineOpen(false)}
+                          >
+                            닫기
+                          </button>
+                        </div>
+                        <div className="approvalCommentRow inline">
+                          <input
+                            type="text"
+                            value={approvalCommentInput}
+                            onChange={(e) => setApprovalCommentInput(e.target.value)}
+                            placeholder="댓글 입력 (승인 전 확인해야 하는 내용이 있다면 입력)"
+                          />
+                          <button
+                            type="button"
+                            className="miniButton"
+                            onClick={() => {
+                              const t = approvalCommentInput.trim()
+                              if (!t) return
+                              void addProjectCommentForStage('dept_review', t)
+                              setApprovalCommentInput('')
+                            }}
+                          >
+                            저장
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                )}
+                {selected.status === 'qc_security' && (
+                  <div className="qcSignoffRow">
+                    {(['qa', 'security', 'pm'] as const).map((r) => (
+                      <span key={r} className={`qcSignoffChip ${qcSignoff[r] ? 'done' : 'pending'}`}>
+                        {{ qa: 'QC', security: '보안', pm: 'PM' }[r]} {qcSignoff[r] ? '✓' : '대기'}
+                      </span>
+                    ))}
+                    <span className="approvalGuide">
+                      {qcAllSignedOff ? 'QC·보안·PM 검토 완료 · 다음 단계 진행 가능' : `검토 대기: ${qcPendingRoles.map((r) => ({ qa: 'QC', security: '보안', pm: 'PM' }[r])).join(', ')}`}
+                    </span>
+                  </div>
+                )}
+                {selected.status === 'completion' && (
+                  <span className="approvalGuide">
+                    {selected.requesterConfirmed ? '요청자 확인 완료 · 게시 가능' : '요청자 확인 대기 중입니다. 요청자가 결과물을 확인해야 게시할 수 있습니다.'}
+                  </span>
+                )}
+                {selected.status === 'rejected' && (
+                  <span className="approvalGuide">반려됨 ({selected.rejectedFromStatus ? statusLabels[selected.rejectedFromStatus] : ''} 단계) · 사유: {selected.rejectedReason}</span>
+                )}
+              </div>
+              <div className="actionButtons">
+                {canQcSignoff && (
+                  <button className="miniButton approveButton" type="button" onClick={() => void toggleQcSignoff()}>
+                    {myQcSignoffRole ? `${{ qa: 'QC', security: '보안', pm: 'PM' }[myQcSignoffRole]} 검토 ${qcSignoff[myQcSignoffRole] ? '취소' : '완료'}` : 'QC 사인오프(대행)'}
+                  </button>
+                )}
+                {selected.status === 'completion' && (role === 'requester' || role === 'admin') && (
+                  <button className="miniButton approveButton" type="button" onClick={() => void confirmByRequester()}>
+                    요청자 확인 {selected.requesterConfirmed ? '취소' : '완료'}
+                  </button>
+                )}
+                {selected.status !== 'dept_review' &&
+                  selected.status !== 'rejected' &&
+                  !selected.onHold &&
+                  canAct &&
+                  !isStepAdvanceBlocked &&
+                  viewedStep === currentStep && (
+                  <button
+                    className="primaryButton"
+                    type="button"
+                    onClick={() => void advanceSelectedProject()}
+                  >
+                    <Send size={16} />
+                    단계 진행
+                  </button>
+                )}
+                {['pm', 'admin'].includes(role) && selected.status === 'request' && (
+                  <button className="miniButton" type="button" onClick={() => void togglePlanningRequired()}>
+                    {isPlanningRequired(selected) ? '기획 생략' : '기획 포함'}
+                  </button>
+                )}
+              </div>
+            </div>
+            )}
+
+            {viewedStatus === 'dept_review' && (() => {
+              type Entry = { at: string; dept: string; actor: string; message: string }
+              const stageComments = (selected.comments ?? [])
+                .filter((c) => c.stage === 'dept_review')
+                .map<Entry>((c) => ({ at: c.at, dept: approvalStepLabels[c.role], actor: c.actor, message: c.message }))
+              const memoEntries: Entry[] = []
+              for (const r of selectedApprovalState.approvedRoles) {
+                const memo = selectedApprovalState.memos?.[r]
+                if (memo?.message?.trim()) {
+                  memoEntries.push({ at: memo.at, dept: approvalStepLabels[r], actor: memo.actor, message: memo.message })
+                }
+                memoEntries.push({ at: memo?.at ?? '', dept: approvalStepLabels[r], actor: memo?.actor ?? roleLabels[r], message: '승인이 완료되었습니다.' })
+              }
+              const history = [...stageComments, ...memoEntries].sort((a, b) => (a.at || '').localeCompare(b.at || ''))
+              return (
+                <section className="requirementsPanel numberedSection approvalHistoryPanel" data-section="승인 이력" data-section-tone="history">
+                  <div className="panelHeader compact">
+                    <h3>승인 이력</h3>
+                    <span>의견·승인 처리가 시간순으로 기록됩니다 · 총 {history.length}건</span>
+                  </div>
+                  <div className="approvalHistoryWrap">
+                    <table className="approvalHistoryTable">
+                      <thead>
+                        <tr>
+                          <th>시간</th>
+                          <th>승인 부서</th>
+                          <th>승인자</th>
+                          <th>의견</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {history.length === 0 ? (
+                          <tr><td colSpan={4} className="approvalHistoryEmpty">아직 등록된 의견이 없습니다.</td></tr>
+                        ) : (
+                          history.map((h, idx) => (
+                            <tr key={idx}>
+                              <td className="approvalHistoryTime">{formatTimestamp(h.at)}</td>
+                              <td className="approvalHistoryDept">{h.dept}</td>
+                              <td className="approvalHistoryActor">{h.actor}</td>
+                              <td className="approvalHistoryMsg">{h.message}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              )
+            })()}
+
 
             {blockedTasks.length > 0 && (
               <section className="riskPanel">
@@ -2171,6 +2277,7 @@ function App() {
               </section>
             )}
 
+            {(viewedStatus === 'completion') && (
             <div className="bottomGrid">
               <section className="infoPanel">
                 <div className="panelHeader compact">
@@ -2181,7 +2288,7 @@ function App() {
                   <Artifact label="요청 승인 기록" state="승인됨" />
                   <Artifact label="SRS" state={(selected.reviewDocs?.srs ?? '').trim().length > 0 ? '완료' : '대기'} />
                   <Artifact label="SDS" state={(selected.reviewDocs?.sds ?? '').trim().length > 0 ? '완료' : '대기'} />
-                  <Artifact label="완료 보고서" state={['completion', 'published'].includes(selected.status) ? '게시 준비' : '대기'} />
+                  <Artifact label="완료 보고서" state={['completion'].includes(selected.status) ? '게시 준비' : '대기'} />
                 </div>
               </section>
 
@@ -2215,9 +2322,10 @@ function App() {
                 </div>
               </section>
             </div>
+            )}
           </div>
           ) : (
-            <EmptyDatabasePanel onCreate={() => setViewMode('request')} loading={loadState === 'loading'} />
+            <EmptyDatabasePanel onCreate={() => setViewMode('requestFlow')} loading={loadState === 'loading'} />
           )}
         </section>
         )}
@@ -2335,6 +2443,7 @@ type DashboardSummary = {
 
 function DashboardOverview({
   role,
+  projects,
   serviceFilter,
   serviceOptions,
   summary,
@@ -2343,6 +2452,7 @@ function DashboardOverview({
   onOpenStatus,
 }: {
   role: Role
+  projects: Project[]
   serviceFilter: ServiceFilter
   serviceOptions: string[]
   summary: DashboardSummary
@@ -2353,11 +2463,21 @@ function DashboardOverview({
   const focusProjects = summary.assignedProjects
   const serviceScopeLabel = serviceFilter === 'all' ? '전체 서비스' : serviceFilter
   const visibleStatuses = summary.projectsByStatus
-  const isAdmin = role === 'admin'
   const phaseFor = (index: number) => (index < 3 ? 1 : index < 5 ? 2 : 3)
-  const statusCountMap = Object.fromEntries(summary.statusCounts.map((item) => [item.status, item.count])) as Record<ProjectStatus, number>
-  const roleDueSoon = role === 'admin' ? summary.dueSoon : summary.dueSoon.filter((project) => isProjectAssignedToRole(project, role))
-  const roleRecent = role === 'admin' ? summary.recent : summary.recent.filter((project) => isProjectAssignedToRole(project, role))
+
+  // 서비스별 단계 흐름: 역할 관련 프로젝트를 서비스별로 묶고, 각 서비스마다 6단계 칸반을 그림
+  const relevantAll = projects.filter((project) => role === 'admin' || isProjectRelevantToRole(project, role))
+  const servicesToShow = serviceFilter === 'all' ? serviceOptions : [serviceFilter]
+  const serviceFlows = servicesToShow.map((service) => {
+    const serviceProjects = relevantAll.filter((project) => inferServiceOption(project, serviceOptions) === service)
+    const columns = visibleStatuses.map((stage) => ({
+      ...stage,
+      projects: serviceProjects
+        .filter((project) => project.status === stage.status)
+        .sort((a, b) => daysUntil(a.dueDate, demoToday) - daysUntil(b.dueDate, demoToday)),
+    }))
+    return { service, total: serviceProjects.length, columns }
+  })
 
   return (
     <section className="dashboardBoard" aria-label="dashboard overview">
@@ -2381,130 +2501,62 @@ function DashboardOverview({
             </select>
           </label>
         </div>
-        <div className="workflowGuideStrip" aria-label="workflow guide">
-          <div className="workflowGuideItem">
-            <strong>1. 요청 정리</strong>
-            <p>요청자가 배경과 목표를 등록하고 PM이 내용을 다듬습니다.</p>
+        {serviceFlows.map((flow) => (
+          <div className="serviceFlow" key={flow.service}>
+            <div className="serviceFlowHead">
+              <strong>{flow.service}</strong>
+              <span>{flow.total}개 프로젝트</span>
+            </div>
+            <div className="dashboardKanban adminScroll">
+              {flow.columns.map((item, index) => {
+                // 내 역할이 처리하는 단계이면서 프로젝트가 있을 때만 컬러풀·클릭 가능, 그 외엔 음영 처리
+                const hasProjects = item.projects.length > 0
+                const active = hasProjects && roleActsOnStatus(role, item.status)
+                return (
+                  <section
+                    key={item.status}
+                    className={`kanbanColumn phase${phaseFor(index)} ${active ? 'owned' : 'dim'}`}
+                  >
+                  <button className="kanbanColumnHeader" type="button" disabled={!active} onClick={() => onOpenStatus(item.status)}>
+                    <div className="kanbanHeaderMeta">
+                      <small>{String(index + 1).padStart(2, '0')}</small>
+                      <span>{item.label}</span>
+                      <em>{item.owner}</em>
+                    </div>
+                    <div className="kanbanHeaderCount">
+                      <strong>{item.projects.length}</strong>
+                      {item.optional && <b>선택</b>}
+                    </div>
+                  </button>
+                  <div className="kanbanCardList">
+                    {item.projects.length === 0 ? (
+                      <div className="kanbanEmpty">진행 중인 프로젝트 없음</div>
+                    ) : (
+                      item.projects.map((project) => (
+                        <button key={project.id} className={`kanbanCard ${project.onHold ? 'onHold' : ''}`} type="button" onClick={() => onOpenProject(project.id)}>
+                          <div className="kanbanCardTop">
+                            <span className={`statusPill ${project.status}`}>{statusLabels[project.status]}</span>
+                            <span className="requestTypePill">{requestTypeLabels[project.requestType]}</span>
+                          </div>
+                          <strong>{project.title}</strong>
+                          <p>{project.serviceName} · {project.serviceArea}</p>
+                          <div className="kanbanMeta">
+                            <span>{project.ownerTeam}</span>
+                            <span>D-{Math.max(0, daysUntil(project.dueDate, demoToday))}</span>
+                            <span>{project.progress}%</span>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  </section>
+                )
+              })}
+            </div>
           </div>
-          <div className="workflowGuideItem">
-            <strong>2. 문서 정리</strong>
-            <p>SRS와 SDS를 등록한 뒤 승인자가 같은 기준으로 검토합니다.</p>
-          </div>
-          <div className="workflowGuideItem">
-            <strong>3. 실행/검증</strong>
-            <p>승인 이후 개발, QC/보안/PM 검토, 완료보고 순서로 진행합니다. PM이 전 단계 책임자입니다.</p>
-          </div>
-        </div>
-        <div className="dashboardKanban adminScroll">
-          {visibleStatuses.map((item, index) => {
-            const isOwned = isAdmin || roleOwnsStatus(item.status, role)
-            return (
-              <section
-                key={item.status}
-                className={`kanbanColumn phase${phaseFor(index)} ${isOwned ? 'owned' : 'dim'}`}
-              >
-              <button className="kanbanColumnHeader" type="button" onClick={() => onOpenStatus(item.status)}>
-                <div className="kanbanHeaderMeta">
-                  <small>{String(index + 1).padStart(2, '0')}</small>
-                  <span>{item.label}</span>
-                  <em>{item.owner}</em>
-                </div>
-                <div className="kanbanHeaderCount">
-                  <strong>{statusCountMap[item.status]}</strong>
-                  {item.optional && <b>선택</b>}
-                </div>
-              </button>
-              <div className="kanbanCardList">
-                {item.projects.length === 0 ? (
-                  <div className="kanbanEmpty">진행 중인 프로젝트 없음</div>
-                ) : (
-                  item.projects.map((project) => (
-                    <button key={project.id} className={`kanbanCard ${project.onHold ? 'onHold' : ''}`} type="button" onClick={() => onOpenProject(project.id)}>
-                      <div className="kanbanCardTop">
-                        <span className={`statusPill ${project.status}`}>{statusLabels[project.status]}</span>
-                        <span className="requestTypePill">{requestTypeLabels[project.requestType]}</span>
-                      </div>
-                      <strong>{project.title}</strong>
-                      <p>{project.serviceName} · {project.serviceArea}</p>
-                      <div className="kanbanMeta">
-                        <span>{project.ownerTeam}</span>
-                        <span>D-{Math.max(0, daysUntil(project.dueDate, demoToday))}</span>
-                        <span>{project.progress}%</span>
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-              </section>
-            )
-          })}
-        </div>
-      </section>
-
-      <section className="dashboardPanel dashboardListPanel">
-        <div className="panelHeader compact">
-          <h2>{role === 'admin' ? '전체 진행 현황' : `${roleLabels[role]} 확인 필요 프로젝트`}</h2>
-          <button className="miniButton" type="button" onClick={() => onOpenStatus('mine')}>
-            전체 보기
-          </button>
-        </div>
-        <DashboardProjectList projects={summary.myQueue} emptyText={role === 'admin' ? '등록된 프로젝트가 없습니다.' : '현재 역할의 처리 대기 프로젝트가 없습니다.'} onOpenProject={onOpenProject} />
-      </section>
-
-      <section className="dashboardPanel dashboardListPanel">
-        <div className="panelHeader compact">
-          <h2>{role === 'admin' ? '전체 마감 임박' : '마감 임박'}</h2>
-          <button className="miniButton" type="button" onClick={() => onOpenStatus('dueSoon')}>
-            전체 보기
-          </button>
-        </div>
-        <DashboardProjectList projects={roleDueSoon} emptyText="해당 역할의 마감 임박 프로젝트가 없습니다." onOpenProject={onOpenProject} />
-      </section>
-
-      <section className="dashboardPanel dashboardListPanel">
-        <div className="panelHeader compact">
-          <h2>최근 업데이트</h2>
-          <button className="miniButton" type="button" onClick={() => onOpenStatus('all')}>
-            전체 보기
-          </button>
-        </div>
-        <DashboardProjectList projects={roleRecent} emptyText="해당 역할의 최근 업데이트가 없습니다." onOpenProject={onOpenProject} />
+        ))}
       </section>
     </section>
-  )
-}
-
-function DashboardProjectList({
-  projects,
-  emptyText,
-  onOpenProject,
-}: {
-  projects: Project[]
-  emptyText: string
-  onOpenProject: (projectId: string) => void
-}) {
-  if (projects.length === 0) {
-    return <p className="dashboardEmpty">{emptyText}</p>
-  }
-
-  return (
-    <div className="dashboardProjectList">
-      {projects.map((project) => (
-        <button key={project.id} className="dashboardProjectItem" type="button" onClick={() => onOpenProject(project.id)}>
-          <div className="dashboardProjectItemTop">
-            <span className={`statusPill ${project.status}`}>{statusLabels[project.status]}</span>
-            <span className="requestTypePill">{requestTypeLabels[project.requestType]}</span>
-          </div>
-          <strong>{project.title}</strong>
-          <p>{project.serviceName} · {project.serviceArea}</p>
-          <small>
-            <span className="metaDday">D-{Math.max(0, daysUntil(project.dueDate, demoToday))}</span>
-            <span>{project.ownerTeam}</span>
-            <span className="metaTime">{formatDateTime(project.updatedAt)}</span>
-          </small>
-        </button>
-      ))}
-    </div>
   )
 }
 
@@ -2515,6 +2567,7 @@ function ProjectTasksPanel({
   onAddTask,
   onPreviewAttachment,
   currentRole,
+  label = '개발 태스크(일감) 등록',
 }: {
   project: Project
   onStatusChange: (taskId: string, status: TaskStatus, statusNote: string) => void
@@ -2522,6 +2575,7 @@ function ProjectTasksPanel({
   onAddTask?: (task: ProjectTask) => void
   onPreviewAttachment?: (attachment: { name: string; type: string; dataUrl?: string; size: number }) => void
   currentRole: Role
+  label?: string
 }) {
   const [statusDrafts, setStatusDrafts] = useState<Record<string, { status: TaskStatus; note: string }>>({})
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({})
@@ -2586,10 +2640,10 @@ function ProjectTasksPanel({
   }
 
   return (
-    <section className="infoPanel taskPanel">
+    <section className="infoPanel taskPanel" data-section="태스크" data-section-tone="tasks">
       <div className="panelHeader compact">
         <div>
-          <h3>태스크(일감) 목록</h3>
+          <h3>{label}</h3>
           <p>계획된 작업과 이슈·티켓을 모두 태스크로 관리합니다. 누구나 댓글로 의견을 남길 수 있습니다.</p>
         </div>
         <div className="taskHeaderRight">
@@ -2754,7 +2808,7 @@ function ProjectTasksPanel({
   )
 }
 
-function RequestIntakePanel({
+function RequestFlowPanel({
   form,
   serviceOptions,
   setForm,
@@ -2773,168 +2827,188 @@ function RequestIntakePanel({
     setForm((current) => ({ ...current, [field]: value }))
   }
 
+  // 프로젝트 워크플로 8단계와 동일한 순서로 표시 (요청 단계만 입력 가능)
+  const stages = workflow
+  const currentStageIndex = 0 // 새 요청은 '요청' 단계(인덱스 0)에 해당
+
+  const titleValid = Boolean(form.title.trim() && form.serviceName.trim() && form.serviceArea.trim() && form.ownerTeam.trim() && form.requester.trim()) && (fieldRules.dueDateOptional || Boolean(form.dueDate))
+  const detailValid = Boolean(form.summary.trim() && form.currentProblem.trim() && form.desiredOutcome.trim() && form.affectedUsers.trim()) && (fieldRules.metricOptional || Boolean(form.successMetric.trim()))
+  const allValid = Boolean(form.requestType) && titleValid && detailValid
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!allValid) return
+    onSubmit(event)
+  }
+
   return (
-    <section className="requestPanel">
-      <div className="requestIntro">
-        <p className="eyebrow">Request Intake</p>
-        <h2>{config.title}</h2>
-        <p>{config.intro}</p>
-      </div>
-      <div className="requestFlowGuide" aria-label="request review guide">
-        <div className="requestFlowStep">
-          <strong>1. 요청자 작성</strong>
-          <p>문제, 목표, 범위, 희망 일정까지 한 번에 정리합니다.</p>
+    <section className="requestPanel flowRequestPanel">
+      <div className="flowRequestHead">
+        <div>
+          <p className="eyebrow">Request Intake · 단계별</p>
+          <h2>{config.title}</h2>
         </div>
-        <div className="requestFlowStep">
-          <strong>2. PM 보완</strong>
-          <p>승인자들이 판단할 수 있도록 범위와 리스크를 다듬습니다.</p>
-        </div>
-        <div className="requestFlowStep">
-          <strong>3. 역할별 승인 검토</strong>
-          <p>PM, CEM, 정보보호, 인프라, QA, 특허, 최종 승인자가 같은 기준으로 봅니다.</p>
+        <div className="flowHeadActions">
+          <span className="flowCurrentStep">현재 단계 {currentStageIndex + 1}. {stages[currentStageIndex].label}</span>
         </div>
       </div>
 
-      <form className="requestForm" onSubmit={onSubmit}>
-        <fieldset>
-          <legend>요청 분류</legend>
-          <p className="fieldHint">요청 성격을 먼저 고르면 입력 문구와 승인 흐름이 맞춰집니다.</p>
-          <div className="requestTypeSelector" role="tablist" aria-label="요청 분류 선택">
-            {requestTypeOptions.map((item) => (
-              <button
-                key={item.type}
-                className={`requestTypeButton ${form.requestType === item.type ? 'active' : ''}`}
-                type="button"
-                onClick={() => updateField('requestType', item.type)}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-          <p className="requestTypeHint">{config.intro}</p>
-          <div className="approvalPreset">
-            <strong>승인 필요 역할</strong>
-            <div className="approvalSummary">
-              {requestApprovalRoles.map((item) => (
-                <span key={item} className="approvalPill pending">
-                  {approvalStepLabels[item]}
+      <ol className="flowStepper projectFlowStepper" aria-label="프로젝트 진행 단계">
+        {stages.map((s, idx) => {
+          const state = idx < currentStageIndex ? 'done' : idx === currentStageIndex ? 'current' : 'pending'
+          return (
+            <li key={s.status} className={`flowStepperItem ${state}`}>
+              <div className="flowStepperBtn" role="presentation">
+                <span className="flowStepNum">{idx + 1}</span>
+                <span className="flowStepText">
+                  <strong>{s.label}</strong>
+                  <em>{s.owner}</em>
                 </span>
+              </div>
+              {idx < stages.length - 1 && <span className="flowStepConn" aria-hidden="true" />}
+            </li>
+          )
+        })}
+      </ol>
+
+      <form className="requestForm flowRequestForm" onSubmit={handleSubmit}>
+        <p className="flowSectionLead">현재 작업 단계: <b>1 · 요청</b> — 요청자가 입력하는 단계입니다. 아래 정보를 모두 작성한 뒤 등록하면 다음 단계로 자동 진행됩니다.</p>
+        <fieldset>
+            <legend>요청 분류</legend>
+            <p className="fieldHint">요청 성격을 먼저 고르면 입력 문구와 승인 흐름이 맞춰집니다.</p>
+            <div className="requestTypeSelector" role="tablist" aria-label="요청 분류 선택">
+              {requestTypeOptions.map((item) => (
+                <button
+                  key={item.type}
+                  className={`requestTypeButton ${form.requestType === item.type ? 'active' : ''}`}
+                  type="button"
+                  onClick={() => updateField('requestType', item.type)}
+                >
+                  {item.label}
+                </button>
               ))}
             </div>
-            <p className="approvalGuide">이 요청 유형은 위 역할의 승인 완료 후 다음 단계로 진행됩니다.</p>
-          </div>
-          <label className="planningSkipToggle">
-            <input
-              type="checkbox"
-              checked={form.skipPlanning ?? !planningRequiredByType[form.requestType]}
-              onChange={(event) => updateField('skipPlanning', event.target.checked)}
-            />
-            <span>
-              <strong>기획 단계(SRS/SDS) 생략</strong>
-              <em>체크하면 기획 문서 작성 없이 요청 → 승인으로 바로 진행합니다. (분류 기본값 자동 적용, 필요 시 변경)</em>
-            </span>
-          </label>
-        </fieldset>
-
-        <fieldset>
-          <legend>기본 정보</legend>
-          <p className="fieldHint">누가 요청했고 어떤 서비스와 범위에 대한 요청인지 먼저 분명하게 남깁니다.</p>
-          <div className="formGrid two">
-            <label>
-              <span>요청 제목</span>
-              <input required value={form.title} onChange={(event) => updateField('title', event.target.value)} placeholder={config.titlePlaceholder} />
-            </label>
-            <label>
-              <span>{config.serviceLabel}</span>
-              {fieldRules.serviceFreeText ? (
-                <input
-                  value={form.serviceName}
-                  onChange={(event) => updateField('serviceName', event.target.value)}
-                  placeholder="예: 신규 출시 예정 서비스명"
-                />
-              ) : (
-                <select value={form.serviceName} onChange={(event) => updateField('serviceName', event.target.value)}>
-                  {serviceOptions.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </label>
-            <label>
-              <span>{config.areaLabel}</span>
-              <input required value={form.serviceArea} onChange={(event) => updateField('serviceArea', event.target.value)} placeholder="예: 체크아웃/PG, 알림, 정산" />
-            </label>
-            <label>
-              <span>요청 부서</span>
-              <input required value={form.ownerTeam} onChange={(event) => updateField('ownerTeam', event.target.value)} placeholder="예: 영업, 운영, 마케팅" />
-            </label>
-            <label>
-              <span>요청자</span>
-              <input required value={form.requester} onChange={(event) => updateField('requester', event.target.value)} />
-            </label>
-            <label>
-              <span>희망 완료일{fieldRules.dueDateOptional ? ' (선택)' : ''}</span>
+            <p className="requestTypeHint">{config.intro}</p>
+            <div className="approvalPreset">
+              <strong>승인 필요 역할</strong>
+              <div className="approvalSummary">
+                {requestApprovalRoles.map((item) => (
+                  <span key={item} className="approvalPill pending">{approvalStepLabels[item]}</span>
+                ))}
+              </div>
+              <p className="approvalGuide">이 요청 유형은 위 역할의 확인 완료 후 다음 단계로 진행됩니다.</p>
+            </div>
+            <label className="planningSkipToggle">
               <input
-                required={!fieldRules.dueDateOptional}
-                type="date"
-                value={form.dueDate}
-                onChange={(event) => updateField('dueDate', event.target.value)}
+                type="checkbox"
+                checked={form.skipPlanning ?? !planningRequiredByType[form.requestType]}
+                onChange={(event) => updateField('skipPlanning', event.target.checked)}
               />
+              <span>
+                <strong>기획 단계(SRS/SDS) 생략</strong>
+                <em>체크하면 기획 문서 작성 없이 요청 → 승인으로 바로 진행합니다.</em>
+              </span>
             </label>
-          </div>
-        </fieldset>
+          </fieldset>
 
         <fieldset>
-          <legend>요구사항 이해</legend>
-          <p className="fieldHint">요청자와 PM이 이후 승인자, 개발, QC, 보안이 함께 참고할 기준 정보를 정리합니다.</p>
-          <div className="formGrid">
-            <label>
-              <span>{config.summaryLabel}</span>
-              <textarea required value={form.summary} onChange={(event) => updateField('summary', event.target.value)} placeholder={config.summaryPlaceholder} />
-            </label>
-            <label>
-              <span>{config.problemLabel}</span>
-              <textarea required value={form.currentProblem} onChange={(event) => updateField('currentProblem', event.target.value)} placeholder={config.problemPlaceholder} />
-            </label>
-            <label>
-              <span>{config.outcomeLabel}</span>
-              <textarea required value={form.desiredOutcome} onChange={(event) => updateField('desiredOutcome', event.target.value)} placeholder={config.outcomePlaceholder} />
-            </label>
-            <label>
-              <span>{config.metricLabel}{fieldRules.metricOptional ? ' (선택)' : ''}</span>
-              <textarea
-                required={!fieldRules.metricOptional}
-                value={form.successMetric}
-                onChange={(event) => updateField('successMetric', event.target.value)}
-                placeholder={config.metricPlaceholder}
-              />
-            </label>
-            <label>
-              <span>{config.audienceLabel}</span>
-              <input required value={form.affectedUsers} onChange={(event) => updateField('affectedUsers', event.target.value)} placeholder={config.audiencePlaceholder} />
-            </label>
-            <label>
-              <span>{config.riskLabel}</span>
-              <textarea value={form.risk} onChange={(event) => updateField('risk', event.target.value)} placeholder={config.riskPlaceholder} />
-            </label>
-          </div>
-        </fieldset>
+            <legend>기본 정보</legend>
+            <p className="fieldHint">누가 요청했고 어떤 서비스와 범위에 대한 요청인지 분명하게 남깁니다.</p>
+            <div className="formGrid two">
+              <label>
+                <span>요청 제목</span>
+                <input required value={form.title} onChange={(event) => updateField('title', event.target.value)} placeholder={config.titlePlaceholder} />
+              </label>
+              <label>
+                <span>{config.serviceLabel}</span>
+                {fieldRules.serviceFreeText ? (
+                  <input value={form.serviceName} onChange={(event) => updateField('serviceName', event.target.value)} placeholder="예: 신규 출시 예정 서비스명" />
+                ) : (
+                  <select value={form.serviceName} onChange={(event) => updateField('serviceName', event.target.value)}>
+                    {serviceOptions.map((item) => (<option key={item} value={item}>{item}</option>))}
+                  </select>
+                )}
+              </label>
+              <label>
+                <span>{config.areaLabel}</span>
+                <input required value={form.serviceArea} onChange={(event) => updateField('serviceArea', event.target.value)} placeholder="예: 체크아웃/PG, 알림, 정산" />
+              </label>
+              <label>
+                <span>요청 부서</span>
+                <input required value={form.ownerTeam} onChange={(event) => updateField('ownerTeam', event.target.value)} placeholder="예: 영업, 운영, 마케팅" />
+              </label>
+              <label>
+                <span>요청자</span>
+                <input required value={form.requester} onChange={(event) => updateField('requester', event.target.value)} />
+              </label>
+              <label>
+                <span>희망 완료일{fieldRules.dueDateOptional ? ' (선택)' : ''}</span>
+                <input required={!fieldRules.dueDateOptional} type="date" value={form.dueDate} onChange={(event) => updateField('dueDate', event.target.value)} />
+              </label>
+            </div>
+          </fieldset>
 
-        <div className="requestFooter">
-          <label>
-            <span>우선순위</span>
-            <select value={form.priority} onChange={(event) => updateField('priority', event.target.value as Priority)}>
-              <option value="low">낮음</option>
-              <option value="normal">보통</option>
-              <option value="high">높음</option>
-              <option value="urgent">긴급</option>
-            </select>
-          </label>
-          <button className="primaryButton" type="submit">
-            <Send size={16} />
-            요청 등록
+        <fieldset>
+            <legend>요구사항 이해</legend>
+            <p className="fieldHint">이후 승인자, 개발, QC, 보안이 함께 참고할 기준 정보를 정리합니다.</p>
+            <div className="formGrid">
+              <label>
+                <span>{config.summaryLabel}</span>
+                <textarea required value={form.summary} onChange={(event) => updateField('summary', event.target.value)} placeholder={config.summaryPlaceholder} />
+              </label>
+              <label>
+                <span>{config.problemLabel}</span>
+                <textarea required value={form.currentProblem} onChange={(event) => updateField('currentProblem', event.target.value)} placeholder={config.problemPlaceholder} />
+              </label>
+              <label>
+                <span>{config.outcomeLabel}</span>
+                <textarea required value={form.desiredOutcome} onChange={(event) => updateField('desiredOutcome', event.target.value)} placeholder={config.outcomePlaceholder} />
+              </label>
+              <label>
+                <span>{config.metricLabel}{fieldRules.metricOptional ? ' (선택)' : ''}</span>
+                <textarea required={!fieldRules.metricOptional} value={form.successMetric} onChange={(event) => updateField('successMetric', event.target.value)} placeholder={config.metricPlaceholder} />
+              </label>
+              <label>
+                <span>{config.audienceLabel}</span>
+                <input required value={form.affectedUsers} onChange={(event) => updateField('affectedUsers', event.target.value)} placeholder={config.audiencePlaceholder} />
+              </label>
+              <label>
+                <span>{config.riskLabel}</span>
+                <textarea value={form.risk} onChange={(event) => updateField('risk', event.target.value)} placeholder={config.riskPlaceholder} />
+              </label>
+            </div>
+          </fieldset>
+
+        <fieldset>
+            <legend>검토 · 제출</legend>
+            <p className="fieldHint">우선순위를 정하고 입력한 내용을 한 번 확인한 뒤 등록합니다.</p>
+            <div className="formGrid two">
+              <label>
+                <span>우선순위</span>
+                <select value={form.priority} onChange={(event) => updateField('priority', event.target.value as Priority)}>
+                  <option value="low">낮음</option>
+                  <option value="normal">보통</option>
+                  <option value="high">높음</option>
+                  <option value="urgent">긴급</option>
+                </select>
+              </label>
+              <label>
+                <span>요청 유형</span>
+                <input value={requestTypeLabels[form.requestType]} readOnly />
+              </label>
+            </div>
+            <div className="flowReviewBox">
+              <div className="flowReviewRow"><span>제목</span><strong>{form.title || '—'}</strong></div>
+              <div className="flowReviewRow"><span>서비스 / 영역</span><strong>{form.serviceName} · {form.serviceArea || '—'}</strong></div>
+              <div className="flowReviewRow"><span>요청자 / 부서</span><strong>{form.requester || '—'} · {form.ownerTeam || '—'}</strong></div>
+              <div className="flowReviewRow"><span>희망 완료일</span><strong>{form.dueDate || '미정'}</strong></div>
+              <div className="flowReviewRow"><span>기획 단계</span><strong>{(form.skipPlanning ?? !planningRequiredByType[form.requestType]) ? '생략 (요청 → 승인)' : '포함 (SRS+SDS)'}</strong></div>
+            </div>
+          </fieldset>
+
+        <div className="flowStepActions">
+          <button type="submit" className="primaryButton" disabled={!allValid}>
+            <Send size={16} /> 요청 등록
           </button>
         </div>
       </form>
@@ -3052,6 +3126,36 @@ function SrsReadView({ srs }: { srs: string }) {
 }
 
 // 댓글 한 행: 왼쪽 작성자/시각, 오른쪽 내용 + 작성자 수정/삭제
+// 문의 댓글의 @담당자 멘션 후보 목록 (역할 라벨 기준)
+const mentionTargets: { value: string; label: string }[] = [
+  { value: 'PM', label: 'PM' },
+  { value: 'CEM', label: 'CEM' },
+  { value: '개발', label: '개발' },
+  { value: 'QA', label: 'QA' },
+  { value: '정보보호', label: '정보보호' },
+  { value: '인프라', label: '인프라' },
+  { value: '특허', label: '특허' },
+  { value: '요청자', label: '요청자' },
+  { value: '관리자', label: '관리자' },
+]
+
+const mentionRegex = new RegExp(`@(${mentionTargets.map((m) => m.value).join('|')})`, 'g')
+
+function renderWithMentions(text: string): React.ReactNode[] {
+  const nodes: React.ReactNode[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  let key = 0
+  const regex = new RegExp(mentionRegex.source, 'g')
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index))
+    nodes.push(<span key={key++} className="mentionChip">@{match[1]}</span>)
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex))
+  return nodes.length > 0 ? nodes : [text]
+}
+
 function CommentItem({
   comment,
   kind,
@@ -3093,7 +3197,7 @@ function CommentItem({
         </form>
       ) : (
         <>
-          <p className="commentBody">{display}</p>
+          <p className="commentBody">{renderWithMentions(display)}</p>
           {canManage && (
             <div className="commentRowActions">
               {onEdit && <button type="button" onClick={() => { setDraft(display); setEditing(true) }}>수정</button>}
@@ -3155,6 +3259,22 @@ function SectionInquiryBox({ sectionLabel, comments, currentRole, onAdd, onEdit,
                         setReplyTo(null)
                       }}
                     >
+                      <select
+                        className="mentionSelect"
+                        value=""
+                        onChange={(e) => {
+                          const v = e.target.value
+                          if (!v) return
+                          setReplyDraft((d) => (d ? `${d.replace(/\s+$/, '')} @${v} ` : `@${v} `))
+                          e.target.value = ''
+                        }}
+                        aria-label="담당자 멘션 추가"
+                      >
+                        <option value="">@담당자</option>
+                        {mentionTargets.map((m) => (
+                          <option key={m.value} value={m.value}>@{m.label}</option>
+                        ))}
+                      </select>
                       <input value={replyDraft} onChange={(e) => setReplyDraft(e.target.value)} placeholder="답변 입력" autoFocus />
                       <button className="primaryButton" type="submit" disabled={!replyDraft.trim()}>답변</button>
                     </form>
@@ -3174,6 +3294,22 @@ function SectionInquiryBox({ sectionLabel, comments, currentRole, onAdd, onEdit,
               setDraft('')
             }}
           >
+            <select
+              className="mentionSelect"
+              value=""
+              onChange={(e) => {
+                const v = e.target.value
+                if (!v) return
+                setDraft((d) => (d ? `${d.replace(/\s+$/, '')} @${v} ` : `@${v} `))
+                e.target.value = ''
+              }}
+              aria-label="담당자 멘션 추가"
+            >
+              <option value="">@담당자</option>
+              {mentionTargets.map((m) => (
+                <option key={m.value} value={m.value}>@{m.label}</option>
+              ))}
+            </select>
             <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`${sectionLabel}에 대한 문의/의견`} />
             <button className="primaryButton" type="submit" disabled={!draft.trim()}>등록</button>
           </form>
@@ -3246,20 +3382,17 @@ function RequesterContentPanel({
   const set = <K extends keyof typeof form>(k: K, v: string) => setForm((s) => ({ ...s, [k]: v }))
 
   return (
-    <section className={`requirementsPanel numberedSection sectionRequester requesterContent ${highlight && canEdit ? 'neonHighlight' : ''}`}>
+    <section className={`requirementsPanel numberedSection sectionRequester requesterContent ${highlight && canEdit ? 'neonHighlight' : ''}`} data-section="요청 내용" data-section-tone="request">
       <div className="panelHeader compact">
         <div>
-          <p className="eyebrow">{project.code}</p>
-          <h3>① 요청자가 요청한 내용</h3>
+          <h3>요청자 작성 내용</h3>
           <span>{editing ? '수정 중 · 저장하면 반영됩니다' : '요청 등록 시 작성된 원본 내용'}</span>
         </div>
-        <div className="requesterContentBadges">
-          <span className="requestTypePill">{requestTypeLabels[project.requestType]}</span>
-          <span className={`statusPill ${project.status}`}>{statusLabels[project.status]}</span>
-          {canEdit && !editing && (
+        {canEdit && !editing && (
+          <div className="requesterContentBadges">
             <button className="miniButton" type="button" onClick={startEdit}>수정</button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {editing ? (
@@ -3309,59 +3442,6 @@ function RequesterContentPanel({
 }
 
 // ④ 단계별 문의/논의: 문의 + 답변을 표시만 (입력은 각 섹션 문의 박스에서)
-function StageInquiryPanel({
-  project,
-  workflow: stages,
-  currentRole,
-  onEdit,
-  onDelete,
-}: {
-  project: Project
-  workflow: Array<{ status: ProjectStatus; label: string }>
-  currentRole: Role
-  onEdit?: (id: string, message: string) => void
-  onDelete?: (id: string) => void
-}) {
-  const comments = project.comments ?? []
-  const threads = comments.filter((c) => !c.parentId)
-  const repliesOf = (id: string) => comments.filter((c) => c.parentId === id)
-
-  if (comments.length === 0) {
-    return <p className="docAttachmentEmpty">아직 등록된 문의가 없습니다. 각 섹션의 "문의 사항"에서 등록하면 여기에 모입니다.</p>
-  }
-
-  return (
-    <div className="stageInquiryGroups">
-      {stages
-        .filter((stage) => threads.some((t) => t.stage === stage.status))
-        .map((stage) => {
-          const stageThreads = threads.filter((t) => t.stage === stage.status)
-          return (
-            <div key={stage.status} className="stageGroup">
-              <div className="stageGroupHeader static">
-                <span className={`statusPill ${stage.status}`}>{stage.label}</span>
-                <span className="stageGroupCount">문의 {stageThreads.length}</span>
-              </div>
-              <div className="stageGroupBody">
-                <div className="commentThreadList">
-                  {stageThreads.slice().reverse().map((q) => (
-                    <div key={q.id} className="commentThread">
-                      <CommentItem comment={q} kind="q" currentRole={currentRole} onEdit={onEdit} onDelete={onDelete} />
-                      {repliesOf(q.id).map((a) => (
-                        <CommentItem key={a.id} comment={a} kind="a" currentRole={currentRole} onEdit={onEdit} onDelete={onDelete} />
-                      ))}
-                      {repliesOf(q.id).length === 0 && <p className="qaNoReply">답변 대기 중</p>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )
-        })}
-    </div>
-  )
-}
-
 function RequirementBlock({ label, value }: { label: string; value: string }) {
   return (
     <div className="requirementBlock">
@@ -3388,6 +3468,26 @@ function SettingsPanel({
 }) {
   const [draft, setDraft] = useState('')
   const [holdFilter, setHoldFilter] = useState<'all' | 'onHold' | 'active'>('all')
+
+  // 동사무소 게시판 API 등록 설정 (localStorage 영속)
+  type OfficeApiConfig = { baseUrl: string; boardName: string; username: string; password: string }
+  const officeApiStorageKey = 'pms-office-api'
+  const [officeApi, setOfficeApi] = useState<OfficeApiConfig>(() => {
+    if (typeof window === 'undefined') return { baseUrl: '', boardName: '', username: '', password: '' }
+    try {
+      const saved = window.localStorage.getItem(officeApiStorageKey)
+      return saved ? JSON.parse(saved) : { baseUrl: '', boardName: '', username: '', password: '' }
+    } catch {
+      return { baseUrl: '', boardName: '', username: '', password: '' }
+    }
+  })
+  const [officeApiSaved, setOfficeApiSaved] = useState(false)
+  function saveOfficeApi(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    window.localStorage.setItem(officeApiStorageKey, JSON.stringify(officeApi))
+    setOfficeApiSaved(true)
+    setTimeout(() => setOfficeApiSaved(false), 1800)
+  }
 
   function addService(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -3445,6 +3545,61 @@ function SettingsPanel({
       <div className="settingsSection">
         <div className="panelHeader compact">
           <div>
+            <h3>동사무소 게시판 API</h3>
+            <p>완료된 프로젝트를 동사무소 게시판에 자동 게시하기 위한 API 연결 정보입니다.</p>
+          </div>
+        </div>
+        <form className="officeApiForm" onSubmit={saveOfficeApi}>
+          <div className="formGrid two">
+            <label>
+              <span>Base URL</span>
+              <input
+                type="url"
+                value={officeApi.baseUrl}
+                onChange={(e) => setOfficeApi((c) => ({ ...c, baseUrl: e.target.value }))}
+                placeholder="https://center.muhayu.com"
+              />
+            </label>
+            <label>
+              <span>Board name</span>
+              <input
+                type="text"
+                value={officeApi.boardName}
+                onChange={(e) => setOfficeApi((c) => ({ ...c, boardName: e.target.value }))}
+                placeholder="security"
+              />
+            </label>
+            <label>
+              <span>Username</span>
+              <input
+                type="text"
+                value={officeApi.username}
+                onChange={(e) => setOfficeApi((c) => ({ ...c, username: e.target.value }))}
+                placeholder="shbae"
+                autoComplete="off"
+              />
+            </label>
+            <label>
+              <span>Password</span>
+              <input
+                type="password"
+                value={officeApi.password}
+                onChange={(e) => setOfficeApi((c) => ({ ...c, password: e.target.value }))}
+                placeholder="새 비밀번호를 입력하면 갱신됩니다."
+                autoComplete="new-password"
+              />
+            </label>
+          </div>
+          <div className="officeApiActions">
+            {officeApiSaved && <span className="officeApiSavedHint">저장되었습니다 ✓</span>}
+            <button className="primaryButton" type="submit">저장</button>
+          </div>
+        </form>
+      </div>
+
+      <div className="settingsSection">
+        <div className="panelHeader compact">
+          <div>
             <h3>프로젝트 관리</h3>
             <p>전체 프로젝트({projects.length}개)의 보류 토글 및 삭제를 관리합니다. 삭제는 되돌릴 수 없습니다.</p>
           </div>
@@ -3482,11 +3637,11 @@ function SettingsPanel({
           {projects
             .filter((project) => {
               if (holdFilter === 'onHold') return project.onHold
-              if (holdFilter === 'active') return !project.onHold && !['published', 'rejected'].includes(project.status)
+              if (holdFilter === 'active') return !project.onHold && !['rejected'].includes(project.status)
               return true
             })
             .map((project) => {
-              const disabled = ['published', 'rejected'].includes(project.status)
+              const disabled = ['rejected'].includes(project.status)
               return (
                 <div key={project.id} className={`projectHoldRow ${project.onHold ? 'onHold' : ''}`}>
                   <div className="projectHoldInfo">
@@ -3558,11 +3713,9 @@ function nextRoleFor(status: ProjectStatus): Role {
   const roleMap: Partial<Record<ProjectStatus, Role>> = {
     dept_review: 'pm',
     planning: 'pm',
-    schedule: 'pm',
     development: 'developer',
     qc_security: 'qa',
     completion: 'admin',
-    published: 'admin',
   }
   return roleMap[status] ?? 'requester'
 }
@@ -3571,11 +3724,9 @@ function nextActionFor(status: ProjectStatus) {
   const actionMap: Partial<Record<ProjectStatus, string>> = {
     dept_review: '승인 의견 취합',
     planning: '기획 문서(SRS+SDS) 작성 후 승인 단계로 이동',
-    schedule: '개발 준비와 일정 확정',
-    development: '개발 태스크 진행',
+    development: '일정 확정 후 개발 태스크 진행',
     qc_security: '품질/보안 검사 및 PM 인수 확인',
-    completion: '완료 보고서 작성',
-    published: '그룹웨어 게시 확인',
+    completion: '완료 보고서 작성 및 게시 확인',
   }
   return actionMap[status] ?? '요청 내용 보완'
 }
@@ -3589,7 +3740,22 @@ function daysUntil(date: string, from: Date) {
 function logStamp() {
   const d = new Date()
   const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
+// 다양한 형식의 'at' 값을 'YYYY-MM-DD HH:mm:ss'로 보여주기 위해 정규화
+function formatTimestamp(at: string): string {
+  if (!at) return ''
+  // ISO 형식 (2026-05-31T14:23:45.123Z)
+  if (/T.*Z|T.*[+-]\d{2}:?\d{2}/.test(at)) {
+    const d = new Date(at)
+    if (isNaN(d.getTime())) return at
+    const p = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+  }
+  // 'YYYY-MM-DD HH:mm' (초가 없으면 :00 추가)
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(at)) return `${at}:00`
+  return at
 }
 
 function formatDate(date: string) {

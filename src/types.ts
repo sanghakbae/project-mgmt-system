@@ -17,11 +17,9 @@ export type ProjectStatus =
   | 'request'
   | 'dept_review'
   | 'planning'
-  | 'schedule'
   | 'development'
   | 'qc_security'
   | 'completion'
-  | 'published'
   | 'rejected'
 
 export type TaskStatus = 'todo' | 'doing' | 'blocked' | 'done'
@@ -45,6 +43,8 @@ export type WorkflowConfig = {
 export type ApprovalState = {
   requiredRoles: Role[]
   approvedRoles: Role[]
+  // 각 역할이 확인하면서 남긴 메모(이유·조건·코멘트). 없을 수도 있음.
+  memos?: Partial<Record<Role, { at: string; actor: string; message: string }>>
 }
 
 // QC/보안/PM 단계의 역할별 검토 완료 상태 (3자 합의 게이트)

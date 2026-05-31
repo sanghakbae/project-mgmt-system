@@ -34,7 +34,7 @@ const defaultSchedule: ScheduleInfo = {
   note: '',
 }
 
-const fullApprovalRoles: Project['approvalState']['requiredRoles'] = ['pm', 'cem', 'developer', 'security', 'infra', 'qa', 'patent', 'admin']
+const fullApprovalRoles: Project['approvalState']['requiredRoles'] = ['cem', 'developer', 'security', 'infra', 'qa', 'patent']
 
 const approvalRolesByRequestType: Record<Project['requestType'], Project['approvalState']['requiredRoles']> = {
   improvement: fullApprovalRoles,
@@ -136,20 +136,25 @@ export function mapProjectRow(row: ProjectRow): Project {
   const approvalState = {
     requiredRoles: baselineRoles,
     approvedRoles: (savedApprovalState?.approvedRoles ?? []).filter((item) => baselineRoles.includes(item)),
+    memos: savedApprovalState?.memos,
   }
   const hasSrs = reviewDocs.srs.trim().length > 0
   const hasSds = reviewDocs.sds.trim().length > 0
   const hasReviewDocs = hasSrs && hasSds
   const legacyRaw = row.status as string
-  // 레거시 status 값을 새 워크플로우로 매핑: uat → qc_security, srs/sds → planning
+  // 레거시 status 매핑: uat → qc_security, srs/sds → planning, schedule → development (개발 단계로 흡수)
   const legacyMappedStatus: Project['status'] = (legacyRaw === 'uat'
     ? 'qc_security'
     : legacyRaw === 'srs' || legacyRaw === 'sds'
       ? 'planning'
-      : (legacyRaw as Project['status']))
+      : legacyRaw === 'schedule'
+        ? 'development'
+        : legacyRaw === 'published'
+          ? 'completion'
+          : (legacyRaw as Project['status']))
   // 문서 작성 상태에 따라 단계 정규화: 기획 문서(SRS+SDS) 미완료 시 'planning' 단계로 강제
   // 단, 기획 단계를 생략하는 요청 분류는 강제하지 않음
-  const docsGatedStatuses: Project['status'][] = ['dept_review', 'schedule', 'development', 'qc_security', 'completion', 'published']
+  const docsGatedStatuses: Project['status'][] = ['dept_review', 'development', 'qc_security', 'completion']
   let normalizedStatus: Project['status'] = legacyMappedStatus
   if (planningRequiredByType[requestType] && docsGatedStatuses.includes(legacyMappedStatus) && !hasReviewDocs) {
     normalizedStatus = 'planning'

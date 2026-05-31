@@ -1,14 +1,60 @@
+html {
+  /* 스크롤바 자리를 항상 확보해 단계 이동 시 본문 폭이 변하지 않도록 */
+  scrollbar-gutter: stable;
+  overflow-y: scroll;
+}
+
 .appShell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
   background: #f4f5f7;
   color: #20242b;
   transition: grid-template-columns 0.18s ease;
+  position: relative;
 }
 
 .appShell.sidebarCollapsed {
-  grid-template-columns: 84px minmax(0, 1fr);
+  grid-template-columns: 88px minmax(0, 1fr);
+}
+
+/* 사이드 메뉴와 본문 사이의 경계선 정중앙에 배치 (사이드바 우측 경계 = 펼침 240px / 접힘 88px) */
+.sidebarToggleEdge {
+  position: fixed;
+  top: 28px;
+  left: 240px;
+  transform: translate(-50%, 0);
+  z-index: 200;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid #dedfe3;
+  border-radius: 50%;
+  background: #fff;
+  color: #4b515c;
+  box-shadow: 0 2px 6px rgba(20, 23, 28, 0.08);
+  cursor: pointer;
+  box-sizing: border-box;
+  line-height: 1;
+  transition: left 0.18s ease;
+}
+
+.sidebarToggleEdge svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+.sidebarCollapsed .sidebarToggleEdge {
+  left: 88px;
+}
+
+.sidebarToggleEdge:hover {
+  border-color: #3b5bdb;
+  color: #3b5bdb;
 }
 
 .sidebar {
@@ -19,7 +65,8 @@
   background: #fbfbfc;
   border-right: 1px solid #dedfe3;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow: visible;
+  z-index: 100;
 }
 
 .brand {
@@ -33,6 +80,14 @@
 .brandText {
   min-width: 0;
   flex: 1;
+}
+
+.brandText strong,
+.brandText span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebarToggle {
@@ -90,6 +145,21 @@ select {
 
 button {
   cursor: pointer;
+  text-align: center;
+}
+
+/* 아이콘 + 텍스트 조합 버튼들도 컨텐츠가 가운데로 모이도록 */
+.miniButton,
+.primaryButton,
+.approveBtn,
+.holdBtn,
+.closeBtn,
+.approveButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
 }
 
 .navItem,
@@ -207,17 +277,60 @@ button {
 .sidebarCollapsed .navItem {
   justify-content: center;
   padding: 12px 0;
+  position: relative;
+}
+
+/* 접혔을 때 hover 시 메뉴 이름 말풍선 (항상 최상단, 아이콘에 가까이) */
+.sidebarCollapsed .navItem:hover::after {
+  content: attr(title);
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 6px;
+  padding: 6px 10px;
+  background: #20242b;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  white-space: nowrap;
+  z-index: 9999;
+  pointer-events: none;
+  box-shadow: 0 4px 10px rgba(20, 23, 28, 0.18);
+}
+
+.sidebarCollapsed .navItem:hover::before {
+  content: '';
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 0px;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-right: 6px solid #20242b;
+  z-index: 9999;
+  pointer-events: none;
 }
 
 .main {
   min-width: 0;
-  padding: 32px;
+  padding: 0 16px;
 }
 
 .topbar,
 .panelHeader,
 .detailHero,
-.actionBanner,
+.actionBanner {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+}
+
 .artifact,
 .cardMeta {
   display: flex;
@@ -225,9 +338,26 @@ button {
 }
 
 .topbar {
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 22px;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-end;
+  gap: 12px;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 30;
+  background: #f4f5f7;
+  padding: 12px 16px;
+  height: 66px;
+  box-sizing: border-box;
+  /* 좌우 main padding(16px)을 무시하고 화면 끝까지 꽉 채움 */
+  width: calc(100% + 32px);
+  margin-left: -16px;
+  margin-right: -16px;
+}
+
+/* 빈 좌측 div 숨김 */
+.topbar > div:empty {
+  display: none;
 }
 
 .topbarActions {
@@ -533,6 +663,18 @@ h3 {
   overflow: hidden;
 }
 
+/* 단계 흐름 헤더 — 제목은 왼쪽, 서비스 선택은 우측 상단 */
+.workflowOverview > .panelHeader.compact {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.workflowOverview > .panelHeader.compact .serviceFilterControl {
+  flex: 0 0 auto;
+}
+
 .workflowSummary {
   display: grid;
   gap: 4px;
@@ -592,29 +734,59 @@ h3 {
   justify-content: start;
 }
 
+/* 서비스별 단계 흐름 — 각 서비스를 한 행(라벨 + 6단계 칸반)으로 표시 */
+.serviceFlow {
+  margin-top: 16px;
+}
+
+.serviceFlow:first-of-type {
+  margin-top: 8px;
+}
+
+.serviceFlowHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 0 2px 8px;
+  border-bottom: 1px solid #eceef2;
+  margin-bottom: 6px;
+}
+
+.serviceFlowHead strong {
+  font-size: 14px;
+  color: #1d2330;
+  letter-spacing: -0.2px;
+}
+
+.serviceFlowHead span {
+  font-size: 12px;
+  font-weight: 700;
+  color: #7b818b;
+}
+
 .dashboardKanban.adminScroll {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
   padding: 4px 0 8px;
   width: 100%;
   overflow: visible;
 }
 
-@media (max-width: 1400px) {
+@media (max-width: 1200px) {
   .dashboardKanban.adminScroll {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 760px) {
   .dashboardKanban.adminScroll {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 480px) {
   .dashboardKanban.adminScroll {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -642,7 +814,19 @@ h3 {
   background: linear-gradient(180deg, #eef0f3 0, #eef0f3 92px, #f7f8fa 92px, #f7f8fa 100%) !important;
   border-color: #dadde2 !important;
   filter: grayscale(0.6);
-  opacity: 0.65;
+  opacity: 0.6;
+}
+
+/* 비어 있는(음영) 컬럼 헤더는 클릭 불가 — 눌리는 느낌 제거 */
+.dashboardKanban.adminScroll .kanbanColumn.dim .kanbanColumnHeader {
+  cursor: default;
+  pointer-events: none;
+}
+
+.dashboardKanban.adminScroll .kanbanColumn.dim .kanbanColumnHeader:hover {
+  background: #fff;
+  box-shadow: none;
+  transform: none;
 }
 
 .dashboardKanban.adminScroll .kanbanColumn.dim .kanbanHeaderMeta small {
@@ -1162,7 +1346,7 @@ h3 {
 .workArea {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 18px;
+  gap: 0;
   align-items: start;
   min-width: 0;
 }
@@ -1172,7 +1356,6 @@ h3 {
 }
 
 .queuePanel,
-.detailPanel,
 .infoPanel,
 .riskPanel,
 .requestPanel,
@@ -1182,7 +1365,88 @@ h3 {
   border-radius: 8px;
 }
 
-/* 시스템 흐름도 */
+/* detailPanel은 외곽 카드 제거 — 내부 패널들이 각자 배경/테두리를 가짐 */
+.detailPanel {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+/* 문의 댓글 @담당자 멘션 */
+.mentionChip {
+  display: inline-block;
+  margin: 0 2px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #eef1ff;
+  color: #3b5bdb;
+  font-weight: 800;
+  font-size: 0.95em;
+}
+
+.mentionPicker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.mentionPickerReply {
+  margin-left: 22px;
+}
+
+.mentionPickerLabel {
+  font-size: 11px;
+  font-weight: 800;
+  color: #6b7280;
+  margin-right: 2px;
+}
+
+.mentionPickerBtn {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid #d8dbe1;
+  border-radius: 999px;
+  background: #fff;
+  color: #4b515c;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mentionPickerBtn:hover {
+  border-color: #3b5bdb;
+  color: #3b5bdb;
+  background: #eef1ff;
+}
+
+.mentionSelect {
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #d8dbe1;
+  border-radius: 7px;
+  background: #fff;
+  color: #4b515c;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  text-align-last: center;
+  cursor: pointer;
+}
+
+.mentionSelect:hover,
+.mentionSelect:focus {
+  border-color: #3b5bdb;
+  color: #3b5bdb;
+  outline: 0;
+}
+
+
+/* 프로젝트 흐름도 */
 .flowPanel {
   background: #fff;
   border: 1px solid #dcdfe4;
@@ -1232,8 +1496,9 @@ h3 {
 }
 
 .flowDiagram {
+  position: relative;
   margin-top: 10px;
-  padding: 16px;
+  padding: 0;
   border: 1px solid #eceef2;
   border-radius: 10px;
   background:
@@ -1241,17 +1506,78 @@ h3 {
     linear-gradient(90deg, #f4f6f9 1px, transparent 1px) 0 0 / 22px 22px,
     #fff;
   overflow: hidden;
+  height: min(72vh, 760px);
+}
+
+/* 확대/축소 · 팬 뷰포트 */
+.flowViewport {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+
+.flowViewport.dragging {
+  cursor: grabbing;
 }
 
 .flowSvgWrap {
+  width: 100%;
+  height: 100%;
+  padding: 16px;
   display: flex;
+  align-items: center;
   justify-content: center;
+  transform-origin: center center;
 }
 
+/* 가로 방향 흐름도를 뷰포트 안에 통째로 맞춰 넣음(메르메이드 인라인 max-width 무시) */
 .flowSvgWrap svg {
-  max-width: 100%;
-  width: 100%;
-  height: auto;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+}
+
+.flowZoomBar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #e1e5eb;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 8px rgba(20, 23, 28, 0.08);
+  backdrop-filter: blur(4px);
+}
+
+.flowZoomBar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: #f4f6f9;
+  color: #2b323d;
+  cursor: pointer;
+}
+
+.flowZoomBar button:hover {
+  background: #e6ebf2;
+}
+
+.flowZoomLevel {
+  min-width: 42px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #4b515c;
 }
 
 .flowSvgWrap .edgeLabel {
@@ -1271,9 +1597,49 @@ h3 {
 }
 
 .queuePanel {
-  padding: 18px;
+  padding: 14px 18px;
   font-size: 12px;
   overflow: hidden;
+  background: #fff;
+}
+
+/* 상단 sticky 컨테이너 — queuePanel + detailHeaderPanel을 한 덩어리로 고정 (topbar 아래) */
+.topStickyArea {
+  position: sticky;
+  top: 66px; /* topbar 높이(66px)와 정확히 맞춤 → 겹침/간격 변동 방지 */
+  z-index: 20;
+  background: #f4f5f7;
+  /* 상단 간격은 topbar 자체 하단 패딩(12px)이 담당 → 여기는 0, 하단은 스크롤 콘텐츠 가림막 */
+  padding: 0 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 프로젝트 헤더 + 스텝퍼 패널 — topStickyArea 내부 카드 */
+.detailHeaderPanel {
+  background: #fff;
+  border: 1px solid #dcdfe4;
+  border-radius: 8px;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.detailHeaderPanel .flowStepper.detailStepper {
+  margin: 0;
+}
+
+.queuePanel .panelHeader {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.queuePanel .panelHeader > div,
+.queuePanel .eyebrow,
+.queuePanel h2 {
+  text-align: left;
 }
 
 .queuePanel h2 {
@@ -1287,6 +1653,37 @@ h3 {
 
 .panelHeader.compact {
   margin-bottom: 12px;
+  /* 세로(제목↔부제) 간격은 4px margin 규칙으로만 통일 — 부모 flex의 14px gap이
+     h3·span이 직접 자식일 때 추가로 끼어드는 것을 차단 (가로 버튼 간격은 유지) */
+  row-gap: 0;
+}
+
+/* 패널 헤더 제목 통일 — 모두 15px */
+.panelHeader h3,
+.panelHeader.compact h3 {
+  font-size: 15px;
+}
+
+/* 패널 헤더 제목 ↔ 부제(span/p) 사이 간격 통일 — 모두 4px */
+.panelHeader span,
+.panelHeader p,
+.panelHeader.compact span,
+.panelHeader.compact p {
+  display: block;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.panelHeader h3 + span,
+.panelHeader h3 + p,
+.panelHeader.compact h3 + span,
+.panelHeader.compact h3 + p,
+.panelHeader > div > h3 + span,
+.panelHeader > div > h3 + p,
+.panelHeader.compact > div > h3 + span,
+.panelHeader.compact > div > h3 + p {
+  margin: 4px 0 0 !important;
 }
 
 .iconButton,
@@ -1308,8 +1705,24 @@ h3 {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 16px 0 10px;
+  margin: 0 0 10px;
   flex-wrap: wrap;
+}
+
+/* 필터 결과가 없어 목록이 숨겨질 때: 검색줄 하단 여백 제거 → 위/아래 간격 동일 */
+.searchFilterRow:has(+ .projectList:empty) {
+  margin-bottom: 0;
+}
+
+.searchFilterRow .searchBox,
+.searchFilterRow .filterChips,
+.searchFilterRow .filterChips button {
+  height: 38px;
+  min-height: 38px;
+  margin: 0 !important;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
 }
 
 .searchFilterRow .searchBox {
@@ -1328,8 +1741,8 @@ h3 {
 }
 
 .searchBox {
-  height: 42px;
-  margin: 16px 0 10px;
+  height: 38px;
+  margin: 0 0 10px;
   padding: 0 12px;
   display: flex;
   align-items: center;
@@ -1351,14 +1764,15 @@ h3 {
 .filterChips {
   display: flex;
   gap: 8px;
-  margin-bottom: 14px;
+  margin-bottom: 6px;
 }
 
 .filterChips button {
-  min-height: 32px;
-  padding: 0 12px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 14px;
   border: 1px solid #d8dbe1;
-  border-radius: 6px;
+  border-radius: 7px;
   background: #fff;
   color: #5f6670;
   font-size: 12px;
@@ -1430,9 +1844,15 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: none;
-  overflow: visible;
-  padding: 0 0 4px;
+  /* 항목이 적으면 스크롤 없이 그대로 보이고, 길어지면(예: 관리자 전체) 이 영역만 내부 스크롤 */
+  max-height: 42vh;
+  overflow-y: auto;
+  padding: 3px 3px 4px;
+}
+
+/* 프로젝트 카드가 하나도 없으면 영역 자체를 숨김 (검색·필터·헤더 카드는 그대로 유지) */
+.projectList:empty {
+  display: none;
 }
 
 .projectCard {
@@ -1511,16 +1931,60 @@ h3 {
 
 .settingsPanel {
   display: grid;
-  gap: 18px;
+  gap: 12px;
 }
 
 .settingsSection {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   padding: 18px;
   border: 1px solid #dfe2e7;
   border-radius: 8px;
   background: #fff;
+}
+
+.officeApiForm {
+  display: grid;
+  gap: 14px;
+}
+
+.officeApiForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.officeApiForm label span {
+  font-size: 12px;
+  font-weight: 800;
+  color: #4b515c;
+}
+
+.officeApiForm input {
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid #d8dbe1;
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+.officeApiForm input:focus {
+  outline: 0;
+  border-color: #3b5bdb;
+  box-shadow: 0 0 0 2px rgba(59, 91, 219, 0.15);
+}
+
+.officeApiActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.officeApiSavedHint {
+  font-size: 12px;
+  font-weight: 700;
+  color: #198247;
 }
 
 .settingsSection p {
@@ -2134,12 +2598,36 @@ h3 {
 .richEditorView th,
 .richEditorView td {
   border: 1px solid #d2d7df;
-  padding: 6px 9px;
+  padding: 2px 5px;
   vertical-align: top;
   box-sizing: border-box;
   min-width: 40px;
   font-size: 12px;
   position: relative;
+  /* 긴 토큰(예: doc_srl(document_srl))이 셀을 넘지 않도록 줄바꿈 허용 */
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* 셀 내부 단락·리스트의 기본 여백/들여쓰기 최소화 → 셀 밖으로 넘침 방지 */
+.richEditorContent td > *,
+.richEditorContent th > *,
+.richEditorView td > *,
+.richEditorView th > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.richEditorContent td ul,
+.richEditorContent td ol,
+.richEditorContent th ul,
+.richEditorContent th ol,
+.richEditorView td ul,
+.richEditorView td ol,
+.richEditorView th ul,
+.richEditorView th ol {
+  padding-left: 16px;
+  margin: 0;
 }
 
 .richEditorContent th,
@@ -2260,6 +2748,525 @@ h3 {
   color: #7b818b;
 }
 
+/* 승인 의견 취합 — 역할별 컬럼형 상태 그리드 */
+.approvalGrid {
+  margin-top: 10px;
+  width: 100%;
+  border: 1px solid #e1e5eb;
+  border-radius: 9px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.approvalGridHead,
+.approvalGridBody {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 8), minmax(0, 1fr));
+}
+
+.approvalGridHead {
+  background: linear-gradient(180deg, #2f6bd8, #2856b5);
+  color: #fff;
+}
+
+.approvalGridHeadCell {
+  padding: 9px 6px;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: -0.2px;
+  border-right: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.approvalGridHeadCell:last-child {
+  border-right: 0;
+}
+
+.approvalGridBody {
+  padding: 12px;
+  gap: 10px;
+  background: #f7f9fc;
+}
+
+.approvalCellPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid transparent;
+  cursor: default;
+}
+
+.approvalCellPill.done {
+  background: #2ec27e;
+  color: #fff;
+}
+
+.approvalCellPill.pending {
+  background: #eef1f5;
+  color: #7b818b;
+}
+
+.approvalCellPill.mine {
+  background: #fff;
+  color: #2b323d;
+  border-color: #cfd3da;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+}
+
+.approvalCellPill.mine:hover {
+  border-color: #1c7a4d;
+  color: #1c7a4d;
+}
+
+.approvalGridFoot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  background: #f7f9fc;
+  border-top: 1px solid #eceef2;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.approvalGridFoot b { color: #198247; }
+.approvalGridFoot .doneAll { color: #198247; font-weight: 800; }
+
+/* 승인 이력 — 별도 패널 */
+.approvalHistoryPanel { padding: 16px 18px 18px; }
+
+.approvalHistoryPanel .panelHeader.compact h3 {
+  font-size: 15px;
+  font-weight: 800;
+  color: #2f6bd8;
+}
+
+.approvalHistoryPanel .approvalHistoryWrap {
+  margin-top: 10px;
+  border: 1px solid #e5e9f0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  padding: 0;
+}
+
+.approvalHistoryPanel .approvalHistoryTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.approvalHistoryPanel .approvalHistoryTable tbody tr:nth-child(even) td {
+  background: #fafbfd;
+}
+
+.approvalHistoryPanel .approvalHistoryTable tbody tr:hover td {
+  background: #f4f6fb;
+}
+
+/* 인라인 승인 입력 영역 */
+.approvalInlineComposer {
+  padding: 14px 16px;
+  border-top: 1px solid #eceef2;
+  background: #fafbfc;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.approvalInlineLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.approvalInlineLabel > span {
+  font-size: 12px;
+  font-weight: 800;
+  color: #1d2330;
+}
+
+.approvalInlineLabel textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid #cfd3da;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.approvalInlineLabel textarea:focus {
+  outline: 0;
+  border-color: #1c7a4d;
+  box-shadow: 0 0 0 2px rgba(28, 122, 77, 0.12);
+}
+
+.approvalInlineActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.approvalCommentRow.inline {
+  padding: 0;
+  border-top: 0;
+}
+
+/* 승인 이력 인라인 */
+.approvalHistoryInline {
+  padding: 12px 16px 16px;
+  border-top: 1px solid #eceef2;
+  background: #fff;
+}
+
+.approvalHistoryInline h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #2f6bd8;
+}
+
+/* ==== 승인 팝업 모달 ==== */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 18, 22, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modalContent.approvalModal {
+  width: min(960px, 100%);
+  max-height: 88vh;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.approvalModalHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #eceef2;
+}
+
+.approvalModalHead h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #2f6bd8;
+}
+
+.modalClose {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  color: #98a0aa;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.modalClose:hover {
+  background: #f0f2f6;
+  color: #2b323d;
+}
+
+.approvalHistoryWrap {
+  overflow-y: auto;
+  padding: 0 18px;
+}
+
+.approvalHistoryTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.approvalHistoryTable thead th {
+  position: sticky;
+  top: 0;
+  background: #f4f6fb;
+  color: #2b323d;
+  font-weight: 800;
+  padding: 10px 12px;
+  text-align: center;
+  letter-spacing: -0.2px;
+  border-bottom: 1px solid #dde2ec;
+  border-right: 1px solid #e5e9f0;
+}
+
+.approvalHistoryTable thead th:first-child { width: 18%; }
+.approvalHistoryTable thead th:nth-child(2) { width: 16%; }
+.approvalHistoryTable thead th:nth-child(3) { width: 14%; }
+.approvalHistoryTable thead th:last-child {
+  border-right: 0;
+}
+
+.approvalHistoryTable tbody td {
+  padding: 9px 12px;
+  border-bottom: 1px solid #f0f2f6;
+  vertical-align: middle;
+  text-align: center;
+}
+
+.approvalHistoryTime { white-space: nowrap; color: #6b7280; font-variant-numeric: tabular-nums; }
+.approvalHistoryDept { font-weight: 800; color: #2f6bd8; white-space: nowrap; }
+.approvalHistoryActor { color: #1d2330; white-space: nowrap; font-weight: 600; }
+.approvalHistoryMsg { color: #2b323d; line-height: 1.55; text-align: left; }
+.approvalHistoryEmpty { text-align: center; color: #98a0aa; padding: 24px 0; }
+
+.approvalCommentRow {
+  display: flex;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid #eceef2;
+}
+
+.approvalCommentRow input {
+  flex: 1;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #cfd3da;
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+.approvalCommentRow .miniButton {
+  min-width: 64px;
+  background: #4a90d9;
+  color: #fff;
+  border-color: #4a90d9;
+}
+
+.approvalModalFoot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  border-top: 1px solid #eceef2;
+  background: #fafbfc;
+}
+
+.approvalModalLabel {
+  font-size: 13px;
+  font-weight: 800;
+  color: #1d2330;
+  margin-right: 4px;
+}
+
+.approvalModalFinalMemo {
+  flex: 1;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #cfd3da;
+  border-radius: 7px;
+  font-size: 12.5px;
+  color: #c0392b;
+  background: #fff;
+}
+
+.approvalModalFinalMemo::placeholder {
+  color: #c0392b;
+  opacity: 0.75;
+}
+
+.approveBtn,
+.holdBtn,
+.closeBtn {
+  min-width: 64px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.approveBtn { background: #2ec27e; color: #fff; }
+.approveBtn:hover { background: #25a86c; }
+
+.holdBtn { background: #f6c25b; color: #5a4500; }
+.holdBtn:hover { background: #e9b143; }
+
+.closeBtn { background: #fff; color: #4b515c; border-color: #cfd3da; }
+.closeBtn:hover { background: #f4f6f9; }
+
+/* 승인 의견 취합 — 역할별 한 행씩 보여주는 검토 패널 */
+.approvalReview {
+  margin-top: 10px;
+  width: 100%;
+  border: 1px solid #e1e5eb;
+  border-radius: 9px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.approvalReviewHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 14px;
+  background: #f7f9fc;
+  border-bottom: 1px solid #eceef2;
+}
+
+.approvalReviewHead strong {
+  font-size: 13px;
+  font-weight: 800;
+  color: #14171c;
+}
+
+.approvalReviewCount {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.approvalReviewCount b {
+  color: #198247;
+  font-weight: 800;
+  margin-right: 2px;
+}
+
+.approvalReviewList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.approvalReviewRow {
+  display: grid;
+  grid-template-columns: 28px 120px 1fr;
+  align-items: start;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f0f2f6;
+  font-size: 12.5px;
+}
+
+.approvalReviewRow:last-child {
+  border-bottom: 0;
+}
+
+.approvalReviewRow.done {
+  background: #eaf6ee;
+}
+
+.approvalReviewRow.done .approvalReviewRole {
+  color: #14532d;
+}
+
+.approvalReviewRow.mine {
+  background: #f4faf6;
+  box-shadow: inset 3px 0 0 #1c7a4d;
+}
+
+.approvalReviewIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+.approvalReviewRow.done .approvalReviewIcon {
+  background: #198247;
+  color: #fff;
+}
+
+.approvalReviewRow.pending .approvalReviewIcon {
+  background: #fff;
+  color: #b0b6c0;
+  border: 1px solid #dadde3;
+}
+
+.approvalReviewRow.mine .approvalReviewIcon {
+  background: #fff;
+  color: #1c7a4d;
+  border: 1.5px solid #1c7a4d;
+}
+
+.approvalReviewRole {
+  font-weight: 800;
+  color: #1d2330;
+  padding-top: 3px;
+}
+
+.approvalReviewBody {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.approvalReviewMeta {
+  color: #98a0aa;
+  font-size: 11px;
+}
+
+.approvalReviewMemo {
+  margin: 0;
+  color: #2b323d;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.approvalReviewMemo em {
+  color: #b0b6c0;
+  font-style: normal;
+}
+
+.approvalReviewWait {
+  color: #98a0aa;
+  font-style: normal;
+}
+
+/* 내 행: 메모 입력 + 확인 완료 버튼 */
+.approvalMemoInput {
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 10px;
+  border: 1px solid #cfd3da;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: inherit;
+  resize: vertical;
+  background: #fff;
+}
+
+.approvalMemoInput:focus {
+  outline: 0;
+  border-color: #1c7a4d;
+  box-shadow: 0 0 0 2px rgba(28, 122, 77, 0.12);
+}
+
+.approvalReviewActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
 .sectionInquiry {
   border-left-color: #8a5cf6 !important;
 }
@@ -2354,6 +3361,7 @@ h3 {
 .taskHeaderRight {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
 }
 
@@ -3078,6 +4086,296 @@ h3 {
   margin-bottom: 20px;
 }
 
+/* 단계별 요청 작성 (Wizard) */
+.flowRequestPanel { }
+
+.flowRequestHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.flowRequestHead .eyebrow {
+  color: #6d4fd0;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.flowRequestHead h2 {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #14171c;
+}
+
+.flowHeadActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.flowCurrentStep {
+  font-size: 12px;
+  font-weight: 700;
+  color: #c98a1a;
+  background: #fff8e6;
+  border: 1px solid #f3d792;
+  padding: 5px 10px;
+  border-radius: 7px;
+}
+
+.flowStepper {
+  list-style: none;
+  margin: 0 0 22px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.flowStepper.projectFlowStepper {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+/* 프로젝트 상세 영역에서는 폭이 좁아 글자 축소·간격 조정 */
+.flowStepper.detailStepper {
+  margin: 0;
+  gap: 8px;
+  width: 100%;
+}
+
+.flowStepper.detailStepper .flowStepperBtn {
+  padding: 8px 8px;
+  gap: 6px;
+  min-width: 0;
+}
+
+.flowStepper.detailStepper .flowStepNum {
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.flowStepper.detailStepper .flowStepText {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.flowStepper.detailStepper .flowStepText strong {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flowStepper.detailStepper .flowStepText em {
+  font-size: 10.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flowStepper.detailStepper .flowStepConn {
+  right: -8px;
+  width: 8px;
+}
+
+/* 프로젝트 상세 스텝퍼는 항상 한 줄 고정 — 좁아질수록 글자/박스가 줄어들지언정 줄바꿈은 하지 않음 */
+
+.flowSectionLead {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border-left: 3px solid #1c7a4d;
+  background: #f4faf6;
+  border-radius: 0 7px 7px 0;
+  font-size: 12.5px;
+  color: #14532d;
+}
+
+.flowStepperItem {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.flowStepperBtn {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1.5px solid #e1e5eb;
+  background: #fff;
+  border-radius: 9px;
+  text-align: left;
+  cursor: pointer;
+  /* 모든 상태에서 박스 크기가 동일하게 유지되도록 box-shadow/transform 사용하지 않음 */
+  box-shadow: none !important;
+  transform: none !important;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.flowStepperItem {
+  min-width: 0;
+}
+
+.flowStepperItem.current .flowStepperBtn {
+  border-color: #1c7a4d;
+  background: linear-gradient(180deg, #d4f0df, #aee0c1);
+}
+
+.flowStepperItem.current .flowStepText strong {
+  color: #0f5132;
+  /* font-weight 변화 시 텍스트 폭이 미세하게 달라져 흔들리므로 800 고정 */
+}
+
+.flowStepperItem.done .flowStepperBtn {
+  border-color: #b6dbc6;
+  background: #f4faf6;
+}
+
+.flowStepperItem.pending .flowStepperBtn {
+  color: #98a0aa;
+  background: #fafbfc;
+}
+
+/* 사용자가 클릭해 '보고 있는' 단계 표시 (현재 단계가 아닐 때 강조)
+   box-shadow 대신 border-color만 변경 — 박스 크기 변화 없음 */
+.flowStepperItem.viewing:not(.current) .flowStepperBtn {
+  border-color: #3b5bdb;
+  background: #f4f7ff;
+}
+
+.flowStepNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+  background: #eef1f5;
+  color: #4b515c;
+}
+
+.flowStepperItem.current .flowStepNum {
+  background: #1c7a4d;
+  color: #fff;
+}
+
+.flowStepperItem.done .flowStepNum {
+  background: #cdebd9;
+  color: #14532d;
+}
+
+.flowStepText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.flowStepText strong {
+  font-size: 13px;
+  font-weight: 800;
+  color: #14171c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flowStepperItem.pending .flowStepText strong {
+  color: #98a0aa;
+}
+
+.flowStepText em {
+  font-style: normal;
+  font-size: 11px;
+  color: #7b818b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flowStepConn {
+  position: absolute;
+  top: 50%;
+  right: -18px;
+  width: 18px;
+  height: 2px;
+  background: #d8dde4;
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
+.flowStepperItem.done + .flowStepperItem .flowStepConn,
+.flowStepperItem.done .flowStepConn {
+  background: #1c7a4d;
+}
+
+.flowRequestForm {
+  margin-top: 4px;
+}
+
+.flowStepActions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #eceef2;
+}
+
+.flowReviewBox {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px dashed #cfd3da;
+  border-radius: 9px;
+  background: #fafbfc;
+}
+
+.flowReviewRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+  border-bottom: 1px dashed #ecedf0;
+  font-size: 12.5px;
+}
+
+.flowReviewRow:last-child {
+  border-bottom: 0;
+}
+
+.flowReviewRow span {
+  color: #7b818b;
+  font-weight: 700;
+}
+
+.flowReviewRow strong {
+  color: #1d2330;
+  text-align: right;
+}
+
+@media (max-width: 900px) {
+  .flowStepper {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .flowStepConn { display: none; }
+}
+
 .requestIntro h2 {
   font-size: 16px;
 }
@@ -3223,7 +4521,7 @@ h3 {
 
 .requestForm {
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .requestForm fieldset {
@@ -3495,7 +4793,19 @@ h3 {
 }
 
 .detailPanel {
-  padding: 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 개별 패널들이 갖고 있을 수 있는 외부 마진을 제거해 gap만으로 균일 간격 보장 */
+.detailPanel > *,
+.detailPanel > * + *,
+.detailPanel > section,
+.detailPanel > div {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
 }
 
 .emptyStatePanel {
@@ -3577,9 +4887,14 @@ h3 {
   background: #0f9f5f;
 }
 
-.actionBanner div:nth-child(2) {
+.actionBanner > div {
   min-width: 0;
-  flex: 1;
+  width: 100%;
+}
+
+.actionBanner .actionButtons {
+  width: 100%;
+  justify-content: flex-end;
 }
 
 .actionBanner strong,
@@ -3587,10 +4902,18 @@ h3 {
   display: block;
 }
 
+/* 패널 헤더 h3와 동일 스타일로 통일 */
+.actionBanner strong {
+  font-size: 15px;
+  font-weight: 800;
+  color: #1d2330;
+  letter-spacing: -0.2px;
+}
+
 .actionBanner span {
   margin-top: 3px;
   color: #606772;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .actionButtons {
@@ -3903,6 +5226,7 @@ h3 {
   height: 26px;
   display: inline-grid;
   place-items: center;
+  text-align: center;
   border-radius: 6px;
   color: #555d68;
   background: #eef0f3;
@@ -4914,7 +6238,7 @@ h3 {
   }
 
   .panelHeader.compact h3 {
-    font-size: 14px;
+    font-size: 15px;
   }
 
   /* Tiptap 에디터 폰트도 살짝 */
