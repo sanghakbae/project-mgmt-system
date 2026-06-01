@@ -2113,7 +2113,7 @@ function App() {
             </section>
             )}
 
-            {(viewedStatus === 'development' || viewedStatus === 'qc_security') && (() => {
+            {(viewedStatus === 'development' || viewedStatus === 'qc_security') && viewedStep <= currentStep && (() => {
               const taskLabel = viewedStatus === 'qc_security' ? '검토 태스크(일감) 등록' : '개발 태스크(일감) 등록'
               return (
                 <ProjectTasksPanel
