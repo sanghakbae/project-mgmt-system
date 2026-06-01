@@ -47,11 +47,24 @@ export type ApprovalState = {
   memos?: Partial<Record<Role, { at: string; actor: string; message: string }>>
 }
 
+// QC/보안/PM 단계의 역할별 검토 내용
+export type QcReviewEntry = {
+  note?: string
+  actor?: string
+  at?: string
+}
+
 // QC/보안/PM 단계의 역할별 검토 완료 상태 (3자 합의 게이트)
 export type QcSignoffState = {
   qa: boolean
   security: boolean
   pm: boolean
+  // 역할별 검토 내용(분리 기록)
+  reviews?: {
+    qa?: QcReviewEntry
+    security?: QcReviewEntry
+    pm?: QcReviewEntry
+  }
 }
 
 // 단계별 문의/논의 댓글

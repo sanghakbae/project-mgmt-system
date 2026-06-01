@@ -674,6 +674,8 @@ function App() {
   // 프로젝트 목록은 항상 '내 할 일'만 보여주므로 필터 값은 더 이상 사용하지 않음 (setter는 네비게이션 호환용 유지)
   const [, setStatusFilter] = useState<StatusFilter>('mine')
   const [query, setQuery] = useState('')
+  // 프로젝트 목록 옆 단계(상태) 필터
+  const [listStatusFilter, setListStatusFilter] = useState<ProjectStatus | 'all'>('all')
   const [loadState, setLoadState] = useState<'loading' | 'live' | 'error'>(hasSupabaseConfig ? 'loading' : 'error')
   const [viewMode, setViewMode] = useState<ViewMode>(restoredSession.viewMode ?? 'dashboard')
   // 프로젝트 상세에서 스텝퍼 클릭으로 보고 있는 단계(실제 프로젝트 상태와 별개)
@@ -684,6 +686,8 @@ function App() {
   const [approvalInlineOpen, setApprovalInlineOpen] = useState(false)
   // 승인 이력 내 임시 댓글 입력
   const [approvalCommentInput, setApprovalCommentInput] = useState('')
+  // 검토 단계(QC/보안/PM) 역할별 검토 내용 임시 입력
+  const [qcReviewDraft, setQcReviewDraft] = useState('')
   const [requestForm, setRequestForm] = useState<RequestFormState>(emptyRequestForm)
   const [reviewDocsDrafts, setReviewDocsDrafts] = useState<Record<string, ReviewDocs>>({})
   const [scheduleDrafts, setScheduleDrafts] = useState<Record<string, ScheduleInfo>>({})
@@ -853,8 +857,9 @@ function App() {
     return queueScopedProjects
       // 프로젝트 목록은 항상 '내 할 일'(현재 역할이 처리하는 프로젝트)만 표시 (admin은 전체)
       .filter((project) => isProjectAssignedToRole(project, role))
+      .filter((project) => listStatusFilter === 'all' || project.status === listStatusFilter)
       .filter((project) => `${project.title} ${project.summary} ${project.code}`.toLowerCase().includes(query.toLowerCase()))
-  }, [query, queueScopedProjects, role])
+  }, [query, queueScopedProjects, role, listStatusFilter])
 
   const dashboardSummary = useMemo(() => {
     const taskStatus = serviceScopedProjects.reduce(
@@ -938,9 +943,6 @@ function App() {
   // QC 사인오프 가능한 역할인지 (admin은 모든 역할 대행 가능)
   const myQcSignoffRole: ('qa' | 'security' | 'pm') | null =
     role === 'qa' ? 'qa' : role === 'security' ? 'security' : role === 'pm' ? 'pm' : null
-  const canQcSignoff = Boolean(
-    selected?.status === 'qc_security' && (myQcSignoffRole || role === 'admin'),
-  )
 
   async function updateApprovalState(approvalState: ApprovalState, message: string) {
     if (!selected) return
@@ -1293,11 +1295,10 @@ function App() {
   }
 
   // #4 QC/보안/PM 3자 사인오프 토글
-  async function toggleQcSignoff() {
+  async function toggleQcSignoff(signRoleArg?: 'qa' | 'security' | 'pm', note?: string) {
     if (!selected || selected.status !== 'qc_security') return
     if (selected.onHold) { window.alert('보류 중에는 검토할 수 없습니다.'); return }
-    const targetRole = myQcSignoffRole ?? (role === 'admin' ? null : null)
-    if (!targetRole && role !== 'admin') return
+    const targetRole = signRoleArg ?? myQcSignoffRole
     // admin이면 어떤 역할을 대행할지 선택
     let signRole = targetRole
     if (!signRole && role === 'admin') {
@@ -1307,13 +1308,22 @@ function App() {
     }
     if (!signRole) return
     const current = selected.qcSignoff ?? { qa: false, security: false, pm: false }
-    const nextSignoff = { ...current, [signRole]: !current[signRole] }
+    const nextDone = !current[signRole]
+    const trimmedNote = (note ?? '').trim()
+    const nextReviews = { ...(current.reviews ?? {}) }
+    if (nextDone) {
+      nextReviews[signRole] = { note: trimmedNote, actor: authorLabel, at: logStamp() }
+    } else {
+      // 취소 시 검토 내용도 함께 비움
+      delete nextReviews[signRole]
+    }
+    const nextSignoff = { ...current, [signRole]: nextDone, reviews: nextReviews }
     const label = { qa: 'QC', security: '보안', pm: 'PM' }[signRole]
     await patchSelectedProject(
       { qcSignoff: nextSignoff },
-      `${label} 검토를 ${nextSignoff[signRole] ? '완료' : '취소'} 처리했습니다.`,
+      `${label} 검토를 ${nextDone ? '완료' : '취소'} 처리했습니다.${nextDone && trimmedNote ? ` (${trimmedNote})` : ''}`,
     )
-    void notifyGoogleChat('task.status', `QC/보안/PM 검토 ${nextSignoff[signRole] ? '완료' : '취소'}: ${label}`, { 프로젝트: selected.title })
+    void notifyGoogleChat('task.status', `QC/보안/PM 검토 ${nextDone ? '완료' : '취소'}: ${label}`, { 프로젝트: selected.title })
   }
 
   // #8 요청자 확인 (완료보고 단계)
@@ -1811,7 +1821,20 @@ function App() {
                 <Search size={17} />
                 <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="프로젝트 검색" />
               </div>
-
+              <div className="listFilterBox">
+                <SlidersHorizontal size={15} />
+                <select
+                  value={listStatusFilter}
+                  onChange={(event) => setListStatusFilter(event.target.value as ProjectStatus | 'all')}
+                  aria-label="단계 필터"
+                >
+                  <option value="all">전체 단계</option>
+                  {workflow.map((item) => (
+                    <option key={item.status} value={item.status}>{statusLabels[item.status]}</option>
+                  ))}
+                  <option value="rejected">{statusLabels.rejected}</option>
+                </select>
+              </div>
             </div>
 
             <div className="projectList">
@@ -2160,26 +2183,23 @@ function App() {
                 <span>담당: {selected.status === 'qc_security' ? 'QC · 보안 · PM' : roleLabels[selected.assigneeRole]} · 마감 {formatDate(selected.dueDate)}</span>
                 {selected.status === 'dept_review' && (
                   <div className="approvalGrid" style={{ ['--cols' as string]: selectedApprovalState.requiredRoles.length }}>
-                    <div className="approvalGridHead">
-                      {selectedApprovalState.requiredRoles.map((r) => (
-                        <div key={r} className="approvalGridHeadCell">{approvalStepLabels[r]}</div>
-                      ))}
-                    </div>
-                    <div className="approvalGridBody">
+                    <div className="approvalUnitGrid">
                       {selectedApprovalState.requiredRoles.map((r) => {
                         const done = selectedApprovalState.approvedRoles.includes(r)
                         const isMine = r === role && !done && canApproveCurrentRole
                         return (
-                          <button
-                            key={r}
-                            type="button"
-                            className={`approvalCellPill ${done ? 'done' : isMine ? 'mine' : 'pending'}`}
-                            disabled={!isMine && !done}
-                            onClick={() => { if (isMine) setApprovalInlineOpen((v) => !v) }}
-                            title={done ? '확인 완료' : isMine ? '내 차례 — 클릭하면 의견·승인/보류 입력' : '대기'}
-                          >
-                            {done ? '완료' : isMine ? '확인' : '승인'}
-                          </button>
+                          <div key={r} className={`approvalUnitCard ${done ? 'done' : isMine ? 'mine' : 'pending'}`}>
+                            <div className="approvalUnitHead">{approvalStepLabels[r]}</div>
+                            <button
+                              type="button"
+                              className={`approvalCellPill ${done ? 'done' : isMine ? 'mine' : 'pending'}`}
+                              disabled={!isMine && !done}
+                              onClick={() => { if (isMine) setApprovalInlineOpen((v) => !v) }}
+                              title={done ? '확인 완료' : isMine ? '내 차례 — 클릭하면 의견·승인/보류 입력' : '대기'}
+                            >
+                              {done ? '완료' : isMine ? '확인' : '승인'}
+                            </button>
+                          </div>
                         )
                       })}
                     </div>
@@ -2248,12 +2268,53 @@ function App() {
                   </div>
                 )}
                 {selected.status === 'qc_security' && (
-                  <div className="qcSignoffRow">
-                    {(['qa', 'security', 'pm'] as const).map((r) => (
-                      <span key={r} className={`qcSignoffChip ${qcSignoff[r] ? 'done' : 'pending'}`}>
-                        {{ qa: 'QC', security: '보안', pm: 'PM' }[r]} {qcSignoff[r] ? '✓' : '대기'}
-                      </span>
-                    ))}
+                  <div className="qcReviewBlock">
+                    <div className="qcReviewGrid">
+                      {(['qa', 'security', 'pm'] as const).map((r) => {
+                        const label = { qa: 'QC', security: '보안', pm: 'PM' }[r]
+                        const done = qcSignoff[r]
+                        const review = qcSignoff.reviews?.[r]
+                        const isMine = (r === myQcSignoffRole) || role === 'admin'
+                        return (
+                          <div key={r} className={`qcReviewCard ${done ? 'done' : 'pending'}`}>
+                            <div className="qcReviewHead">
+                              <strong>{label} 검토</strong>
+                              <span className={`qcReviewBadge ${done ? 'done' : 'pending'}`}>{done ? '완료' : '대기'}</span>
+                            </div>
+                            {done ? (
+                              <div className="qcReviewBody">
+                                <p className="qcReviewNote">{review?.note?.trim() || '검토 내용 미입력'}</p>
+                                <small>{review?.actor ?? label} · {review?.at ? formatTimestamp(review.at) : ''}</small>
+                                {isMine && (
+                                  <button className="miniButton qcReviewCancel" type="button" onClick={() => void toggleQcSignoff(r)}>
+                                    검토 취소
+                                  </button>
+                                )}
+                              </div>
+                            ) : isMine && !selected.onHold ? (
+                              <div className="qcReviewBody">
+                                <textarea
+                                  rows={2}
+                                  className="qcReviewInput"
+                                  placeholder={`${label} 검토 내용 (예: ${label} 검토 완료, 이슈 없음)`}
+                                  value={qcReviewDraft}
+                                  onChange={(e) => setQcReviewDraft(e.target.value)}
+                                />
+                                <button
+                                  className="miniButton approveButton"
+                                  type="button"
+                                  onClick={() => { void toggleQcSignoff(r, qcReviewDraft); setQcReviewDraft('') }}
+                                >
+                                  {label} 검토 완료
+                                </button>
+                              </div>
+                            ) : (
+                              <p className="qcReviewWait">담당자 검토 대기 중</p>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
                     <span className="approvalGuide">
                       {qcAllSignedOff ? 'QC·보안·PM 검토 완료 · 다음 단계 진행 가능' : `검토 대기: ${qcPendingRoles.map((r) => ({ qa: 'QC', security: '보안', pm: 'PM' }[r])).join(', ')}`}
                     </span>
@@ -2269,11 +2330,6 @@ function App() {
                 )}
               </div>
               <div className="actionButtons">
-                {canQcSignoff && (
-                  <button className="miniButton approveButton" type="button" onClick={() => void toggleQcSignoff()}>
-                    {myQcSignoffRole ? `${{ qa: 'QC', security: '보안', pm: 'PM' }[myQcSignoffRole]} 검토 ${qcSignoff[myQcSignoffRole] ? '취소' : '완료'}` : 'QC 사인오프(대행)'}
-                  </button>
-                )}
                 {selected.status === 'completion' && (role === 'requester' || role === 'admin') && (
                   <button className="miniButton approveButton" type="button" onClick={() => void confirmByRequester()}>
                     요청자 확인 {selected.requesterConfirmed ? '취소' : '완료'}
@@ -2306,10 +2362,10 @@ function App() {
             {viewedStatus === 'dept_review' && (() => {
               type Entry = { at: string; dept: string; actor: string; message: string }
               const stageComments = (selected.comments ?? [])
-                .filter((c) => c.stage === 'dept_review')
+                .filter((c) => c.stage === 'dept_review' && c.role !== 'pm')
                 .map<Entry>((c) => ({ at: c.at, dept: approvalStepLabels[c.role], actor: c.actor, message: c.message }))
               const memoEntries: Entry[] = []
-              for (const r of selectedApprovalState.approvedRoles) {
+              for (const r of selectedApprovalState.approvedRoles.filter((r) => r !== 'pm')) {
                 const memo = selectedApprovalState.memos?.[r]
                 if (memo?.message?.trim()) {
                   memoEntries.push({ at: memo.at, dept: approvalStepLabels[r], actor: memo.actor, message: memo.message })
@@ -2802,6 +2858,7 @@ function ProjectTasksPanel({
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({})
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({})
   const [showAddForm, setShowAddForm] = useState(false)
+  const [taskFilter, setTaskFilter] = useState<TaskStatus>('todo')
   const [newTask, setNewTask] = useState({ title: '', type: 'task' as IssueType, owner: '', priority: 'normal' as Priority, dueDate: '', note: '' })
 
   function submitNewTask() {
@@ -2904,11 +2961,11 @@ function ProjectTasksPanel({
         </div>
       )}
 
-      <div className="taskSummary" aria-label="task summary">
-        <span>대기 {taskSummary.todo}</span>
-        <span>진행 {taskSummary.doing}</span>
-        <span>보류 {taskSummary.blocked}</span>
-        <span>완료 {taskSummary.done}</span>
+      <div className="taskSummary" aria-label="task summary" role="tablist">
+        <button type="button" className={`taskFilterPill todo ${taskFilter === 'todo' ? 'active' : ''}`} aria-pressed={taskFilter === 'todo'} onClick={() => setTaskFilter('todo')}>대기 {taskSummary.todo}</button>
+        <button type="button" className={`taskFilterPill doing ${taskFilter === 'doing' ? 'active' : ''}`} aria-pressed={taskFilter === 'doing'} onClick={() => setTaskFilter('doing')}>진행 {taskSummary.doing}</button>
+        <button type="button" className={`taskFilterPill blocked ${taskFilter === 'blocked' ? 'active' : ''}`} aria-pressed={taskFilter === 'blocked'} onClick={() => setTaskFilter('blocked')}>보류 {taskSummary.blocked}</button>
+        <button type="button" className={`taskFilterPill done ${taskFilter === 'done' ? 'active' : ''}`} aria-pressed={taskFilter === 'done'} onClick={() => setTaskFilter('done')}>완료 {taskSummary.done}</button>
       </div>
 
       {project.tasks.length === 0 && (
@@ -2917,8 +2974,14 @@ function ProjectTasksPanel({
         </p>
       )}
 
+      {project.tasks.length > 0 && taskSummary[taskFilter] === 0 && (
+        <p className="dashboardEmpty">
+          {taskLabels[taskFilter]} 상태의 태스크가 없습니다.
+        </p>
+      )}
+
       <div className="taskList">
-        {project.tasks.map((task) => {
+        {project.tasks.filter((task) => task.status === taskFilter).map((task) => {
           const draft = taskDraft(task)
           const canSaveStatus = draft.note.trim().length > 0 && (draft.status !== task.status || draft.note.trim() !== (task.statusNote ?? '').trim())
 
