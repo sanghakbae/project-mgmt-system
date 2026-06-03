@@ -1890,6 +1890,131 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   flex-shrink: 0;
 }
 
+/* 가로 스텝 카드 흐름도 — ①~⑥ 한 줄 정렬 + 분기 노드 */
+.flowStage {
+  position: relative;
+  margin: 0 0 12px;
+  padding: 20px 16px 18px;
+  border: 1px solid #eceef2;
+  border-radius: 12px;
+  background: #fbfcfe;
+  overflow: visible;
+}
+.flowLines {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.flowLine.reject path { stroke: #c0392b; stroke-width: 1.6px; stroke-dasharray: 5 4; }
+.flowLine.hold path { stroke: #c98a1a; stroke-width: 1.6px; stroke-dasharray: 5 4; }
+.flowLineLabel { font-size: 11px; font-weight: 800; text-anchor: middle; }
+.flowLine.reject .flowLineLabel { fill: #c0392b; }
+.flowLine.hold .flowLineLabel { fill: #b07310; }
+.flowStrip {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.flowConnector {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 40px;
+  padding: 0 6px;
+  color: #1c9d5b;
+}
+.flowConnectorLabel {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #5b8a6f;
+  white-space: nowrap;
+}
+.flowStep {
+  flex: 0 0 150px;
+  width: 150px;
+  height: 116px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 12px 10px;
+  border: 1.5px solid;
+  border-radius: 12px;
+  text-align: center;
+  background: #fff;
+}
+.flowStepNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 14px;
+  font-weight: 800;
+}
+.flowStepTitle {
+  font-size: 12.5px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: #1d2330;
+}
+.flowStepRole {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  opacity: 0.85;
+}
+/* 분기 노드 (반려·보류) — 메인 행 아래, SVG 점선으로 연결 */
+.flowBranchLane {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  gap: 80px;
+  margin-top: 64px;
+}
+.flowBranchNode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 9px 16px;
+  border: 1.5px solid;
+  border-radius: 999px;
+  text-align: center;
+  background: #fff;
+}
+.flowBranchNode strong { font-size: 12.5px; font-weight: 800; }
+.flowBranchNode span { font-size: 10.5px; font-weight: 600; opacity: 0.85; }
+.flowBranchNode.reject { border-color: #c0392b; background: #fdecea; }
+.flowBranchNode.reject strong, .flowBranchNode.reject span { color: #a3271a; }
+.flowBranchNode.hold { border-color: #c98a1a; background: #fff4e0; }
+.flowBranchNode.hold strong, .flowBranchNode.hold span { color: #875a08; }
+
+/* 단계 색 = 담당 역할 */
+.flowStep.requester { border-color: #2f6bd8; background: #f4f8ff; }
+.flowStep.requester .flowStepNum, .flowStep.requester .flowStepRole { color: #14386e; }
+.flowStep.pm { border-color: #6d4fd0; background: #f6f3ff; }
+.flowStep.pm .flowStepNum, .flowStep.pm .flowStepRole { color: #392487; }
+.flowStep.multi { border-color: #9b51c4; background: #faf3fd; }
+.flowStep.multi .flowStepNum, .flowStep.multi .flowStepRole { color: #5a1d7a; }
+.flowStep.dev { border-color: #149e7e; background: #f0fbf7; }
+.flowStep.dev .flowStepNum, .flowStep.dev .flowStepRole { color: #0c5a47; }
+.flowStep.qa { border-color: #d98324; background: #fff8f0; }
+.flowStep.qa .flowStepNum, .flowStep.qa .flowStepRole { color: #7a4500; }
+.flowStep.admin { border-color: #5a6473; background: #f4f5f8; }
+.flowStep.admin .flowStepNum, .flowStep.admin .flowStepRole { color: #2b323d; }
+
 .flowDiagram {
   position: relative;
   margin-top: 10px;
@@ -3657,6 +3782,15 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .closeBtn { background: #fff; color: #4b515c; border-color: #cfd3da; }
 .closeBtn:hover { background: #f4f6f9; }
 
+/* 검토 단계 반려 영역 */
+.qcRejectArea {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
 /* 반려 사유 프리셋 입력 */
 .rejectComposer {
   margin-top: 10px;
@@ -3961,16 +4095,41 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 
 .inquiryForm {
   display: flex;
+  align-items: flex-start;
   gap: 6px;
 }
 
-.inquiryForm input {
+.inquiryForm input,
+.inquiryForm .inquiryInput {
   flex: 1;
+  min-height: 38px;
   padding: 8px 12px;
   border: 1px solid #d8dbe1;
   border-radius: 7px;
   font-size: 13px;
+  line-height: 1.5;
   background: #fff;
+  box-sizing: border-box;
+}
+
+/* 자동 확장 입력창: 내용이 넘치면 아래로 늘어남 */
+.inquiryForm .inquiryInput {
+  resize: none;
+  overflow: hidden;
+  max-height: 200px;
+  font-family: inherit;
+}
+.inquiryForm .inquiryInput:focus {
+  outline: 0;
+  border-color: #3b5bdb;
+}
+
+/* 좌측 멘션 선택·우측 등록 버튼을 입력창 높이에 맞춰 정렬 */
+.inquiryForm .mentionSelect,
+.inquiryForm .primaryButton {
+  height: 38px;
+  min-height: 38px;
+  flex-shrink: 0;
 }
 
 .taskHeaderRight {
@@ -4566,10 +4725,14 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 }
 
 .scheduleCompare {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  box-sizing: border-box;
   font-size: 12px;
   font-weight: 700;
-  padding: 6px 10px;
-  border-radius: 6px;
+  padding: 0 12px;
+  border-radius: 7px;
 }
 
 .scheduleCompare.onTime {

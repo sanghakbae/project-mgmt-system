@@ -2531,6 +2531,44 @@ function App() {
                     <span className="approvalGuide">
                       {qcAllSignedOff ? 'QC·보안·PM 검토 완료 · 다음 단계 진행 가능' : `검토 대기: ${qcPendingRoles.map((r) => ({ qa: 'QC', security: '보안', pm: 'PM' }[r])).join(', ')}`}
                     </span>
+                    {(myQcSignoffRole || role === 'admin') && !selected.onHold && (
+                      <div className="qcRejectArea">
+                        <button type="button" className="rejectBtn" onClick={() => setRejectOpen((v) => !v)}>반려</button>
+                        {rejectOpen && (
+                          <div className="rejectComposer">
+                            <span className="rejectComposerLabel">반려 사유 — 프리셋 선택 또는 직접 입력</span>
+                            <div className="rejectPresetList">
+                              {rejectReasonPresets.map((preset) => (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  className={`rejectPreset ${rejectReasonDraft === preset ? 'active' : ''}`}
+                                  onClick={() => setRejectReasonDraft(preset)}
+                                >
+                                  {preset}
+                                </button>
+                              ))}
+                            </div>
+                            <textarea
+                              rows={2}
+                              placeholder="반려 사유를 입력하거나 위 프리셋을 선택하세요."
+                              value={rejectReasonDraft}
+                              onChange={(e) => setRejectReasonDraft(e.target.value)}
+                            />
+                            <div className="rejectComposerActions">
+                              <button
+                                type="button"
+                                className="rejectConfirmBtn"
+                                onClick={() => { void rejectSelectedProject(rejectReasonDraft); setRejectReasonDraft(''); setRejectOpen(false) }}
+                              >
+                                반려 확정
+                              </button>
+                              <button type="button" className="closeBtn" onClick={() => setRejectOpen(false)}>취소</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
                 {selected.status === 'completion' && (
@@ -4017,7 +4055,16 @@ function SectionInquiryBox({ sectionLabel, comments, currentRole, onAdd, onEdit,
                           <option key={m.value} value={m.value}>@{m.label}</option>
                         ))}
                       </select>
-                      <input value={replyDraft} onChange={(e) => setReplyDraft(e.target.value)} placeholder="답변 입력" autoFocus />
+                      <textarea
+                        className="inquiryInput"
+                        rows={1}
+                        value={replyDraft}
+                        onChange={(e) => setReplyDraft(e.target.value)}
+                        onInput={(e) => { e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px` }}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (replyDraft.trim()) { onAdd(`[${sectionLabel}] ${replyDraft.trim()}`, q.id); setReplyDraft(''); setReplyTo(null) } } }}
+                        placeholder="답변 입력"
+                        autoFocus
+                      />
                       <button className="primaryButton" type="submit" disabled={!replyDraft.trim()}>답변</button>
                     </form>
                   ) : (
@@ -4052,7 +4099,15 @@ function SectionInquiryBox({ sectionLabel, comments, currentRole, onAdd, onEdit,
                 <option key={m.value} value={m.value}>@{m.label}</option>
               ))}
             </select>
-            <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`${sectionLabel}에 대한 문의/의견`} />
+            <textarea
+              className="inquiryInput"
+              rows={1}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onInput={(e) => { e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px` }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (draft.trim()) { onAdd(`[${sectionLabel}] ${draft.trim()}`); setDraft('') } } }}
+              placeholder={`${sectionLabel}에 대한 문의/의견`}
+            />
             <button className="primaryButton" type="submit" disabled={!draft.trim()}>등록</button>
           </form>
         </div>

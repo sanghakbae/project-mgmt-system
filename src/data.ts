@@ -6,7 +6,7 @@ export const workflow: Array<{ status: ProjectStatus; label: string; owner: stri
   { status: 'dept_review', label: '승인 단계', owner: '승인자' },
   { status: 'development', label: '개발 단계', owner: '기획·개발' },
   { status: 'qc_security', label: '검토 단계', owner: '품질·보안·PM' },
-  { status: 'completion', label: '완료 보고', owner: 'PM' },
+  { status: 'completion', label: '완료 보고', owner: 'PM·관리자' },
 ]
 
 export const roleLabels: Record<Role, string> = {
