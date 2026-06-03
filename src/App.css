@@ -366,6 +366,102 @@ button {
   gap: 10px;
 }
 
+/* 알림 벨 */
+.notifBell {
+  position: relative;
+  display: inline-flex;
+}
+.notifBellBtn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #dfe3ea;
+  border-radius: 10px;
+  background: #fff;
+  color: #4b515c;
+  cursor: pointer;
+}
+.notifBellBtn:hover { background: #f4f6f9; }
+.notifBadge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #d14343;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  border: 2px solid #fff;
+  box-sizing: border-box;
+}
+.notifPanel {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  width: 320px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #e2e5ea;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(20, 30, 50, 0.16);
+  z-index: 60;
+}
+.notifPanelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid #eef0f3;
+  font-size: 13px;
+  color: #6b7280;
+}
+.notifPanelHead strong { color: #2a2f37; font-size: 14px; }
+.notifEmpty {
+  margin: 0;
+  padding: 24px 14px;
+  text-align: center;
+  color: #98a0aa;
+  font-size: 13px;
+}
+.notifList { list-style: none; margin: 0; padding: 6px; }
+.notifItem {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+.notifItem:hover { background: #f5f7fa; }
+.notifTag {
+  flex-shrink: 0;
+  margin-top: 1px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.notifTag.action { background: #e7f0ff; color: #2b6cf0; }
+.notifTag.overdue { background: #d14343; color: #fff; }
+.notifTag.soon { background: #fff4e5; color: #b25e00; }
+.notifItemBody { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.notifItemTitle { font-size: 13px; font-weight: 800; color: #2a2f37; }
+.notifItemText { font-size: 12px; color: #6b727c; }
+
 .roleControl {
   min-height: 42px;
   display: inline-flex;
@@ -911,6 +1007,53 @@ h3 {
   overflow: hidden;
 }
 
+/* 대시보드 통계 요약 */
+.dashboardStats {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) repeat(2, minmax(0, 1.6fr));
+  gap: 12px;
+}
+.statCard {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid #dcdfe4;
+  border-radius: 8px;
+  background: #fff;
+}
+.statCardLabel { font-size: 12px; font-weight: 800; color: #6b7280; }
+.statCardValue { font-size: 28px; font-weight: 800; color: #1f2530; line-height: 1.1; }
+.statCardValue small { font-size: 14px; font-weight: 700; color: #8a909a; margin-left: 3px; }
+.statCardSub { font-size: 11px; color: #98a0aa; }
+.statEmpty { margin: 6px 0 0; font-size: 12px; color: #98a0aa; }
+.statBars { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.statBarRow {
+  display: grid;
+  grid-template-columns: 64px 1fr 28px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: default;
+  text-align: left;
+}
+button.statBarRow { cursor: pointer; }
+button.statBarRow:hover .statBarName { color: #2b6cf0; }
+.statBarName { font-size: 12px; font-weight: 700; color: #4b515c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.statBarTrack { height: 10px; border-radius: 999px; background: #eef1f5; overflow: hidden; }
+.statBarFill { display: block; height: 100%; border-radius: 999px; background: #2b6cf0; min-width: 2px; }
+.statBarFill.amber { background: #e9b143; }
+.statBarNum { font-size: 12px; font-weight: 800; color: #2a2f37; text-align: right; }
+
+@media (max-width: 900px) {
+  .dashboardStats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .statCardWide { grid-column: 1 / -1; }
+}
+
 /* 단계 흐름 헤더 — 제목은 왼쪽, 서비스 선택은 우측 상단 */
 .workflowOverview > .panelHeader.compact {
   flex-direction: row;
@@ -1176,6 +1319,10 @@ h3 {
 .dashboardKanban.adminScroll .kanbanCard strong {
   font-size: 12px;
   line-height: 1.35;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dashboardKanban.adminScroll .kanbanCard p {
@@ -1983,6 +2130,24 @@ h3 {
   background: #fafafa;
   color: #6b7280;
 }
+
+.csvExportButton {
+  flex: 0 0 auto;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 12px;
+  border: 1px solid #cdd6e4;
+  border-radius: 7px;
+  background: #fff;
+  color: #2b6cf0;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.csvExportButton:hover { background: #f1f6ff; }
+.csvExportButton:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .listFilterBox select {
   border: 0;
@@ -3026,17 +3191,19 @@ h3 {
 }
 
 .qcReviewGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 
 .qcReviewCard {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  align-items: start;
+  column-gap: 14px;
+  row-gap: 8px;
   min-width: 0;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid #e1e5eb;
   border-radius: 9px;
   background: #fff;
@@ -3049,10 +3216,14 @@ h3 {
 
 .qcReviewHead {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
   font-size: 13px;
+}
+
+.qcReviewBadge {
+  align-self: flex-start;
 }
 
 .qcReviewBadge {
@@ -3113,7 +3284,7 @@ h3 {
 }
 
 @media (max-width: 760px) {
-  .qcReviewGrid {
+  .qcReviewCard {
     grid-template-columns: 1fr;
   }
 }
@@ -3462,6 +3633,7 @@ h3 {
 
 .approveBtn,
 .holdBtn,
+.rejectBtn,
 .closeBtn {
   min-width: 64px;
   height: 34px;
@@ -3479,8 +3651,78 @@ h3 {
 .holdBtn { background: #f6c25b; color: #5a4500; }
 .holdBtn:hover { background: #e9b143; }
 
+.rejectBtn { background: #fbe3e3; color: #b53333; border-color: #f1bcbc; }
+.rejectBtn:hover { background: #f7cccc; }
+
 .closeBtn { background: #fff; color: #4b515c; border-color: #cfd3da; }
 .closeBtn:hover { background: #f4f6f9; }
+
+/* 반려 사유 프리셋 입력 */
+.rejectComposer {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #f1bcbc;
+  border-radius: 9px;
+  background: #fff7f7;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rejectComposerLabel {
+  font-size: 12px;
+  font-weight: 800;
+  color: #b53333;
+}
+.rejectPresetList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.rejectPreset {
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: 7px;
+  border: 1px solid #e3d3d3;
+  background: #fff;
+  color: #5a4646;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.rejectPreset:hover { background: #fbeff0; border-color: #e0b6b6; }
+.rejectPreset.active {
+  background: #fde8e8;
+  border-color: #d14343;
+  color: #b53333;
+  font-weight: 800;
+}
+.rejectComposer textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid #e0c4c4;
+  border-radius: 7px;
+  padding: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.rejectComposerActions {
+  display: flex;
+  gap: 8px;
+}
+.rejectConfirmBtn {
+  min-width: 64px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: #d14343;
+  color: #fff;
+}
+.rejectConfirmBtn:hover { background: #b53333; }
 
 /* 승인 의견 취합 — 역할별 한 행씩 보여주는 검토 패널 */
 .approvalReview {
@@ -3910,6 +4152,72 @@ h3 {
   border-radius: 8px;
 }
 
+/* 활동 로그 — 표/타임라인 토글 */
+.logViewToggle {
+  display: inline-flex;
+  border: 1px solid #d8dbe1;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.logViewToggle button {
+  border: 0;
+  background: #fff;
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.logViewToggle button + button { border-left: 1px solid #e3e5e9; }
+.logViewToggle button.active { background: #2b6cf0; color: #fff; }
+
+/* 세로 타임라인 */
+.logTimeline {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 0 0;
+}
+.logTimelineItem {
+  position: relative;
+  padding: 0 0 14px 22px;
+}
+.logTimelineItem::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 14px;
+  bottom: -2px;
+  width: 2px;
+  background: #e6e9ee;
+}
+.logTimelineItem:last-child { padding-bottom: 2px; }
+.logTimelineItem:last-child::before { display: none; }
+.logTimelineDot {
+  position: absolute;
+  left: 0;
+  top: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #9aa0aa;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #d4d8df;
+}
+.logTimelineItem.reject .logTimelineDot { background: #d14343; box-shadow: 0 0 0 1px #f1bcbc; }
+.logTimelineItem.approve .logTimelineDot { background: #2ec27e; box-shadow: 0 0 0 1px #b6e6cf; }
+.logTimelineItem.advance .logTimelineDot { background: #2b6cf0; box-shadow: 0 0 0 1px #b9cdf7; }
+.logTimelineItem.hold .logTimelineDot { background: #e9b143; box-shadow: 0 0 0 1px #f6dca0; }
+.logTimelineItem.doc .logTimelineDot { background: #8b5cf6; box-shadow: 0 0 0 1px #d6c5f7; }
+.logTimelineMeta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.logTimelineActor { font-size: 12px; font-weight: 800; color: #2a2f37; }
+.logTimelineTime { font-size: 11px; color: #98a0aa; }
+.logTimelineMsg { margin: 2px 0 0; font-size: 12px; line-height: 1.5; color: #3a4049; }
+
 .logTable {
   width: 100%;
   border-collapse: collapse;
@@ -4031,6 +4339,52 @@ h3 {
 .inlineTaskActions {
   display: flex;
   justify-content: flex-end;
+}
+
+.inlineTaskNoteField,
+.inlineTaskAttachField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inlineTaskNoteLabel {
+  font-size: 12px;
+  font-weight: 800;
+  color: #555d68;
+}
+
+/* 작업 내용/메모 에디터: 최소 3행 보이도록 */
+.inlineTaskNoteField .richEditorContent {
+  min-height: 84px;
+}
+
+.inlineTaskAttachHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.attachmentName {
+  flex: 1 1 auto;
+  word-break: break-all;
+  font-weight: 700;
+  color: #2b323d;
+}
+
+.attachmentRemove {
+  flex: 0 0 auto;
+  border: 0;
+  background: none;
+  color: #9aa0aa;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.attachmentRemove:hover {
+  color: #d14343;
 }
 
 @media (max-width: 768px) {
@@ -5102,6 +5456,40 @@ h3 {
   flex-shrink: 0;
 }
 
+/* 마감일 D-day 배지 */
+.ddayPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.ddayPill.normal {
+  background: #eef1f5;
+  color: #5b626d;
+  border-color: #e0e4ea;
+}
+.ddayPill.soon {
+  background: #fff4e5;
+  color: #b25e00;
+  border-color: #ffd9a8;
+}
+.ddayPill.today {
+  background: #fde8e8;
+  color: #c0392b;
+  border-color: #f7bcbc;
+}
+.ddayPill.overdue {
+  background: #d14343;
+  color: #fff;
+  border-color: #b53333;
+}
+
 .priority {
   font-weight: 800;
 }
@@ -5524,8 +5912,32 @@ h3 {
 }
 
 .taskPanel .panelHeader {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
   padding-bottom: 12px;
   border-bottom: 1px solid #eceef2;
+}
+
+/* 제목 블록(제목+설명)은 왼쪽에서 남는 폭을 차지 */
+.taskPanel .panelHeader > div:first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* 카운트 배지 + 추가 버튼은 오른쪽에 세로 중앙 정렬 */
+.taskPanel .panelHeader .taskHeaderRight {
+  flex: 0 0 auto;
+}
+
+/* .panelHeader span { display:block } 가 배지의 inline-grid를 덮어써
+   "3개" 텍스트가 위로 붙는 문제 방지 — 더 높은 우선순위로 가운데 정렬 복구 */
+.taskPanel .panelHeader .taskHeaderRight .taskTotal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  line-height: 1;
 }
 
 .detailGrid > .infoPanel:not(.taskPanel) {
@@ -5752,6 +6164,15 @@ h3 {
   background: #f1f5f9;
 }
 
+.attachmentThumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid #d6dbe2;
+}
+
 .attachmentChip button {
   width: 18px;
   height: 18px;
@@ -5864,6 +6285,21 @@ h3 {
 .statusNote {
   color: #20242b;
   font-weight: 700;
+}
+
+.statusNoteLabel {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.statusNote .richEditorView {
+  font-weight: 500;
+}
+
+.statusNote .richEditorFallback {
+  margin: 0;
+  font-weight: 500;
+  color: #9aa0aa;
 }
 
 .taskStatusControl {

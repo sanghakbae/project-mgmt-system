@@ -14,6 +14,7 @@ export type NotifyEvent =
   | 'project.advance'
   | 'project.hold'
   | 'project.unhold'
+  | 'project.reject'
   | 'task.create'
   | 'task.comment'
   | 'task.status'

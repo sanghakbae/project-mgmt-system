@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type Dispatc
 import {
   AlertTriangle,
   BarChart3,
+  Bell,
   CalendarDays,
   Check,
   ChevronLeft,
@@ -9,6 +10,7 @@ import {
   CornerDownRight,
   ClipboardList,
   Database,
+  Download,
   FileText,
   LayoutDashboard,
   ListChecks,
@@ -28,7 +30,7 @@ import { notifyGoogleChat } from './notify'
 const SystemFlowPanel = lazy(() => import('./SystemFlowPanel').then((m) => ({ default: m.SystemFlowPanel })))
 import { roleLabels, workflow } from './data'
 import { hasSupabaseConfig, mapProjectRow, supabase } from './supabase'
-import type { ApprovalState, IssueType, Priority, Project, ProjectRequestType, ProjectStatus, ProjectTask, ReviewDocs, Role, ScheduleInfo, SecurityReview, TaskStatus, WorkflowConfig } from './types'
+import type { ApprovalState, IssueType, Priority, Project, ProjectRequestType, ProjectStatus, ProjectTask, ReviewDocs, Role, ScheduleInfo, SecurityReview, TaskAttachment, TaskStatus, WorkflowConfig } from './types'
 
 const statusLabels: Record<ProjectStatus, string> = {
   request: '요청 단계',
@@ -60,6 +62,16 @@ const priorityLabels: Record<Priority, string> = {
   high: '높음',
   urgent: '긴급',
 }
+
+// 자주 쓰는 반려 사유 프리셋
+const rejectReasonPresets = [
+  '요구사항이 불명확합니다. 상세 내용을 보완해 주세요.',
+  '우선순위/일정이 현 분기 계획과 맞지 않습니다.',
+  '보안·개인정보 검토 기준을 충족하지 못했습니다.',
+  '유사 기능과 중복됩니다. 기존 기능으로 대응 가능합니다.',
+  '예산·리소스 확보가 어렵습니다.',
+  '성공 기준(지표)이 측정 가능하지 않습니다.',
+]
 
 const taskLabels: Record<TaskStatus, string> = {
   todo: '대기',
@@ -456,6 +468,15 @@ function isRequesterRole(role: Role) {
 const demoToday = new Date('2026-05-17T09:00:00+09:00')
 
 type ViewMode = 'dashboard' | 'requestFlow' | 'pipeline' | 'flow' | 'settings'
+
+type NotificationItem = {
+  id: string
+  kind: 'approval' | 'qc' | 'due' | 'overdue'
+  tone: 'action' | 'overdue' | 'soon'
+  projectId: string
+  projectTitle: string
+  text: string
+}
 type StatusFilter = ProjectStatus | 'all' | 'active' | 'dueSoon' | 'mine' | 'risk' | 'blocked'
 
 type RequestFormState = {
@@ -676,6 +697,10 @@ function App() {
   const [query, setQuery] = useState('')
   // 프로젝트 목록 옆 단계(상태) 필터
   const [listStatusFilter, setListStatusFilter] = useState<ProjectStatus | 'all'>('all')
+  // 추가 다중 필터: 담당 팀 / 우선순위 / 요청 유형
+  const [listTeamFilter, setListTeamFilter] = useState<string>('all')
+  const [listPriorityFilter, setListPriorityFilter] = useState<Priority | 'all'>('all')
+  const [listTypeFilter, setListTypeFilter] = useState<ProjectRequestType | 'all'>('all')
   const [loadState, setLoadState] = useState<'loading' | 'live' | 'error'>(hasSupabaseConfig ? 'loading' : 'error')
   const [viewMode, setViewMode] = useState<ViewMode>(restoredSession.viewMode ?? 'dashboard')
   // 프로젝트 상세에서 스텝퍼 클릭으로 보고 있는 단계(실제 프로젝트 상태와 별개)
@@ -686,6 +711,11 @@ function App() {
   const [approvalInlineOpen, setApprovalInlineOpen] = useState(false)
   // 승인 이력 내 임시 댓글 입력
   const [approvalCommentInput, setApprovalCommentInput] = useState('')
+  // 반려 사유 입력 (프리셋 + 직접 입력)
+  const [rejectReasonDraft, setRejectReasonDraft] = useState('')
+  const [rejectOpen, setRejectOpen] = useState(false)
+  // 활동 로그 표시 방식: 세로 타임라인 / 표
+  const [logView, setLogView] = useState<'timeline' | 'table'>('timeline')
   // 검토 단계(QC/보안/PM) 역할별 검토 내용 임시 입력
   const [qcReviewDraft, setQcReviewDraft] = useState('')
   const [requestForm, setRequestForm] = useState<RequestFormState>(emptyRequestForm)
@@ -858,8 +888,48 @@ function App() {
       // 프로젝트 목록은 항상 '내 할 일'(현재 역할이 처리하는 프로젝트)만 표시 (admin은 전체)
       .filter((project) => isProjectAssignedToRole(project, role))
       .filter((project) => listStatusFilter === 'all' || project.status === listStatusFilter)
+      .filter((project) => listTeamFilter === 'all' || project.ownerTeam === listTeamFilter)
+      .filter((project) => listPriorityFilter === 'all' || project.priority === listPriorityFilter)
+      .filter((project) => listTypeFilter === 'all' || project.requestType === listTypeFilter)
       .filter((project) => `${project.title} ${project.summary} ${project.code}`.toLowerCase().includes(query.toLowerCase()))
-  }, [query, queueScopedProjects, role, listStatusFilter])
+  }, [query, queueScopedProjects, role, listStatusFilter, listTeamFilter, listPriorityFilter, listTypeFilter])
+
+  // 담당 팀 필터 옵션 (현재 역할이 볼 수 있는 프로젝트 기준)
+  const teamFilterOptions = useMemo(() => {
+    const set = new Set<string>()
+    queueScopedProjects.filter((project) => isProjectAssignedToRole(project, role)).forEach((p) => p.ownerTeam && set.add(p.ownerTeam))
+    return Array.from(set).sort()
+  }, [queueScopedProjects, role])
+
+  // 알림/리마인더: 내 승인 차례·검토 요청·마감 임박·지연
+  const notifications = useMemo<NotificationItem[]>(() => {
+    const items: NotificationItem[] = []
+    for (const p of serviceScopedProjects) {
+      if (p.onHold) continue
+      // 내 승인 차례 (부서 승인 단계)
+      if (p.status === 'dept_review' && p.approvalState.requiredRoles.includes(role) && !p.approvalState.approvedRoles.includes(role)) {
+        items.push({ id: `appr-${p.id}`, kind: 'approval', tone: 'action', projectId: p.id, projectTitle: p.title, text: '내 승인 차례입니다.' })
+      }
+      // 내 검토 차례 (QC·보안·PM 검토 단계)
+      if (p.status === 'qc_security' && (role === 'qa' || role === 'security' || role === 'pm')) {
+        if (!p.qcSignoff?.[role]) {
+          items.push({ id: `qc-${p.id}`, kind: 'qc', tone: 'action', projectId: p.id, projectTitle: p.title, text: `${role === 'qa' ? 'QC' : role === 'security' ? '보안' : 'PM'} 검토가 필요합니다.` })
+        }
+      }
+      // 마감 임박 / 지연 (내 할 일 프로젝트만)
+      if (!['completion', 'rejected'].includes(p.status) && isProjectAssignedToRole(p, role)) {
+        const d = daysUntil(p.dueDate, demoToday)
+        if (d < 0) {
+          items.push({ id: `over-${p.id}`, kind: 'overdue', tone: 'overdue', projectId: p.id, projectTitle: p.title, text: `마감 ${Math.abs(d)}일 지연 (D+${Math.abs(d)})` })
+        } else if (d <= 1) {
+          items.push({ id: `due-${p.id}`, kind: 'due', tone: 'soon', projectId: p.id, projectTitle: p.title, text: `마감 임박 (${d === 0 ? 'D-DAY' : 'D-1'})` })
+        }
+      }
+    }
+    // 처리 필요(action) → 지연 → 임박 순으로 정렬
+    const order: Record<string, number> = { action: 0, overdue: 1, soon: 2 }
+    return items.sort((a, b) => (order[a.tone] ?? 9) - (order[b.tone] ?? 9))
+  }, [serviceScopedProjects, role])
 
   const dashboardSummary = useMemo(() => {
     const taskStatus = serviceScopedProjects.reduce(
@@ -897,7 +967,33 @@ function App() {
     const assignedProjects = serviceScopedProjects.filter((project) => isProjectAssignedToRole(project, role))
     const myQueue = serviceScopedProjects.filter((project) => isProjectAssignedToRole(project, role)).slice(0, 5)
 
-    return { taskStatus, priority, statusCounts, projectsByStatus, assignedProjects, dueSoon, recent, myQueue }
+    // 평균 처리 기간(일): 완료된 프로젝트의 등록→완료 소요일 평균
+    const completedProjects = serviceScopedProjects.filter((project) => project.status === 'completion')
+    const avgCompletionDays = completedProjects.length
+      ? Math.round(
+          completedProjects.reduce((sum, project) => sum + Math.max(0, (Date.parse(project.updatedAt) - Date.parse(project.createdAt)) / 86_400_000), 0) /
+            completedProjects.length,
+        )
+      : 0
+
+    // 역할별 대기 건수: 진행 중 프로젝트에서 각 역할이 처리해야 할 건수
+    const roleBuckets: Partial<Record<Role, number>> = {}
+    const bump = (r: Role) => { roleBuckets[r] = (roleBuckets[r] ?? 0) + 1 }
+    for (const project of serviceScopedProjects) {
+      if (project.onHold || ['completion', 'rejected'].includes(project.status)) continue
+      if (project.status === 'dept_review') {
+        project.approvalState.requiredRoles.filter((r) => !project.approvalState.approvedRoles.includes(r)).forEach(bump)
+      } else if (project.status === 'qc_security') {
+        (['qa', 'security', 'pm'] as const).forEach((r) => { if (!project.qcSignoff?.[r]) bump(r) })
+      } else {
+        bump(project.assigneeRole)
+      }
+    }
+    const pendingByRole = (Object.entries(roleBuckets) as Array<[Role, number]>)
+      .map(([r, count]) => ({ role: r, count }))
+      .sort((a, b) => b.count - a.count)
+
+    return { taskStatus, priority, statusCounts, projectsByStatus, assignedProjects, dueSoon, recent, myQueue, avgCompletionDays, completedCount: completedProjects.length, pendingByRole }
   }, [role, serviceScopedProjects])
 
   const currentStep = Math.max(
@@ -1326,6 +1422,24 @@ function App() {
     void notifyGoogleChat('task.status', `QC/보안/PM 검토 ${nextDone ? '완료' : '취소'}: ${label}`, { 프로젝트: selected.title })
   }
 
+  // 반려 처리: 현재 단계에서 프로젝트를 반려하고 사유를 기록
+  async function rejectSelectedProject(reason: string) {
+    if (!selected) return
+    const trimmed = reason.trim()
+    if (!trimmed) { window.alert('반려 사유를 입력하거나 선택해 주세요.'); return }
+    if (!window.confirm(`"${selected.title}" 프로젝트를 반려합니다.\n사유: ${trimmed}`)) return
+    await patchSelectedProject(
+      {
+        status: 'rejected',
+        rejectedReason: trimmed,
+        rejectedFromStatus: selected.status,
+        nextAction: '반려됨 · 요청자 재검토 필요',
+      },
+      `프로젝트를 반려했습니다. (사유: ${trimmed})`,
+    )
+    void notifyGoogleChat('project.reject', `프로젝트 반려: ${selected.title}`, { 사유: trimmed })
+  }
+
   // #8 요청자 확인 (완료보고 단계)
   async function confirmByRequester() {
     if (!selected || selected.status !== 'completion') return
@@ -1748,6 +1862,13 @@ function App() {
         <header className="topbar">
           <div />
           <div className="topbarActions">
+            <NotificationBell
+              items={notifications}
+              onOpenProject={(projectId) => {
+                setSelectedId(projectId)
+                setViewMode('pipeline')
+              }}
+            />
             {account ? (
               <AccountMenu email={account.email} role={role} onLogout={handleLogout} />
             ) : null}
@@ -1835,6 +1956,58 @@ function App() {
                   <option value="rejected">{statusLabels.rejected}</option>
                 </select>
               </div>
+              <div className="listFilterBox">
+                <select
+                  value={listTeamFilter}
+                  onChange={(event) => setListTeamFilter(event.target.value)}
+                  aria-label="담당 팀 필터"
+                >
+                  <option value="all">전체 담당팀</option>
+                  {teamFilterOptions.map((team) => (
+                    <option key={team} value={team}>{team}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="listFilterBox">
+                <select
+                  value={listPriorityFilter}
+                  onChange={(event) => setListPriorityFilter(event.target.value as Priority | 'all')}
+                  aria-label="우선순위 필터"
+                >
+                  <option value="all">전체 우선순위</option>
+                  {(['urgent', 'high', 'normal', 'low'] as Priority[]).map((p) => (
+                    <option key={p} value={p}>{priorityLabels[p]}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="listFilterBox">
+                <select
+                  value={listTypeFilter}
+                  onChange={(event) => setListTypeFilter(event.target.value as ProjectRequestType | 'all')}
+                  aria-label="요청 유형 필터"
+                >
+                  <option value="all">전체 유형</option>
+                  {(Object.keys(requestTypeLabels) as ProjectRequestType[]).map((t) => (
+                    <option key={t} value={t}>{requestTypeLabels[t]}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                className="csvExportButton"
+                disabled={filteredProjects.length === 0}
+                title="현재 목록을 CSV로 내보내기"
+                onClick={() => {
+                  const header = ['코드', '제목', '요청유형', '담당팀', '요청자', '우선순위', '단계', '진행률(%)', '마감일', '등록일']
+                  const rows = filteredProjects.map((p) => [
+                    p.code, p.title, requestTypeLabels[p.requestType], p.ownerTeam, p.requester,
+                    priorityLabels[p.priority], statusLabels[p.status], p.progress, p.dueDate, p.createdAt,
+                  ])
+                  downloadCsv(`projects_${todayStamp()}.csv`, [header, ...rows])
+                }}
+              >
+                <Download size={15} /> CSV
+              </button>
             </div>
 
             <div className="projectList">
@@ -1851,7 +2024,7 @@ function App() {
                     <span className="requestTypePill">{requestTypeLabels[project.requestType]}</span>
                     <span className={`priority ${project.priority}`}>{priorityLabels[project.priority]}</span>
                     <span>{project.ownerTeam}</span>
-                    <span>D-{Math.max(0, daysUntil(project.dueDate, demoToday))}</span>
+                    {(() => { const dd = dDayInfo(project.dueDate, demoToday); return <span className={`ddayPill ${dd.tone}`}>{dd.label}</span> })()}
                   </span>
                 </button>
               ))}
@@ -2179,7 +2352,7 @@ function App() {
             {viewedStep === currentStep && ['dept_review', 'qc_security', 'completion', 'rejected'].includes(viewedStatus) && (
             <div className={`actionBanner ${canAct && !selected.onHold ? 'neonHighlight' : ''}`} data-section="현재 단계 액션" data-section-tone="approval">
               <div>
-                <strong>{selected.status === 'dept_review' ? '승인 단계' : (canAct ? selected.nextAction : `${roleLabels[role]} 역할은 현재 단계에서 대기 상태입니다.`)}</strong>
+                <strong>{selected.status === 'dept_review' ? '승인 단계' : selected.status === 'qc_security' ? 'QC·보안·PM 3자 검토' : (canAct ? selected.nextAction : `${roleLabels[role]} 역할은 현재 단계에서 대기 상태입니다.`)}</strong>
                 <span>담당: {selected.status === 'qc_security' ? 'QC · 보안 · PM' : roleLabels[selected.assigneeRole]} · 마감 {formatDate(selected.dueDate)}</span>
                 {selected.status === 'dept_review' && (
                   <div className="approvalGrid" style={{ ['--cols' as string]: selectedApprovalState.requiredRoles.length }}>
@@ -2236,12 +2409,52 @@ function App() {
                           </button>
                           <button
                             type="button"
+                            className="rejectBtn"
+                            onClick={() => setRejectOpen((v) => !v)}
+                          >
+                            반려
+                          </button>
+                          <button
+                            type="button"
                             className="closeBtn"
-                            onClick={() => setApprovalInlineOpen(false)}
+                            onClick={() => { setApprovalInlineOpen(false); setRejectOpen(false) }}
                           >
                             닫기
                           </button>
                         </div>
+                        {rejectOpen && (
+                          <div className="rejectComposer">
+                            <span className="rejectComposerLabel">반려 사유 — 프리셋 선택 또는 직접 입력</span>
+                            <div className="rejectPresetList">
+                              {rejectReasonPresets.map((preset) => (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  className={`rejectPreset ${rejectReasonDraft === preset ? 'active' : ''}`}
+                                  onClick={() => setRejectReasonDraft(preset)}
+                                >
+                                  {preset}
+                                </button>
+                              ))}
+                            </div>
+                            <textarea
+                              rows={2}
+                              placeholder="반려 사유를 입력하거나 위 프리셋을 선택하세요."
+                              value={rejectReasonDraft}
+                              onChange={(e) => setRejectReasonDraft(e.target.value)}
+                            />
+                            <div className="rejectComposerActions">
+                              <button
+                                type="button"
+                                className="rejectConfirmBtn"
+                                onClick={() => { void rejectSelectedProject(rejectReasonDraft); setRejectReasonDraft(''); setRejectOpen(false); setApprovalInlineOpen(false) }}
+                              >
+                                반려 확정
+                              </button>
+                              <button type="button" className="closeBtn" onClick={() => setRejectOpen(false)}>취소</button>
+                            </div>
+                          </div>
+                        )}
                         <div className="approvalCommentRow inline">
                           <input
                             type="text"
@@ -2437,32 +2650,56 @@ function App() {
 
               <section className="infoPanel">
                 <div className="panelHeader compact">
-                  <h3>활동 로그</h3>
-                  <MessageSquareText size={17} />
+                  <h3><MessageSquareText size={16} style={{ verticalAlign: '-3px', marginRight: 4 }} />활동 로그</h3>
+                  <div className="logViewToggle">
+                    <button type="button" className={logView === 'timeline' ? 'active' : ''} onClick={() => setLogView('timeline')}>타임라인</button>
+                    <button type="button" className={logView === 'table' ? 'active' : ''} onClick={() => setLogView('table')}>표</button>
+                  </div>
                 </div>
-                <div className="logTableWrap">
-                  <table className="logTable">
-                    <thead>
-                      <tr>
-                        <th>시각</th>
-                        <th>담당</th>
-                        <th>내용</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                {logView === 'timeline' ? (
+                  selected.logs.length === 0 ? (
+                    <p className="logEmpty">활동 기록이 없습니다.</p>
+                  ) : (
+                    <ol className="logTimeline">
                       {selected.logs.map((log) => (
-                        <tr key={log.id}>
-                          <td className="logTime">{log.at}</td>
-                          <td className="logActor">{log.actor}</td>
-                          <td className="logMsg">{log.message}</td>
-                        </tr>
+                        <li key={log.id} className={`logTimelineItem ${logTone(log.message)}`}>
+                          <span className="logTimelineDot" aria-hidden="true" />
+                          <div className="logTimelineBody">
+                            <div className="logTimelineMeta">
+                              <span className="logTimelineActor">{log.actor}</span>
+                              <span className="logTimelineTime">{formatTimestamp(log.at)}</span>
+                            </div>
+                            <p className="logTimelineMsg">{log.message}</p>
+                          </div>
+                        </li>
                       ))}
-                      {selected.logs.length === 0 && (
-                        <tr><td colSpan={3} className="logEmpty">활동 기록이 없습니다.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                    </ol>
+                  )
+                ) : (
+                  <div className="logTableWrap">
+                    <table className="logTable">
+                      <thead>
+                        <tr>
+                          <th>시각</th>
+                          <th>담당</th>
+                          <th>내용</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selected.logs.map((log) => (
+                          <tr key={log.id}>
+                            <td className="logTime">{log.at}</td>
+                            <td className="logActor">{log.actor}</td>
+                            <td className="logMsg">{log.message}</td>
+                          </tr>
+                        ))}
+                        {selected.logs.length === 0 && (
+                          <tr><td colSpan={3} className="logEmpty">활동 기록이 없습니다.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </section>
             </div>
             )}
@@ -2693,6 +2930,55 @@ function AccountMenu({ email, role, onLogout }: { email: string; role: Role; onL
   )
 }
 
+// 알림 벨 — 내 승인/검토 차례·마감 임박·지연을 모아 보여준다
+function NotificationBell({ items, onOpenProject }: { items: NotificationItem[]; onOpenProject: (projectId: string) => void }) {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOpen(false)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [open])
+  const kindLabel: Record<NotificationItem['kind'], string> = { approval: '승인', qc: '검토', due: '임박', overdue: '지연' }
+  return (
+    <div className="notifBell" onClick={(e) => e.stopPropagation()}>
+      <button type="button" className="notifBellBtn" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open} title="알림">
+        <Bell size={17} />
+        {items.length > 0 && <span className="notifBadge">{items.length > 99 ? '99+' : items.length}</span>}
+      </button>
+      {open && (
+        <div className="notifPanel" role="menu">
+          <div className="notifPanelHead">
+            <strong>알림</strong>
+            <span>{items.length}건</span>
+          </div>
+          {items.length === 0 ? (
+            <p className="notifEmpty">새 알림이 없습니다.</p>
+          ) : (
+            <ul className="notifList">
+              {items.map((n) => (
+                <li key={n.id}>
+                  <button
+                    type="button"
+                    className={`notifItem ${n.tone}`}
+                    onClick={() => { onOpenProject(n.projectId); setOpen(false) }}
+                  >
+                    <span className={`notifTag ${n.tone}`}>{kindLabel[n.kind]}</span>
+                    <span className="notifItemBody">
+                      <span className="notifItemTitle">{n.projectTitle}</span>
+                      <span className="notifItemText">{n.text}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function EmptyDatabasePanel({ loading, onCreate }: { loading: boolean; onCreate: () => void }) {
   return (
     <div className="detailPanel emptyStatePanel">
@@ -2716,6 +3002,9 @@ type DashboardSummary = {
   dueSoon: Project[]
   recent: Project[]
   myQueue: Project[]
+  avgCompletionDays: number
+  completedCount: number
+  pendingByRole: Array<{ role: Role; count: number }>
 }
 
 function DashboardOverview({
@@ -2756,8 +3045,52 @@ function DashboardOverview({
     return { service, total: serviceProjects.length, columns }
   })
 
+  const totalProjects = summary.statusCounts.reduce((sum, item) => sum + item.count, 0)
+  const maxStatusCount = Math.max(1, ...summary.statusCounts.map((item) => item.count))
+  const maxRolePending = Math.max(1, ...summary.pendingByRole.map((item) => item.count))
+
   return (
     <section className="dashboardBoard" aria-label="dashboard overview">
+      <section className="dashboardStats" aria-label="통계 요약">
+        <div className="statCard">
+          <span className="statCardLabel">전체 프로젝트</span>
+          <strong className="statCardValue">{totalProjects}<small>건</small></strong>
+          <span className="statCardSub">진행 {summary.statusCounts.filter((s) => !['completion'].includes(s.status)).reduce((a, b) => a + b.count, 0)} · 완료 {summary.completedCount}</span>
+        </div>
+        <div className="statCard">
+          <span className="statCardLabel">평균 처리 기간</span>
+          <strong className="statCardValue">{summary.avgCompletionDays}<small>일</small></strong>
+          <span className="statCardSub">완료 {summary.completedCount}건 기준 (등록→완료)</span>
+        </div>
+        <div className="statCard statCardWide">
+          <span className="statCardLabel">단계별 건수</span>
+          <div className="statBars">
+            {summary.statusCounts.map((item) => (
+              <button key={item.status} type="button" className="statBarRow" onClick={() => onOpenStatus(item.status)} title={`${item.label} ${item.count}건`}>
+                <span className="statBarName">{item.label}</span>
+                <span className="statBarTrack"><span className="statBarFill" style={{ width: `${(item.count / maxStatusCount) * 100}%` }} /></span>
+                <span className="statBarNum">{item.count}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="statCard statCardWide">
+          <span className="statCardLabel">역할별 대기 건수</span>
+          {summary.pendingByRole.length === 0 ? (
+            <p className="statEmpty">대기 중인 처리 건이 없습니다.</p>
+          ) : (
+            <div className="statBars">
+              {summary.pendingByRole.map((item) => (
+                <div key={item.role} className="statBarRow" title={`${roleLabels[item.role]} ${item.count}건`}>
+                  <span className="statBarName">{roleLabels[item.role]}</span>
+                  <span className="statBarTrack"><span className="statBarFill amber" style={{ width: `${(item.count / maxRolePending) * 100}%` }} /></span>
+                  <span className="statBarNum">{item.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
       <section className="dashboardPanel workflowOverview">
         <div className="panelHeader compact">
           <div className="workflowSummary">
@@ -2819,7 +3152,7 @@ function DashboardOverview({
                           <p>{project.serviceName} · {project.serviceArea}</p>
                           <div className="kanbanMeta">
                             <span>{project.ownerTeam}</span>
-                            <span>D-{Math.max(0, daysUntil(project.dueDate, demoToday))}</span>
+                            {(() => { const dd = dDayInfo(project.dueDate, demoToday); return <span className={`ddayPill ${dd.tone}`}>{dd.label}</span> })()}
                             <span>{project.progress}%</span>
                           </div>
                         </button>
@@ -2859,7 +3192,35 @@ function ProjectTasksPanel({
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({})
   const [showAddForm, setShowAddForm] = useState(false)
   const [taskFilter, setTaskFilter] = useState<TaskStatus>('todo')
-  const [newTask, setNewTask] = useState({ title: '', type: 'task' as IssueType, owner: '', priority: 'normal' as Priority, dueDate: '', note: '' })
+  const emptyNewTask = { title: '', type: 'task' as IssueType, owner: '', priority: 'normal' as Priority, dueDate: '', note: '', attachments: [] as TaskAttachment[] }
+  const [newTask, setNewTask] = useState(emptyNewTask)
+
+  function handleNewTaskFiles(files: FileList | null) {
+    if (!files || files.length === 0) return
+    const readers = Array.from(files).map(
+      (file) =>
+        new Promise<TaskAttachment>((resolve) => {
+          const reader = new FileReader()
+          reader.onload = () =>
+            resolve({
+              id: crypto.randomUUID(),
+              name: file.name,
+              size: file.size,
+              type: file.type || 'application/octet-stream',
+              dataUrl: typeof reader.result === 'string' ? reader.result : undefined,
+              uploadedAt: new Date().toISOString(),
+            })
+          reader.readAsDataURL(file)
+        }),
+    )
+    void Promise.all(readers).then((items) =>
+      setNewTask((s) => ({ ...s, attachments: [...s.attachments, ...items] })),
+    )
+  }
+
+  function removeNewTaskAttachment(id: string) {
+    setNewTask((s) => ({ ...s, attachments: s.attachments.filter((a) => a.id !== id) }))
+  }
 
   function submitNewTask() {
     if (!onAddTask || !newTask.title.trim()) return
@@ -2879,9 +3240,9 @@ function ProjectTasksPanel({
       status: 'todo',
       statusNote: newTask.note.trim(),
       statusChangedAt: new Date().toISOString(),
-      attachments: [],
+      attachments: newTask.attachments,
     })
-    setNewTask({ title: '', type: 'task', owner: '', priority: 'normal', dueDate: '', note: '' })
+    setNewTask(emptyNewTask)
     setShowAddForm(false)
   }
 
@@ -2926,6 +3287,30 @@ function ProjectTasksPanel({
         </div>
         <div className="taskHeaderRight">
           <span className="taskTotal">{project.tasks.length}개</span>
+          <button
+            className="miniButton"
+            type="button"
+            disabled={project.tasks.length === 0}
+            title="태스크를 CSV로 내보내기"
+            onClick={() => {
+              const header = ['키', '유형', '제목', '담당', '보고자', '우선순위', '상태', '마감일', '공수(pt)', '최근 메모']
+              const rows = project.tasks.map((t) => [
+                t.key ?? project.code,
+                issueTypeLabels[t.type ?? 'task'],
+                t.title,
+                t.owner,
+                t.reporter ?? project.requester,
+                priorityLabels[t.priority ?? 'normal'],
+                taskLabels[t.status],
+                t.dueDate,
+                t.estimate ?? 0,
+                stripHtml(t.statusNote ?? ''),
+              ])
+              downloadCsv(`tasks_${project.code}_${todayStamp()}.csv`, [header, ...rows])
+            }}
+          >
+            <Download size={14} /> CSV
+          </button>
           {onAddTask && (
             <button className="miniButton" type="button" onClick={() => setShowAddForm((v) => !v)}>
               {showAddForm ? '닫기' : '+ 태스크 추가'}
@@ -2939,11 +3324,11 @@ function ProjectTasksPanel({
           <div className="inlineTaskGrid">
             <input placeholder="태스크 제목" value={newTask.title} onChange={(e) => setNewTask((s) => ({ ...s, title: e.target.value }))} />
             <select value={newTask.type} onChange={(e) => setNewTask((s) => ({ ...s, type: e.target.value as IssueType }))}>
-              <option value="task">Task</option>
-              <option value="story">Story</option>
-              <option value="bug">Bug</option>
-              <option value="change">Change</option>
-              <option value="epic">Epic</option>
+              <option value="task">Task (작업)</option>
+              <option value="story">Story (스토리)</option>
+              <option value="bug">Bug (버그)</option>
+              <option value="change">Change (변경)</option>
+              <option value="epic">Epic (에픽)</option>
             </select>
             <input placeholder={`담당자 (기본: ${roleLabels[currentRole]})`} value={newTask.owner} onChange={(e) => setNewTask((s) => ({ ...s, owner: e.target.value }))} />
             <select value={newTask.priority} onChange={(e) => setNewTask((s) => ({ ...s, priority: e.target.value as Priority }))}>
@@ -2954,7 +3339,45 @@ function ProjectTasksPanel({
             </select>
             <input type="date" value={newTask.dueDate} onChange={(e) => setNewTask((s) => ({ ...s, dueDate: e.target.value }))} />
           </div>
-          <input className="inlineTaskNote" placeholder="작업 내용 / 메모" value={newTask.note} onChange={(e) => setNewTask((s) => ({ ...s, note: e.target.value }))} />
+          <div className="inlineTaskNoteField">
+            <label className="inlineTaskNoteLabel">작업 내용 / 메모</label>
+            <RichEditor
+              value={newTask.note}
+              onChange={(html) => setNewTask((s) => ({ ...s, note: html }))}
+              placeholder="작업 내용·완료 기준·메모를 입력하세요"
+              minHeight={84}
+            />
+          </div>
+          <div className="inlineTaskAttachField">
+            <div className="inlineTaskAttachHeader">
+              <span className="inlineTaskNoteLabel">첨부 파일</span>
+              <label className="miniButton uploadButton">
+                파일 추가
+                <input
+                  type="file"
+                  multiple
+                  hidden
+                  onChange={(event) => {
+                    handleNewTaskFiles(event.target.files)
+                    event.target.value = ''
+                  }}
+                />
+              </label>
+            </div>
+            {newTask.attachments.length === 0 ? (
+              <p className="docAttachmentEmpty">첨부된 파일이 없습니다.</p>
+            ) : (
+              <ul className="docAttachmentList">
+                {newTask.attachments.map((file) => (
+                  <li key={file.id}>
+                    <span className="attachmentName">{file.name}</span>
+                    <span>{formatBytes(file.size)}</span>
+                    <button type="button" className="attachmentRemove" onClick={() => removeNewTaskAttachment(file.id)} aria-label={`${file.name} 제거`}>✕</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <div className="inlineTaskActions">
             <button className="primaryButton" type="button" onClick={submitNewTask} disabled={!newTask.title.trim()}>등록</button>
           </div>
@@ -2995,10 +3418,13 @@ function ProjectTasksPanel({
                 <span className={`priority ${task.priority ?? 'normal'}`}>{priorityLabels[task.priority ?? 'normal']}</span>
               </div>
               <strong>{task.title}</strong>
-              <small>{statusLabels[task.stage ?? project.status]} · 담당 {task.owner} · 보고 {task.reporter ?? project.requester} · {formatDate(task.dueDate)} · {task.estimate ?? 0}pt</small>
+              <small>{statusLabels[task.stage ?? project.status]} · 담당 {task.owner} · 보고 {task.reporter ?? project.requester} · {formatDate(task.dueDate)} {(() => { const dd = dDayInfo(task.dueDate, demoToday); const tone = task.status === 'done' ? 'normal' : dd.tone; return <span className={`ddayPill ${tone}`}>{dd.label}</span> })()} · {task.estimate ?? 0}pt</small>
               <p>{task.output || '산출물/완료 기준 미입력'}</p>
               <p>{task.acceptanceCriteria || '인수 조건 미입력'}</p>
-              <p className="statusNote">최근 상태 메모: {task.statusNote || '아직 기록 없음'}</p>
+              <div className="statusNote">
+                <span className="statusNoteLabel">최근 상태 메모</span>
+                <RichTextView html={task.statusNote ?? ''} fallback="아직 기록 없음" />
+              </div>
               {(task.attachments?.length ?? 0) > 0 && (
                 <div className="taskAttachments" aria-label={`${task.title} 첨부 파일`}>
                   {task.attachments?.map((attachment) => (
@@ -3009,7 +3435,11 @@ function ProjectTasksPanel({
                         className="attachmentChip attachmentLink"
                         onClick={() => onPreviewAttachment({ name: attachment.name, type: attachment.type, dataUrl: attachment.dataUrl, size: attachment.size })}
                       >
-                        <Paperclip size={13} />
+                        {attachment.type.startsWith('image/') && attachment.dataUrl ? (
+                          <img className="attachmentThumb" src={attachment.dataUrl} alt="" />
+                        ) : (
+                          <Paperclip size={13} />
+                        )}
                         {attachment.name}
                       </button>
                     ) : attachment.dataUrl ? (
@@ -3304,6 +3734,34 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+// HTML 문자열에서 태그를 제거하고 순수 텍스트만 추출 (CSV/요약용)
+function stripHtml(html: string): string {
+  if (!html) return ''
+  const tmp = document.createElement('div')
+  tmp.innerHTML = html
+  return (tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim()
+}
+
+// CSV 한 셀 이스케이프 (쉼표·따옴표·줄바꿈 처리)
+function csvCell(value: unknown): string {
+  const s = value === null || value === undefined ? '' : String(value)
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+// 행 배열을 CSV 파일로 다운로드 (엑셀 한글 호환 위해 UTF-8 BOM 추가)
+function downloadCsv(filename: string, rows: (string | number | undefined)[][]) {
+  const body = rows.map((row) => row.map(csvCell).join(',')).join('\r\n')
+  const blob = new Blob(['﻿' + body], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
 function DocAttachmentField({
@@ -3935,7 +4393,7 @@ function SettingsPanel({
                       {project.onHold && <span className="holdTag">보류</span>}
                     </div>
                     <strong>{project.title}</strong>
-                    <small>{project.serviceName} · {project.ownerTeam} · D-{Math.max(0, daysUntil(project.dueDate, demoToday))}</small>
+                    <small>{project.serviceName} · {project.ownerTeam} · {(() => { const dd = dDayInfo(project.dueDate, demoToday); return <span className={`ddayPill ${dd.tone}`}>{dd.label}</span> })()}</small>
                     {project.onHold && project.holdReason && <em>사유: {project.holdReason}</em>}
                   </div>
                   <div className="projectManageActions">
@@ -4018,6 +4476,32 @@ function nextActionFor(status: ProjectStatus) {
 function daysUntil(date: string, from: Date) {
   const target = new Date(`${date}T23:59:59+09:00`)
   return Math.ceil((target.getTime() - from.getTime()) / 86_400_000)
+}
+
+// 활동 로그 메시지로 타임라인 도트 색/종류 추정
+function logTone(message: string): 'reject' | 'approve' | 'advance' | 'hold' | 'doc' | 'default' {
+  if (/반려/.test(message)) return 'reject'
+  if (/승인|확인|완료/.test(message)) return 'approve'
+  if (/단계 진행|진행했|진행 처리|단계를/.test(message)) return 'advance'
+  if (/보류/.test(message)) return 'hold'
+  if (/문서|기획|일정|업데이트/.test(message)) return 'doc'
+  return 'default'
+}
+
+// 마감일 기준 D-day 라벨/상태. overdue면 D+n, 오늘이면 D-DAY, 임박/여유 구분.
+function dDayInfo(date: string, from: Date): { label: string; tone: 'overdue' | 'today' | 'soon' | 'normal' } {
+  if (!date) return { label: '미정', tone: 'normal' }
+  const d = daysUntil(date, from)
+  if (d < 0) return { label: `D+${Math.abs(d)}`, tone: 'overdue' }
+  if (d === 0) return { label: 'D-DAY', tone: 'today' }
+  return { label: `D-${d}`, tone: d <= 3 ? 'soon' : 'normal' }
+}
+
+// 파일명용 날짜 스탬프: 'YYYYMMDD'
+function todayStamp() {
+  const d = new Date()
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`
 }
 
 // 로그용 타임스탬프: 'YYYY-MM-DD HH:mm'
