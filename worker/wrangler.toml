@@ -1,0 +1,18 @@
+name = "pms-r2-presign"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# 공개 가능한 설정값(시크릿 아님)
+[vars]
+R2_ACCOUNT_ID = "your-cloudflare-account-id"
+R2_BUCKET = "pms-attachments"
+ALLOWED_ORIGIN = "http://localhost:5173"
+
+# 시크릿은 아래 명령으로 등록(파일에 넣지 말 것):
+#   wrangler secret put R2_ACCESS_KEY_ID
+#   wrangler secret put R2_SECRET_ACCESS_KEY
+#
+# 선택: R2 바인딩(프록시 방식으로 확장할 때만 필요. presigned 방식에는 불필요)
+# [[r2_buckets]]
+# binding = "BUCKET"
+# bucket_name = "pms-attachments"

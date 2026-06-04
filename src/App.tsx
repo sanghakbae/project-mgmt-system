@@ -29,7 +29,17 @@ import { notifyGoogleChat } from './notify'
 
 const SystemFlowPanel = lazy(() => import('./SystemFlowPanel').then((m) => ({ default: m.SystemFlowPanel })))
 import { roleLabels, workflow } from './data'
-import { hasSupabaseConfig, mapProjectRow, supabase } from './supabase'
+import { hasSupabaseConfig, supabase } from './supabase'
+import {
+  deleteProject as deleteProjectDoc,
+  deleteProjects as deleteProjectsDoc,
+  fetchProjects,
+  hasFirebaseConfig,
+  insertProject,
+  updateProject as updateProjectDoc,
+  type ProjectRow,
+} from './projectsRepo'
+import { resolveAttachmentUrl, uploadAttachment } from './storage'
 import type { ApprovalState, IssueType, Priority, Project, ProjectRequestType, ProjectStatus, ProjectTask, ReviewDocs, Role, ScheduleInfo, SecurityReview, TaskAttachment, TaskStatus, WorkflowConfig } from './types'
 
 const statusLabels: Record<ProjectStatus, string> = {
@@ -701,7 +711,7 @@ function App() {
   const [listTeamFilter, setListTeamFilter] = useState<string>('all')
   const [listPriorityFilter, setListPriorityFilter] = useState<Priority | 'all'>('all')
   const [listTypeFilter, setListTypeFilter] = useState<ProjectRequestType | 'all'>('all')
-  const [loadState, setLoadState] = useState<'loading' | 'live' | 'error'>(hasSupabaseConfig ? 'loading' : 'error')
+  const [loadState, setLoadState] = useState<'loading' | 'live' | 'error'>(hasFirebaseConfig ? 'loading' : 'error')
   const [viewMode, setViewMode] = useState<ViewMode>(restoredSession.viewMode ?? 'dashboard')
   // 프로젝트 상세에서 스텝퍼 클릭으로 보고 있는 단계(실제 프로젝트 상태와 별개)
   const [viewedStageIndex, setViewedStageIndex] = useState<number | null>(null)
@@ -721,7 +731,7 @@ function App() {
   const [requestForm, setRequestForm] = useState<RequestFormState>(emptyRequestForm)
   const [reviewDocsDrafts, setReviewDocsDrafts] = useState<Record<string, ReviewDocs>>({})
   const [scheduleDrafts, setScheduleDrafts] = useState<Record<string, ScheduleInfo>>({})
-  const [previewAttachment, setPreviewAttachment] = useState<{ name: string; type: string; dataUrl?: string; size: number } | null>(null)
+  const [previewAttachment, setPreviewAttachment] = useState<{ name: string; type: string; dataUrl?: string; key?: string; size: number } | null>(null)
   const [srsCollapsed, setSrsCollapsed] = useState(false)
   const [sdsCollapsed, setSdsCollapsed] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
@@ -764,24 +774,15 @@ function App() {
     return () => window.clearTimeout(timer)
   }, [account, handleLogout])
 
-  // 프로젝트 로드 — 로그인(계정) 이후에만
+  // 프로젝트 로드(Firestore) — 로그인(계정) 이후에만
   useEffect(() => {
-    if (!supabase || !account) {
+    if (!hasFirebaseConfig || !account) {
       return
     }
     setLoadState('loading')
 
-    supabase
-      .from('pms_projects')
-      .select('*')
-      .order('updated_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (error) {
-          setLoadState('error')
-          return
-        }
-
-        const liveProjects = (data ?? []).map((row) => mapProjectRow(row))
+    fetchProjects()
+      .then((liveProjects) => {
         setProjects(liveProjects)
         setSelectedId((current) =>
           current && liveProjects.some((project) => project.id === current)
@@ -790,6 +791,7 @@ function App() {
         )
         setLoadState('live')
       })
+      .catch(() => setLoadState('error'))
   }, [account])
 
   useEffect(() => {
@@ -1097,19 +1099,18 @@ function App() {
       ),
     )
 
-    if (!supabase) return
-    const { error } = await supabase
-      .from('pms_projects')
-      .update({
+    if (!hasFirebaseConfig) return
+    try {
+      await updateProjectDoc(selected.id, {
         status: advancedStatus,
         assignee_role: persistAssigneeRole(advancedAssigneeRole),
         progress: advancedProgress,
         next_action: nextAction,
         logs: nextLogs,
       })
-      .eq('id', selected.id)
-
-    if (error) setLoadState('error')
+    } catch {
+      setLoadState('error')
+    }
   }
 
   async function updateSelectedReviewDocs() {
@@ -1150,13 +1151,12 @@ function App() {
       코드: selected.code,
     })
 
-    if (!supabase) return
-    const { error } = await supabase
-      .from('pms_projects')
-      .update({ logs: nextLogs })
-      .eq('id', selected.id)
-
-    if (error) setLoadState('error')
+    if (!hasFirebaseConfig) return
+    try {
+      await updateProjectDoc(selected.id, { logs: nextLogs })
+    } catch {
+      setLoadState('error')
+    }
   }
 
   async function updateSelectedSchedule() {
@@ -1199,13 +1199,12 @@ function App() {
       완료예정: currentScheduleDraft.plannedEnd || '미정',
     })
 
-    if (!supabase) return
-    const { error } = await supabase
-      .from('pms_projects')
-      .update({ logs: nextLogs })
-      .eq('id', selected.id)
-
-    if (error) setLoadState('error')
+    if (!hasFirebaseConfig) return
+    try {
+      await updateProjectDoc(selected.id, { logs: nextLogs })
+    } catch {
+      setLoadState('error')
+    }
   }
 
   async function approveCurrentRole(memo: string = '') {
@@ -1278,12 +1277,12 @@ function App() {
       ...(willHold && reason ? { 사유: reason } : {}),
     })
 
-    if (!supabase) return
-    const { error } = await supabase
-      .from('pms_projects')
-      .update({ logs: nextLogs })
-      .eq('id', projectId)
-    if (error) setLoadState('error')
+    if (!hasFirebaseConfig) return
+    try {
+      await updateProjectDoc(projectId, { logs: nextLogs })
+    } catch {
+      setLoadState('error')
+    }
   }
 
   async function toggleHoldSelectedProject() {
@@ -1336,20 +1335,19 @@ function App() {
       ),
     )
 
-    if (!supabase) return
-
-    const { error } = await supabase
-      .from('pms_projects')
-      .update({
-        status: targetStatus,
-        progress: nextProgress,
-        assignee_role: persistAssigneeRole(nextAssigneeRole),
-        next_action: nextAction,
-        logs: nextLogs,
-      })
-      .eq('id', selected.id)
-
-    if (error) setLoadState('error')
+    if (hasFirebaseConfig) {
+      try {
+        await updateProjectDoc(selected.id, {
+          status: targetStatus,
+          progress: nextProgress,
+          assignee_role: persistAssigneeRole(nextAssigneeRole),
+          next_action: nextAction,
+          logs: nextLogs,
+        })
+      } catch {
+        setLoadState('error')
+      }
+    }
 
     void notifyGoogleChat('project.advance', `단계 진행: ${statusLabels[targetStatus]}`, {
       프로젝트: selected.title,
@@ -1380,14 +1378,17 @@ function App() {
     ]
     merged.logs = nextLogs
     setProjects((current) => current.map((project) => (project.id === selected.id ? merged : project)))
-    if (!supabase) return
-    const dbPatch: Record<string, unknown> = { logs: nextLogs }
+    if (!hasFirebaseConfig) return
+    const dbPatch: Partial<ProjectRow> = { logs: nextLogs }
     if (patch.status) dbPatch.status = patch.status
     if (patch.assigneeRole) dbPatch.assignee_role = persistAssigneeRole(patch.assigneeRole)
     if (patch.nextAction) dbPatch.next_action = patch.nextAction
     if (patch.progress !== undefined) dbPatch.progress = patch.progress
-    const { error } = await supabase.from('pms_projects').update(dbPatch).eq('id', selected.id)
-    if (error) setLoadState('error')
+    try {
+      await updateProjectDoc(selected.id, dbPatch)
+    } catch {
+      setLoadState('error')
+    }
   }
 
   // #4 QC/보안/PM 3자 사인오프 토글
@@ -1490,7 +1491,7 @@ function App() {
 
   async function submitRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!supabase) {
+    if (!hasFirebaseConfig) {
       setLoadState('error')
       return
     }
@@ -1547,39 +1548,40 @@ function App() {
       ],
     }
 
-    const { data, error } = await supabase
-      .from('pms_projects')
-      .insert({
-        code: newProject.code,
-        title: newProject.title,
-        service_name: newProject.serviceName,
-        service_area: newProject.serviceArea,
-        requester: newProject.requester,
-        owner_team: newProject.ownerTeam,
-        priority: newProject.priority,
-        status: newProject.status,
-        summary: newProject.summary,
-        current_problem: newProject.currentProblem,
-        desired_outcome: newProject.desiredOutcome,
-        success_metric: newProject.successMetric,
-        affected_users: newProject.affectedUsers,
-        due_date: newProject.dueDate,
-        risk: newProject.risk,
-        progress: newProject.progress,
-        next_action: newProject.nextAction,
-        assignee_role: persistAssigneeRole(newProject.assigneeRole),
-        tasks: newProject.tasks,
-        logs: newProject.logs,
-      })
-      .select('*')
-      .single()
+    const row: ProjectRow = {
+      id: newProject.id,
+      code: newProject.code,
+      title: newProject.title,
+      service_name: newProject.serviceName,
+      service_area: newProject.serviceArea,
+      requester: newProject.requester,
+      owner_team: newProject.ownerTeam,
+      priority: newProject.priority,
+      status: newProject.status,
+      summary: newProject.summary,
+      current_problem: newProject.currentProblem,
+      desired_outcome: newProject.desiredOutcome,
+      success_metric: newProject.successMetric,
+      affected_users: newProject.affectedUsers,
+      due_date: newProject.dueDate,
+      created_at: now,
+      updated_at: now,
+      risk: newProject.risk,
+      progress: newProject.progress,
+      next_action: newProject.nextAction,
+      assignee_role: persistAssigneeRole(newProject.assigneeRole),
+      tasks: newProject.tasks,
+      logs: newProject.logs,
+    }
 
-    if (error || !data) {
+    let savedProject: Project
+    try {
+      savedProject = await insertProject(row)
+    } catch {
       setLoadState('error')
       return
     }
 
-    const savedProject = mapProjectRow(data)
     setProjects((current) => [savedProject, ...current])
     setSelectedId(savedProject.id)
 
@@ -1597,7 +1599,7 @@ function App() {
   }
 
   async function updateSelectedProjectTasks(nextTasks: ProjectTask[], logMessage: string) {
-    if (!selected || !supabase) {
+    if (!selected || !hasFirebaseConfig) {
       setLoadState('error')
       return
     }
@@ -1625,15 +1627,11 @@ function App() {
       ),
     )
 
-    const { error } = await supabase
-      .from('pms_projects')
-      .update({
-        tasks: nextTasks,
-        logs: nextLogs,
-      })
-      .eq('id', selected.id)
-
-    if (error) setLoadState('error')
+    try {
+      await updateProjectDoc(selected.id, { tasks: nextTasks, logs: nextLogs })
+    } catch {
+      setLoadState('error')
+    }
   }
 
   async function addTaskToProject(projectId: string, task: ProjectTask) {
@@ -1663,12 +1661,12 @@ function App() {
       마감: task.dueDate,
     })
 
-    if (!supabase) return
-    const { error } = await supabase
-      .from('pms_projects')
-      .update({ tasks: nextTasks, logs: nextLogs })
-      .eq('id', projectId)
-    if (error) setLoadState('error')
+    if (!hasFirebaseConfig) return
+    try {
+      await updateProjectDoc(projectId, { tasks: nextTasks, logs: nextLogs })
+    } catch {
+      setLoadState('error')
+    }
   }
 
 
@@ -1681,10 +1679,9 @@ function App() {
     ]
     const merged: Project = { ...selected, ...patch, logs: nextLogs, updatedAt: new Date().toISOString() }
     setProjects((current) => current.map((project) => (project.id === selected.id ? merged : project)))
-    if (!supabase) return
-    const { error } = await supabase
-      .from('pms_projects')
-      .update({
+    if (!hasFirebaseConfig) return
+    try {
+      await updateProjectDoc(selected.id, {
         title: merged.title,
         service_name: merged.serviceName,
         service_area: merged.serviceArea,
@@ -1699,8 +1696,9 @@ function App() {
         risk: merged.risk,
         logs: nextLogs,
       })
-      .eq('id', selected.id)
-    if (error) setLoadState('error')
+    } catch {
+      setLoadState('error')
+    }
   }
 
   // PM/관리자: 기획 단계 필요 여부 토글
@@ -1719,9 +1717,12 @@ function App() {
   async function deleteProject(projectId: string) {
     setProjects((current) => current.filter((project) => project.id !== projectId))
     setSelectedId((current) => (current === projectId ? '' : current))
-    if (!supabase) return
-    const { error } = await supabase.from('pms_projects').delete().eq('id', projectId)
-    if (error) setLoadState('error')
+    if (!hasFirebaseConfig) return
+    try {
+      await deleteProjectDoc(projectId)
+    } catch {
+      setLoadState('error')
+    }
   }
 
   async function deleteAllProjects() {
@@ -1729,9 +1730,12 @@ function App() {
     if (ids.length === 0) return
     setProjects([])
     setSelectedId('')
-    if (!supabase) return
-    const { error } = await supabase.from('pms_projects').delete().in('id', ids)
-    if (error) setLoadState('error')
+    if (!hasFirebaseConfig) return
+    try {
+      await deleteProjectsDoc(ids)
+    } catch {
+      setLoadState('error')
+    }
   }
 
   async function addTaskComment(taskId: string, message: string) {
@@ -1872,10 +1876,6 @@ function App() {
             {account ? (
               <AccountMenu email={account.email} role={role} onLogout={handleLogout} />
             ) : null}
-            <div className={`connection ${loadState}`}>
-              <Database size={16} />
-              {loadState === 'live' ? 'Supabase 연결됨' : loadState === 'loading' ? 'DB 불러오는 중' : 'Supabase 연결 필요'}
-            </div>
           </div>
         </header>
 
@@ -2201,7 +2201,7 @@ function App() {
                             <button
                               type="button"
                               className="attachmentLink"
-                              onClick={() => setPreviewAttachment({ name: file.name, type: file.type, dataUrl: file.dataUrl, size: file.size })}
+                              onClick={() => setPreviewAttachment({ name: file.name, type: file.type, dataUrl: file.dataUrl, key: file.key, size: file.size })}
                             >
                               {file.name}
                             </button>
@@ -2223,7 +2223,7 @@ function App() {
                             <button
                               type="button"
                               className="attachmentLink"
-                              onClick={() => setPreviewAttachment({ name: file.name, type: file.type, dataUrl: file.dataUrl, size: file.size })}
+                              onClick={() => setPreviewAttachment({ name: file.name, type: file.type, dataUrl: file.dataUrl, key: file.key, size: file.size })}
                             >
                               {file.name}
                             </button>
@@ -2762,30 +2762,44 @@ function AttachmentPreviewModal({
   attachment,
   onClose,
 }: {
-  attachment: { name: string; type: string; dataUrl?: string; size: number }
+  attachment: { name: string; type: string; dataUrl?: string; key?: string; size: number }
   onClose: () => void
 }) {
   const isImage = attachment.type.startsWith('image/')
   const isPdf = attachment.type === 'application/pdf'
+  // R2 키가 있으면 presigned URL을 비동기로 해소, 아니면 dataUrl 사용
+  const [url, setUrl] = useState<string | undefined>(attachment.dataUrl)
+  const [resolving, setResolving] = useState(Boolean(attachment.key && !attachment.dataUrl))
+  useEffect(() => {
+    let active = true
+    if (attachment.key && !attachment.dataUrl) {
+      resolveAttachmentUrl(attachment)
+        .then((u) => { if (active) { setUrl(u); setResolving(false) } })
+        .catch(() => { if (active) { setUrl(undefined); setResolving(false) } })
+    }
+    return () => { active = false }
+  }, [attachment])
   return (
     <div className="attachmentModalBackdrop" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="attachmentModal" onClick={(event) => event.stopPropagation()}>
         <div className="attachmentModalHeader">
           <strong>{attachment.name}</strong>
           <div className="attachmentModalActions">
-            {attachment.dataUrl && (
-              <a className="miniButton" href={attachment.dataUrl} download={attachment.name}>다운로드</a>
+            {url && (
+              <a className="miniButton" href={url} download={attachment.name} target="_blank" rel="noreferrer">다운로드</a>
             )}
             <button className="miniButton" type="button" onClick={onClose}>닫기</button>
           </div>
         </div>
         <div className="attachmentModalBody">
-          {!attachment.dataUrl ? (
+          {resolving ? (
+            <p className="attachmentModalFallback">불러오는 중…</p>
+          ) : !url ? (
             <p className="attachmentModalFallback">미리볼 데이터가 없습니다.</p>
           ) : isImage ? (
-            <img src={attachment.dataUrl} alt={attachment.name} />
+            <img src={url} alt={attachment.name} />
           ) : isPdf ? (
-            <iframe src={attachment.dataUrl} title={attachment.name} />
+            <iframe src={url} title={attachment.name} />
           ) : (
             <p className="attachmentModalFallback">
               이 파일 형식은 미리보기를 지원하지 않습니다. ({attachment.type || '알 수 없는 형식'})<br />
@@ -3021,8 +3035,8 @@ function EmptyDatabasePanel({ loading, onCreate }: { loading: boolean; onCreate:
   return (
     <div className="detailPanel emptyStatePanel">
       <Database size={34} />
-      <h2>{loading ? 'Supabase에서 프로젝트를 불러오는 중입니다.' : '아직 DB에 등록된 프로젝트가 없습니다.'}</h2>
-      <p>이 화면은 목업 데이터를 사용하지 않습니다. 새 요청을 등록하면 Supabase `pms_projects` 테이블에 실제 row가 생성됩니다.</p>
+      <h2>{loading ? '프로젝트를 불러오는 중입니다.' : '아직 등록된 프로젝트가 없습니다.'}</h2>
+      <p>이 화면은 목업 데이터를 사용하지 않습니다. 새 요청을 등록하면 Firestore `pms_projects` 컬렉션에 실제 문서가 생성됩니다.</p>
       <button className="primaryButton" type="button" onClick={onCreate} disabled={loading}>
         <Plus size={16} />
         새 요청 등록
@@ -3221,7 +3235,7 @@ function ProjectTasksPanel({
   onStatusChange: (taskId: string, status: TaskStatus, statusNote: string) => void
   onAddComment: (taskId: string, message: string) => void
   onAddTask?: (task: ProjectTask) => void
-  onPreviewAttachment?: (attachment: { name: string; type: string; dataUrl?: string; size: number }) => void
+  onPreviewAttachment?: (attachment: { name: string; type: string; dataUrl?: string; key?: string; size: number }) => void
   currentRole: Role
   label?: string
 }) {
@@ -3235,25 +3249,10 @@ function ProjectTasksPanel({
 
   function handleNewTaskFiles(files: FileList | null) {
     if (!files || files.length === 0) return
-    const readers = Array.from(files).map(
-      (file) =>
-        new Promise<TaskAttachment>((resolve) => {
-          const reader = new FileReader()
-          reader.onload = () =>
-            resolve({
-              id: crypto.randomUUID(),
-              name: file.name,
-              size: file.size,
-              type: file.type || 'application/octet-stream',
-              dataUrl: typeof reader.result === 'string' ? reader.result : undefined,
-              uploadedAt: new Date().toISOString(),
-            })
-          reader.readAsDataURL(file)
-        }),
-    )
-    void Promise.all(readers).then((items) =>
-      setNewTask((s) => ({ ...s, attachments: [...s.attachments, ...items] })),
-    )
+    // R2 업로드(미설정 시 storage.ts가 dataURL로 폴백)
+    void Promise.all(Array.from(files).map((file) => uploadAttachment(file)))
+      .then((items) => setNewTask((s) => ({ ...s, attachments: [...s.attachments, ...items] })))
+      .catch(() => window.alert('첨부파일 업로드에 실패했습니다.'))
   }
 
   function removeNewTaskAttachment(id: string) {
@@ -3471,7 +3470,7 @@ function ProjectTasksPanel({
                         key={attachment.id}
                         type="button"
                         className="attachmentChip attachmentLink"
-                        onClick={() => onPreviewAttachment({ name: attachment.name, type: attachment.type, dataUrl: attachment.dataUrl, size: attachment.size })}
+                        onClick={() => onPreviewAttachment({ name: attachment.name, type: attachment.type, dataUrl: attachment.dataUrl, key: attachment.key, size: attachment.size })}
                       >
                         {attachment.type.startsWith('image/') && attachment.dataUrl ? (
                           <img className="attachmentThumb" src={attachment.dataUrl} alt="" />
@@ -3811,29 +3810,13 @@ function DocAttachmentField({
   label: string
   attachments: import('./types').ReviewDocAttachment[]
   onChange: (next: import('./types').ReviewDocAttachment[]) => void
-  onPreview?: (attachment: { name: string; type: string; dataUrl?: string; size: number }) => void
+  onPreview?: (attachment: { name: string; type: string; dataUrl?: string; key?: string; size: number }) => void
 }) {
   function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return
-    const fileArray = Array.from(files)
-    const readers = fileArray.map(
-      (file) =>
-        new Promise<import('./types').ReviewDocAttachment>((resolve) => {
-          const reader = new FileReader()
-          reader.onload = () => {
-            resolve({
-              id: crypto.randomUUID(),
-              name: file.name,
-              size: file.size,
-              type: file.type || 'application/octet-stream',
-              dataUrl: typeof reader.result === 'string' ? reader.result : undefined,
-              uploadedAt: new Date().toISOString(),
-            })
-          }
-          reader.readAsDataURL(file)
-        }),
-    )
-    void Promise.all(readers).then((items) => onChange([...attachments, ...items]))
+    void Promise.all(Array.from(files).map((file) => uploadAttachment(file)))
+      .then((items) => onChange([...attachments, ...items]))
+      .catch(() => window.alert('첨부파일 업로드에 실패했습니다.'))
   }
 
   return (
@@ -3863,7 +3846,7 @@ function DocAttachmentField({
                 <button
                   type="button"
                   className="attachmentLink"
-                  onClick={() => onPreview({ name: file.name, type: file.type, dataUrl: file.dataUrl, size: file.size })}
+                  onClick={() => onPreview({ name: file.name, type: file.type, dataUrl: file.dataUrl, key: file.key, size: file.size })}
                 >
                   {file.name}
                 </button>

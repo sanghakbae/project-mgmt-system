@@ -1,27 +1,24 @@
 # Project Management System
 
-React + Vite + Supabase 기반의 워크플로우형 프로젝트 관리 시스템입니다. Jira식 이슈/티켓 관리 관점을 반영해 프로젝트, 요청서, 수행 티켓, 담당자, 우선순위, 상태, 산출물, 인수 조건을 함께 관리합니다.
+React + Vite 기반의 워크플로우형 프로젝트 관리 시스템입니다. Jira식 이슈/티켓 관리 관점을 반영해 프로젝트, 요청서, 수행 티켓, 담당자, 우선순위, 상태, 산출물, 인수 조건을 함께 관리합니다.
+
+## 아키텍처
+
+| 영역 | 백엔드 |
+|------|--------|
+| 인증(이메일/비밀번호) | Supabase (`pms_accounts` + RPC) |
+| 프로젝트 데이터 | Firebase Firestore (`pms_projects`) |
+| 첨부파일 | Cloudflare R2 (Worker presigned URL, `worker/`) |
 
 ## 실행
 
 ```bash
 npm install
+cp .env.example .env.local   # 값 채우기 (아래 SETUP.md 참고)
 npm run dev
 ```
 
-## Supabase 연결
-
-Supabase 연결이 필요합니다. 목업 데이터 fallback은 사용하지 않습니다.
-
-```bash
-cp .env.example .env.local
-```
-
-`.env.local`에 Supabase URL과 anon key를 넣고, Supabase SQL editor에서 `supabase/schema.sql`을 실행하세요.
-
-```bash
-npm run dev
-```
+연결 설정(三 백엔드)은 **[SETUP.md](./SETUP.md)** 를 참고하세요.
 
 ## 인증 (DB 계정 기반)
 

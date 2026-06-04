@@ -32,6 +32,8 @@ export type TaskAttachment = {
   size: number
   type: string
   dataUrl?: string
+  // Cloudflare R2 객체 키 (R2 사용 시). 미리보기/다운로드는 presigned GET URL로 해소.
+  key?: string
   uploadedAt: string
 }
 
@@ -93,6 +95,7 @@ export type ReviewDocAttachment = {
   size: number
   type: string
   dataUrl?: string
+  key?: string
   uploadedAt: string
 }
 
