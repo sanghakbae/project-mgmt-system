@@ -1,5 +1,4 @@
-// Firebase (Firestore) 초기화 — 프로젝트 데이터 저장소.
-// 인증은 기존 Supabase(이메일/비밀번호)를 그대로 사용하며, 여기서는 Firestore만 다룬다.
+// Firebase (Firestore) 초기화 — 인증 계정(pms_users)과 프로젝트 데이터(pms_projects) 저장소.
 import { initializeApp, type FirebaseApp } from 'firebase/app'
 import { initializeFirestore, type Firestore } from 'firebase/firestore'
 
