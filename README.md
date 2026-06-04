@@ -6,9 +6,11 @@ React + Vite 기반의 워크플로우형 프로젝트 관리 시스템입니다
 
 | 영역 | 백엔드 |
 |------|--------|
-| 인증(이메일/비밀번호) | Supabase (`pms_accounts` + RPC) |
+| 인증(이메일/비밀번호) | Firebase Firestore (`pms_users`, PBKDF2 해시) |
 | 프로젝트 데이터 | Firebase Firestore (`pms_projects`) |
 | 첨부파일 | Cloudflare R2 (Worker presigned URL, `worker/`) |
+
+> 인증/데이터 모두 Firestore에 저장합니다. Supabase는 더 이상 사용하지 않습니다.
 
 ## 실행
 

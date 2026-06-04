@@ -1,10 +1,10 @@
-# 셋업 가이드 — 인증(Supabase) · 데이터(Firestore) · 첨부(Cloudflare R2)
+# 셋업 가이드 — 인증·데이터(Firestore) · 첨부(Cloudflare R2)
 
-이 앱은 세 가지 백엔드를 사용합니다.
+이 앱은 두 가지 백엔드를 사용합니다. (Supabase는 더 이상 사용하지 않음)
 
 | 영역 | 백엔드 | 비고 |
 |------|--------|------|
-| 인증(로그인/가입) | **Supabase** | 이메일/비밀번호. 기존 그대로 유지 |
+| 인증(로그인/가입) | **Firebase Firestore** | `pms_users` 컬렉션, 비밀번호 PBKDF2 해시 |
 | 프로젝트 데이터 | **Firebase Firestore** | `pms_projects` 컬렉션 |
 | 첨부파일 | **Cloudflare R2** | Worker presigned URL |
 
@@ -18,18 +18,17 @@ cp .env.example .env.local
 
 ---
 
-## 1) 인증 — Supabase (기존 유지)
+## 1) 인증 — Firebase Firestore (별도 인증 서비스 없음)
 
-이미 구성돼 있다면 그대로 둡니다. 신규라면 `supabase/migrations/20260531200000_pms_db_auth.sql`을
-Supabase SQL Editor에서 한 번 실행하면 `pms_accounts` + `pms_register/pms_authenticate` RPC가 생성됩니다.
+계정 정보(이메일·이름·역할·비밀번호 해시)를 Firestore `pms_users` 컬렉션에 직접 저장합니다.
+**Firebase Authentication 제품을 켤 필요가 없습니다.** 앱의 "가입" 탭에서 등록하면 바로 계정이 생성됩니다.
 
-```
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_ANON_KEY=...
-```
+- 비밀번호는 PBKDF2(SHA-256, 10만 회) 해시 + salt로 저장(평문 저장 안 함).
+- 가입 시 역할(요청자/PM/QA 등)을 선택하며, `pms_users/<email>` 문서에 기록됩니다.
+- 문서 id = 이메일(소문자) → 이메일 중복 가입 방지.
 
-> 참고: 프로젝트 데이터는 더 이상 Supabase `pms_projects`를 쓰지 않습니다(Firestore로 이전).
-> Supabase는 계정 인증 용도로만 남습니다.
+> ⚠️ 보안: 현재 Firestore 규칙이 공개(2번 참고)라 `pms_users`의 password_hash가 읽힐 수 있습니다(해시라 평문은 아님).
+> 운영 강화 시 규칙을 조이거나(쓰기/읽기 경로를 Worker 프록시로) Cloud Functions(Blaze)로 인증을 서버화하세요.
 
 ---
 
@@ -50,12 +49,12 @@ VITE_SUPABASE_ANON_KEY=...
 
 4. **Firestore 보안 규칙**: 이 앱은 Supabase로 인증하고 Firebase Auth 세션은 없으므로,
    Firestore에는 Firebase 인증 컨텍스트가 없습니다. 다음 중 하나를 선택하세요.
-   - (간단) 개발/내부용으로 `pms_projects` 읽기·쓰기 허용:
+   - (간단) 개발/내부용으로 `pms_users`·`pms_projects` 읽기·쓰기 허용:
      ```
      rules_version = '2';
      service cloud.firestore {
        match /databases/{database}/documents {
-         match /pms_projects/{doc} {
+         match /{document=**} {
            allow read, write: if true;
          }
        }

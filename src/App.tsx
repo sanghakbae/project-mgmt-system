@@ -29,7 +29,6 @@ import { notifyGoogleChat } from './notify'
 
 const SystemFlowPanel = lazy(() => import('./SystemFlowPanel').then((m) => ({ default: m.SystemFlowPanel })))
 import { roleLabels, workflow } from './data'
-import { hasSupabaseConfig, supabase } from './supabase'
 import {
   deleteProject as deleteProjectDoc,
   deleteProjects as deleteProjectsDoc,
@@ -39,6 +38,7 @@ import {
   updateProject as updateProjectDoc,
   type ProjectRow,
 } from './projectsRepo'
+import { registerWithEmail, signInWithEmail } from './authRepo'
 import { resolveAttachmentUrl, uploadAttachment } from './storage'
 import type { ApprovalState, IssueType, Priority, Project, ProjectRequestType, ProjectStatus, ProjectTask, ReviewDocs, Role, ScheduleInfo, SecurityReview, TaskAttachment, TaskStatus, WorkflowConfig } from './types'
 
@@ -1782,8 +1782,8 @@ function App() {
     })
   }
 
-  // 인증 게이트: Supabase가 설정된 경우 로그인 전에는 앱 셸을 렌더링하지 않음
-  if (hasSupabaseConfig && !account) {
+  // 인증 게이트: Firebase가 설정된 경우 로그인 전에는 앱 셸을 렌더링하지 않음
+  if (hasFirebaseConfig && !account) {
     return <AuthGate onAuthenticated={(next) => { storeAccount(next); setAccount(next) }} />
   }
 
@@ -2821,21 +2821,7 @@ function validatePasswordPolicy(password: string): string | null {
   return null
 }
 
-function translateAuthError(message: string): string {
-  const m = message.toLowerCase()
-  if (m.includes('email_taken')) return '이미 가입된 이메일입니다. 로그인해 주세요.'
-  if (m.includes('weak_password')) return '비밀번호는 8자 이상이어야 합니다.'
-  if (m.includes('invalid_email')) return '이메일 형식이 올바르지 않습니다.'
-  if (m.includes('invalid login credentials')) return '이메일 또는 비밀번호가 올바르지 않습니다.'
-  return message
-}
-
-// RPC가 돌려준 계정 JSON을 Account로 변환
-function toAccount(row: { id: string; email: string; full_name?: string; role: string }): Account {
-  return { id: row.id, email: row.email, fullName: row.full_name ?? '', role: row.role as Role }
-}
-
-// 가입/로그인 화면 — DB 계정(pms_accounts) + RPC(pms_register / pms_authenticate)
+// 가입/로그인 화면 — Firebase Authentication(이메일/비밀번호) + Firestore 프로필(role)
 function AuthGate({ onAuthenticated }: { onAuthenticated: (account: Account) => void }) {
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [email, setEmail] = useState('')
@@ -2848,7 +2834,7 @@ function AuthGate({ onAuthenticated }: { onAuthenticated: (account: Account) => 
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    if (!supabase || busy) return
+    if (!hasFirebaseConfig || busy) return
     setError('')
     setNotice('')
     if (mode === 'signup') {
@@ -2860,32 +2846,12 @@ function AuthGate({ onAuthenticated }: { onAuthenticated: (account: Account) => 
     }
     setBusy(true)
     try {
-      if (mode === 'login') {
-        const { data, error } = await supabase.rpc('pms_authenticate', {
-          p_email: email.trim(),
-          p_password: password,
-        })
-        if (error) {
-          setError(translateAuthError(error.message))
-        } else if (!data) {
-          setError('이메일 또는 비밀번호가 올바르지 않습니다.')
-        } else {
-          onAuthenticated(toAccount(data))
-        }
-      } else {
-        const { data, error } = await supabase.rpc('pms_register', {
-          p_email: email.trim(),
-          p_password: password,
-          p_full_name: fullName.trim(),
-          p_role: signupRole,
-        })
-        if (error) {
-          setError(translateAuthError(error.message))
-        } else if (data) {
-          // 가입 즉시 로그인 처리
-          onAuthenticated(toAccount(data))
-        }
-      }
+      const account = mode === 'login'
+        ? await signInWithEmail(email, password)
+        : await registerWithEmail(email, password, fullName, signupRole)
+      onAuthenticated(account)
+    } catch (err) {
+      setError((err as Error)?.message || '인증 처리 중 오류가 발생했습니다.')
     } finally {
       setBusy(false)
     }
