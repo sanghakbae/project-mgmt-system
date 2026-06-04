@@ -42,24 +42,59 @@ if (error) {
 }
 console.log(`행 ${data.length}건 발견.${dryRun ? ' (dry-run: 쓰기 생략)' : ''}`)
 
+// Firestore 문서 한계 1MB. base64 첨부(dataUrl)가 박혀 초과하는 문서는 dataUrl만 떼어낸다(메타 유지).
+const DOC_LIMIT = 1_000_000
+function byteSize(obj) {
+  return Buffer.byteLength(JSON.stringify(obj), 'utf8')
+}
+function stripDataUrls(row) {
+  let stripped = 0
+  const strip = (arr) => {
+    if (!Array.isArray(arr)) return
+    for (const a of arr) {
+      if (a && typeof a === 'object' && a.dataUrl) {
+        delete a.dataUrl
+        a.migratedStripped = true // 원본 파일은 R2 설정 후 재업로드 필요
+        stripped++
+      }
+    }
+  }
+  for (const t of row.tasks ?? []) strip(t.attachments)
+  for (const log of row.logs ?? []) {
+    const rd = log.meta?.reviewDocs
+    if (rd) { strip(rd.srsAttachments); strip(rd.sdsAttachments) }
+  }
+  return stripped
+}
+
 let ok = 0
+const strippedDocs = []
 for (const row of data) {
   if (!row.id) {
     console.warn('id 없는 행 건너뜀:', row.code ?? '(코드 없음)')
     continue
   }
+  // 용량 초과 시 base64 첨부 제거
+  if (byteSize(row) > DOC_LIMIT) {
+    const n = stripDataUrls(row)
+    if (n > 0) strippedDocs.push(`${row.code ?? row.id}(첨부 ${n}개)`)
+  }
+  const size = byteSize(row)
   if (dryRun) {
-    console.log(`  [dry] ${row.code ?? row.id} → pms_projects/${row.id}`)
+    console.log(`  [dry] ${row.code ?? row.id} → pms_projects/${row.id} (${(size / 1024).toFixed(0)}KB)${size > DOC_LIMIT ? ' ⚠️여전히 초과' : ''}`)
     ok++
     continue
   }
   try {
     await setDoc(doc(db, 'pms_projects', row.id), row)
     ok++
-    console.log(`  ✓ ${row.code ?? row.id}`)
+    console.log(`  ✓ ${row.code ?? row.id} (${(size / 1024).toFixed(0)}KB)`)
   } catch (e) {
     console.error(`  ✗ ${row.code ?? row.id}:`, e.message)
   }
+}
+if (strippedDocs.length) {
+  console.log(`\n⚠️ base64 첨부를 제거한 문서(메타데이터만 보존, R2 설정 후 재업로드 권장):\n   ${strippedDocs.join(', ')}`)
 }
 
 console.log(`완료: ${ok}/${data.length}건 ${dryRun ? '확인' : '이전'}.`)
