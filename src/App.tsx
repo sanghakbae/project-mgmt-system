@@ -892,14 +892,14 @@ function App() {
 
   const filteredProjects = useMemo(() => {
     return queueScopedProjects
-      // 프로젝트 목록은 항상 '내 할 일'(현재 역할이 처리하는 프로젝트)만 표시 (admin은 전체)
-      .filter((project) => isProjectAssignedToRole(project, role))
+      // 프로젝트 목록 = 현재 역할과 '관련된' 프로젝트(대시보드 '관련 프로젝트' 수치와 일치)
+      // queueScopedProjects가 이미 isProjectRelevantToRole로 스코프됨
       .filter((project) => listStatusFilter === 'all' || project.status === listStatusFilter)
       .filter((project) => listTeamFilter === 'all' || project.ownerTeam === listTeamFilter)
       .filter((project) => listPriorityFilter === 'all' || project.priority === listPriorityFilter)
       .filter((project) => listTypeFilter === 'all' || project.requestType === listTypeFilter)
       .filter((project) => `${project.title} ${project.summary} ${project.code}`.toLowerCase().includes(query.toLowerCase()))
-  }, [query, queueScopedProjects, role, listStatusFilter, listTeamFilter, listPriorityFilter, listTypeFilter])
+  }, [query, queueScopedProjects, listStatusFilter, listTeamFilter, listPriorityFilter, listTypeFilter])
 
   // 담당 팀 필터 옵션 (현재 역할이 볼 수 있는 프로젝트 기준)
   const teamFilterOptions = useMemo(() => {
@@ -1871,20 +1871,8 @@ function App() {
         <header className="topbar">
           <div />
           <div className="topbarActions">
-            {/* 임시 데모: 역할 필터 — 선택한 역할 관점으로 화면 전환 */}
-            <label className="roleSwitch">
-              <span className="roleSwitchLabel">역할</span>
-              <select
-                className="roleSwitchSelect"
-                value={role}
-                onChange={(e) => setRole(e.target.value as Role)}
-                aria-label="역할 선택"
-              >
-                {(['requester', ...activeRoles] as Role[]).map((r) => (
-                  <option key={r} value={r}>{roleLabels[r]}</option>
-                ))}
-              </select>
-            </label>
+            {/* 임시 데모: 역할 필터 — 클릭 시 아래로 펼쳐지는 드롭다운 */}
+            <RoleSwitcher role={role} onChange={setRole} />
             <NotificationBell
               items={notifications}
               onOpenProject={(projectId) => {
@@ -2961,6 +2949,41 @@ function AccountMenu({ email, role, onLogout }: { email: string; role: Role; onL
           <button type="button" className="accountLogout" onClick={onLogout}>
             로그아웃
           </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// 역할 필터 — 클릭하면 아래로 펼쳐지는 드롭다운, 선택 시 해당 역할 관점으로 전환(임시 데모)
+function RoleSwitcher({ role, onChange }: { role: Role; onChange: (next: Role) => void }) {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOpen(false)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [open])
+  const roles = ['requester', ...activeRoles] as Role[]
+  return (
+    <div className="roleSwitch" onClick={(e) => e.stopPropagation()}>
+      <button type="button" className="roleSwitchBtn" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open}>
+        <span className="roleSwitchLabel">역할</span>
+        <span className="roleSwitchCurrent">{roleLabels[role]}</span>
+        <span className="roleSwitchChevron">{open ? '▴' : '▾'}</span>
+      </button>
+      {open && (
+        <div className="roleSwitchPanel" role="menu">
+          {roles.map((r) => (
+            <button
+              key={r}
+              type="button"
+              className={`roleSwitchOption ${r === role ? 'active' : ''}`}
+              onClick={() => { onChange(r); setOpen(false) }}
+            >
+              {roleLabels[r]}
+            </button>
+          ))}
         </div>
       )}
     </div>

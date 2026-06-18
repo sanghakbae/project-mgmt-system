@@ -366,31 +366,56 @@ button {
   gap: 10px;
 }
 
-/* 임시 데모: 역할 필터 셀렉트 */
+/* 임시 데모: 역할 필터 드롭다운 (클릭 시 아래로 펼침) */
 .roleSwitch {
+  position: relative;
+  display: inline-flex;
+}
+.roleSwitchBtn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 40px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 1px solid #dfe3ea;
   border-radius: 10px;
   background: #fff;
+  cursor: pointer;
 }
-.roleSwitchLabel {
-  font-size: 12px;
-  font-weight: 800;
-  color: #6b7280;
+.roleSwitchBtn:hover { background: #f4f6f9; }
+.roleSwitchLabel { font-size: 13px; font-weight: 800; color: #6b7280; }
+.roleSwitchCurrent { font-size: 13px; font-weight: 800; color: #2b323d; }
+.roleSwitchChevron { font-size: 11px; color: #8a909a; }
+.roleSwitchPanel {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  min-width: 160px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid #e2e5ea;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(20, 30, 50, 0.16);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
-.roleSwitchSelect {
+.roleSwitchOption {
+  text-align: left;
+  padding: 8px 12px;
   border: 0;
-  outline: 0;
+  border-radius: 8px;
   background: transparent;
   font-size: 13px;
   font-weight: 700;
-  color: #2b323d;
+  color: #39414c;
   cursor: pointer;
 }
+.roleSwitchOption:hover { background: #f5f7fa; }
+.roleSwitchOption.active { background: #e7f0ff; color: #2b6cf0; }
 
 /* 알림 벨 */
 .notifBell {
@@ -1935,13 +1960,20 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 
 /* 가로 스텝 카드 흐름도 — ①~⑥ 한 줄 정렬 + 분기 노드 */
 .flowStage {
-  position: relative;
   margin: 0 0 12px;
-  padding: 20px 16px 18px;
+  padding: 16px 14px;
   border: 1px solid #eceef2;
   border-radius: 12px;
   background: #fbfcfe;
-  overflow: visible;
+  /* 폭이 좁으면 패널 밖으로 나가지 않고 패널 안에서 가로 스크롤 */
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+/* 스크롤되는 실제 콘텐츠(=SVG·카드·분기노드를 한 덩어리로). 내용 폭만큼 넓어짐 */
+.flowStageInner {
+  position: relative;
+  width: max-content;
+  min-width: 100%;
 }
 .flowLines {
   position: absolute;
@@ -1968,27 +2000,27 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   align-items: center;
   justify-content: center;
   gap: 2px;
-  min-width: 40px;
-  padding: 0 6px;
+  min-width: 24px;
+  padding: 0 2px;
   color: #1c9d5b;
 }
 .flowConnectorLabel {
-  font-size: 10.5px;
+  font-size: 9px;
   font-weight: 700;
   color: #5b8a6f;
   white-space: nowrap;
 }
 .flowStep {
-  flex: 0 0 150px;
-  width: 150px;
-  height: 116px;
+  flex: 0 0 110px;
+  width: 110px;
+  height: 96px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 12px 10px;
+  gap: 4px;
+  padding: 6px 6px;
   border: 1.5px solid;
   border-radius: 12px;
   text-align: center;
@@ -2795,26 +2827,32 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 }
 
 /* SRS 읽기 전용 섹션 뷰 */
-.planningSkipToggle {
+/* .requestForm로 스코프 — .requestForm label{display:grid} 보다 특이도 높여 가로 배치 보장 */
+.requestForm .planningSkipToggle {
   display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
   align-items: flex-start;
   gap: 10px;
   margin-top: 12px;
-  padding: 12px 14px;
+  padding: 5px;
   border: 1px solid #e1e5eb;
   border-radius: 8px;
   background: #fafbfc;
   cursor: pointer;
 }
 
-.planningSkipToggle input {
-  margin-top: 2px;
+.requestForm .planningSkipToggle input {
+  /* flex-basis로 폭 고정 — 폼 전역 input{width:100%} 영향 차단(체크박스 왼쪽 고정) */
+  flex: 0 0 16px;
   width: 16px;
   height: 16px;
-  flex-shrink: 0;
+  margin-top: 2px;
 }
 
-.planningSkipToggle span {
+.requestForm .planningSkipToggle span {
+  flex: 1 1 auto;
+  min-width: 0;
   display: grid;
   gap: 2px;
 }
@@ -5442,7 +5480,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 
 .approvalPreset {
   margin-top: 12px;
-  padding: 12px;
+  padding: 5px;
   border: 1px solid #e0e4ea;
   border-radius: 8px;
   background: #fbfbfc;

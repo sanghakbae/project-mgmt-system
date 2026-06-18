@@ -111,7 +111,8 @@ export function SystemFlowPanel() {
         ))}
       </div>
 
-      <div className="flowStage" ref={containerRef}>
+      <div className="flowStage">
+        <div className="flowStageInner" ref={containerRef}>
         <svg className="flowLines" width={size.w} height={size.h} viewBox={`0 0 ${size.w} ${size.h}`} aria-hidden="true">
           {lines.map((line, i) => (
             <g key={i} className={`flowLine ${line.kind}`}>
@@ -154,6 +155,7 @@ export function SystemFlowPanel() {
             <strong>반려</strong>
             <span>요청자 보완 후 재요청</span>
           </div>
+        </div>
         </div>
       </div>
     </section>
