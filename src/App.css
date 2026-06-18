@@ -366,6 +366,32 @@ button {
   gap: 10px;
 }
 
+/* 임시 데모: 역할 필터 셀렉트 */
+.roleSwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid #dfe3ea;
+  border-radius: 10px;
+  background: #fff;
+}
+.roleSwitchLabel {
+  font-size: 12px;
+  font-weight: 800;
+  color: #6b7280;
+}
+.roleSwitchSelect {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2b323d;
+  cursor: pointer;
+}
+
 /* 알림 벨 */
 .notifBell {
   position: relative;
@@ -1174,6 +1200,23 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 @media (max-width: 760px) {
   .dashboardKanban.adminScroll {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* 단계 흐름 헤더: 좁은 폭에서 제목이 한 글자씩 세로로 깨지지 않게 세로 스택 */
+  .workflowOverview > .panelHeader.compact {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .workflowOverview > .panelHeader.compact .serviceFilterControl {
+    width: 100%;
+  }
+  .serviceFilterControl {
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .serviceFilterControl select {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 }
 
@@ -7265,5 +7308,52 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
     height: 24px;
     padding: 0 4px;
     font-size: 11px;
+  }
+}
+
+/* ============================================================
+   모바일 전용 오버라이드 (PC 미적용) — 화면 폭 768px 이하에서만 적용.
+   이 블록은 파일 맨 끝이라 동일 특이도 규칙보다 나중에 적용되어 우선합니다.
+   요구사항: 사이드 접기 제거 · 하단 내비 한 행 · 폰트 8~10px 정규화
+   ============================================================ */
+@media (max-width: 768px) {
+  /* ① 사이드 메뉴 접기 기능 제거 */
+  .sidebarToggleEdge { display: none !important; }
+
+  /* ② 하단 내비: 한 행에 5개 고정, 라벨 8px */
+  .sidebar nav {
+    display: grid !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: minmax(0, 1fr) !important;
+  }
+  .navItem span {
+    font-size: 8px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ③ 폰트 정규화 — 모바일 최대 10px / 최소 8px */
+  /* 기본 본문 9px */
+  .appShell, .appShell p, .appShell span, .appShell div, .appShell a,
+  .appShell li, .appShell td, .appShell th, .appShell label,
+  .appShell button, .appShell input, .appShell select, .appShell textarea,
+  .appShell h1, .appShell h2, .appShell h3, .appShell h4, .appShell strong, .appShell b, .appShell em, .appShell small {
+    font-size: 9px !important;
+    line-height: 1.35 !important;
+  }
+  /* 제목·핵심 수치 최대 10px */
+  .appShell h1, .appShell h2, .appShell h3,
+  .metric strong, .statCardValue, .workflowSummary strong,
+  .detailTitle, .projectCard strong, .kanbanCard strong, .flowStepTitle {
+    font-size: 10px !important;
+  }
+  .statCardValue small, .metric span { font-size: 9px !important; }
+  /* 보조·메타·배지 최소 8px */
+  .appShell small, .cardMeta, .cardMeta *, .navItem span,
+  .flowConnectorLabel, .statCardSub, .statCardLabel, .statBarName, .statBarNum,
+  .ddayPill, .priority, .requestTypePill, .statusPill, .flowChip,
+  .notifItemText, .flowStepRole, .flowStepRole span {
+    font-size: 8px !important;
   }
 }

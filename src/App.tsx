@@ -97,6 +97,10 @@ const sessionStateStorageKey = 'pms-session-state'
 // ── DB 계정 인증 ──────────────────────────────────────────────
 // 로그인한 계정 정보 (비밀번호는 보관하지 않음)
 export type Account = { id: string; email: string; fullName: string; role: Role }
+
+// ⚠️ 임시 데모 모드: 로그인 페이지를 건너뛰고 바로 접속. (다시 로그인 강제하려면 false)
+const DEV_NO_LOGIN = true
+const DEV_ACCOUNT: Account = { id: 'demo', email: 'demo@local', fullName: '데모', role: 'admin' }
 const accountStorageKey = 'pms-account'
 const sessionStartStorageKey = 'pms-session-start'
 const SESSION_MAX_MS = 60 * 60 * 1000 // 세션 타임아웃 60분 고정
@@ -690,7 +694,7 @@ function App() {
   const restoredSession = readSessionState()
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedId, setSelectedId] = useState(restoredSession.selectedId ?? '')
-  const [role, setRole] = useState<Role>(restoredSession.role ?? 'requester')
+  const [role, setRole] = useState<Role>(restoredSession.role ?? (DEV_NO_LOGIN ? 'admin' : 'requester'))
   const [serviceOptions, setServiceOptions] = useState<string[]>(() => {
     if (typeof window === 'undefined') return defaultServiceOptions
     try {
@@ -736,15 +740,16 @@ function App() {
   const [sdsCollapsed, setSdsCollapsed] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   // 인증 상태 — DB 계정 기반 로그인(계정당 고정 역할). localStorage에 60분 세션 보관.
-  const [account, setAccount] = useState<Account | null>(() => loadStoredAccount())
+  const [account, setAccount] = useState<Account | null>(() => loadStoredAccount() ?? (DEV_NO_LOGIN ? DEV_ACCOUNT : null))
   // 작성자 표기 — "이름(역할)" 형식. 이름이 없으면 역할만 표시
   const authorName = account?.fullName?.trim()
   const authorLabel = authorName ? `${authorName}(${roleLabels[role]})` : roleLabels[role]
   const requestTypeConfig = requestTypeOptions.find((item) => item.type === requestForm.requestType) ?? requestTypeOptions[0]
 
   // 로그인하면 계정의 고정 역할을 적용. 관리자가 아니면 설정 화면에서 대시보드로 이동.
+  // (데모 모드에서는 역할 필터로 자유롭게 바꾸므로 계정 역할 강제를 생략)
   useEffect(() => {
-    if (!account) return
+    if (!account || DEV_NO_LOGIN) return
     setRole(account.role)
     if (account.role !== 'admin') {
       setViewMode((mode) => (mode === 'settings' ? 'dashboard' : mode))
@@ -1783,7 +1788,7 @@ function App() {
   }
 
   // 인증 게이트: Firebase가 설정된 경우 로그인 전에는 앱 셸을 렌더링하지 않음
-  if (hasFirebaseConfig && !account) {
+  if (!DEV_NO_LOGIN && hasFirebaseConfig && !account) {
     return <AuthGate onAuthenticated={(next) => { storeAccount(next); setAccount(next) }} />
   }
 
@@ -1866,6 +1871,20 @@ function App() {
         <header className="topbar">
           <div />
           <div className="topbarActions">
+            {/* 임시 데모: 역할 필터 — 선택한 역할 관점으로 화면 전환 */}
+            <label className="roleSwitch">
+              <span className="roleSwitchLabel">역할</span>
+              <select
+                className="roleSwitchSelect"
+                value={role}
+                onChange={(e) => setRole(e.target.value as Role)}
+                aria-label="역할 선택"
+              >
+                {(['requester', ...activeRoles] as Role[]).map((r) => (
+                  <option key={r} value={r}>{roleLabels[r]}</option>
+                ))}
+              </select>
+            </label>
             <NotificationBell
               items={notifications}
               onOpenProject={(projectId) => {
@@ -1873,7 +1892,7 @@ function App() {
                 setViewMode('pipeline')
               }}
             />
-            {account ? (
+            {account && !DEV_NO_LOGIN ? (
               <AccountMenu email={account.email} role={role} onLogout={handleLogout} />
             ) : null}
           </div>
