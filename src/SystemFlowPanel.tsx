@@ -1,34 +1,33 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { CheckCircle2, ChevronRight, CircleAlert, PauseCircle } from 'lucide-react'
 
 type Stage = {
   num: string
   title: string
-  role: string
+  owner: string
+  work: string
+  done: string
   cls: string
   enterLabel?: string
 }
 
 const stages: Stage[] = [
-  { num: '①', title: '새 요청 등록', role: '요청자', cls: 'requester' },
-  { num: '②', title: '기획 문서 작성 (SRS+SDS)', role: 'PM', cls: 'pm' },
-  { num: '③', title: '부서 검토 · 승인', role: 'CEM·개발·정보보호\n인프라·QA·특허', cls: 'multi', enterLabel: '기획 완료' },
-  { num: '④', title: '개발 (일정 조율·진행)', role: '기획(PM)·개발자', cls: 'dev', enterLabel: '역할 전원 확인' },
-  { num: '⑤', title: '검토 (QC·보안·PM)', role: 'QA·보안·PM 3자', cls: 'qa', enterLabel: '일정 확정' },
-  { num: '⑥', title: '완료 보고·게시', role: 'PM·관리자', cls: 'admin', enterLabel: '3자 검토 완료' },
+  { num: '1', title: '요청하기', owner: '요청자', work: '무엇이 필요한지 적어요.', done: '요청 내용이 저장되면 다음으로 갑니다.', cls: 'requester' },
+  { num: '2', title: '계획 세우기', owner: 'PM', work: '요구사항(SRS)과 설계(SDS)를 정리해요.', done: '문서가 준비되면 승인 요청합니다.', cls: 'pm', enterLabel: '내용 정리' },
+  { num: '3', title: '함께 승인하기', owner: '관련 부서', work: 'CEM·개발·정보보호·인프라·QA·특허가 확인해요.', done: '모두 승인하면 만들 수 있습니다.', cls: 'multi', enterLabel: '문서 준비' },
+  { num: '4', title: '만들기', owner: 'PM·개발자', work: '일정을 잡고 개발 작업을 진행해요.', done: '개발이 끝나면 검토로 갑니다.', cls: 'dev', enterLabel: '승인 완료' },
+  { num: '5', title: '검사하기', owner: 'QA·보안·PM', work: '품질, 보안, 인수 조건을 확인해요.', done: '문제가 없으면 완료 보고합니다.', cls: 'qa', enterLabel: '개발 완료' },
+  { num: '6', title: '끝내고 알리기', owner: 'PM·관리자', work: '완료 보고서를 쓰고 게시해요.', done: '모두가 결과를 확인할 수 있습니다.', cls: 'admin', enterLabel: '검토 완료' },
 ]
 
 // 분기: 어떤 단계(인덱스)에서 어떤 분기 노드로 가는지
 const rejectFrom = [2, 4] // ③ 부서 검토, ⑤ 검토
 const holdFrom = [1, 2, 3] // ② 기획, ③ 승인, ④ 개발
 
-const legend = [
-  { color: '#e7f0ff', border: '#2f6bd8', label: '요청자' },
-  { color: '#eee9ff', border: '#6d4fd0', label: '기획 (PM)' },
-  { color: '#f3e9fb', border: '#9b51c4', label: '다중 협의·승인' },
-  { color: '#e2f6f1', border: '#149e7e', label: '개발' },
-  { color: '#fff0e2', border: '#d98324', label: '검토 (QA·보안·PM)' },
-  { color: '#eef1f5', border: '#5a6473', label: '완료 (PM·관리자)' },
+const flowRules = [
+  { icon: CheckCircle2, title: '초록 화살표', text: '문제가 없으면 오른쪽으로 한 칸 이동합니다.' },
+  { icon: PauseCircle, title: '보류', text: '잠깐 멈추고, 해결되면 같은 단계에서 다시 시작합니다.' },
+  { icon: CircleAlert, title: '반려', text: '내용을 고쳐야 해서 요청자에게 되돌아갑니다.' },
 ]
 
 type Line = { d: string; kind: 'reject' | 'hold'; lx: number; ly: number; label: string }
@@ -98,17 +97,21 @@ export function SystemFlowPanel() {
       <div className="flowPanelHead">
         <div>
           <h2>프로젝트 흐름도</h2>
-          <p>새 요청 등록부터 완료 보고까지 6단계 흐름입니다. <b>각 단계 색이 담당 역할</b>을 나타내며, 굵은 화살표가 정상 진행 경로, 아래 점선이 반려·보류 분기입니다.</p>
+          <p>프로젝트는 <b>요청 → 계획 → 승인 → 만들기 → 검사 → 완료</b> 순서로 움직입니다. 각 칸에는 누가 맡는지, 무엇을 하는지, 언제 다음으로 가는지가 적혀 있습니다.</p>
         </div>
       </div>
 
-      <div className="flowLegend">
-        {legend.map((item) => (
-          <span key={item.label} className="flowLegendItem">
-            <i style={{ background: item.color, borderColor: item.border }} />
-            {item.label}
-          </span>
-        ))}
+      <div className="flowSimpleGuide">
+        {flowRules.map((item) => {
+          const Icon = item.icon
+          return (
+            <div key={item.title} className="flowSimpleRule">
+              <Icon size={18} />
+              <strong>{item.title}</strong>
+              <span>{item.text}</span>
+            </div>
+          )
+        })}
       </div>
 
       <div className="flowStage">
@@ -126,34 +129,30 @@ export function SystemFlowPanel() {
 
         <div className="flowStrip">
           {stages.map((stage, index) => (
-            <Fragment key={stage.num}>
+            <div className={`flowStep ${stage.cls}`} key={stage.num} ref={(el) => { cardRefs.current[index] = el }}>
               {index > 0 && (
                 <div className="flowConnector" aria-hidden="true">
                   {stage.enterLabel && <span className="flowConnectorLabel">{stage.enterLabel}</span>}
                   <ChevronRight size={20} />
                 </div>
               )}
-              <div className={`flowStep ${stage.cls}`} ref={(el) => { cardRefs.current[index] = el }}>
-                <span className="flowStepNum">{stage.num}</span>
-                <strong className="flowStepTitle">{stage.title}</strong>
-                <span className="flowStepRole">
-                  {stage.role.split('\n').map((line, i) => (
-                    <span key={i}>{line}</span>
-                  ))}
-                </span>
-              </div>
-            </Fragment>
+              <span className="flowStepNum">{stage.num}</span>
+              <strong className="flowStepTitle">{stage.title}</strong>
+              <span className="flowStepOwner">담당: {stage.owner}</span>
+              <span className="flowStepWork">{stage.work}</span>
+              <span className="flowStepDone">다음: {stage.done}</span>
+            </div>
           ))}
         </div>
 
         <div className="flowBranchLane">
           <div className="flowBranchNode hold" ref={holdRef}>
             <strong>보류</strong>
-            <span>해제 시 같은 지점 재개</span>
+            <span>잠깐 멈춤 · 같은 단계에서 다시 시작</span>
           </div>
           <div className="flowBranchNode reject" ref={rejectRef}>
             <strong>반려</strong>
-            <span>요청자 보완 후 재요청</span>
+            <span>요청자에게 돌아가서 고친 뒤 다시 요청</span>
           </div>
         </div>
         </div>

@@ -706,8 +706,7 @@ function App() {
     }
   })
   const [serviceFilter, setServiceFilter] = useState<ServiceFilter>('all')
-  // 프로젝트 목록은 항상 '내 할 일'만 보여주므로 필터 값은 더 이상 사용하지 않음 (setter는 네비게이션 호환용 유지)
-  const [, setStatusFilter] = useState<StatusFilter>('mine')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('mine')
   const [query, setQuery] = useState('')
   // 프로젝트 목록 옆 단계(상태) 필터
   const [listStatusFilter, setListStatusFilter] = useState<ProjectStatus | 'all'>('all')
@@ -868,38 +867,48 @@ function App() {
     return true
   }) : workflow
   const metrics = useMemo(() => {
-    const active = serviceScopedProjects.filter((project) => !['rejected'].includes(project.status))
-    const dueSoon = serviceScopedProjects.filter((project) => daysUntil(project.dueDate, demoToday) <= 5 && true)
-    const blocked = serviceScopedProjects.reduce((count, project) => count + project.tasks.filter((task) => task.status === 'blocked').length, 0)
+    const countable = (project: Project) => !['completion', 'rejected'].includes(project.status)
+    const isDueSoon = (project: Project) => countable(project) && daysUntil(project.dueDate, demoToday) <= 5
+    const isBlocked = (project: Project) => project.onHold || project.tasks.some((task) => task.status === 'blocked')
+    const active = serviceScopedProjects.filter(countable)
+    const dueSoon = serviceScopedProjects.filter(isDueSoon)
+    const blocked = serviceScopedProjects.filter(isBlocked)
     const myQueue = serviceScopedProjects.filter((project) => isProjectAssignedToRole(project, role))
     const relevantProjects = serviceScopedProjects.filter((project) => isProjectRelevantToRole(project, role))
-    const relevantActive = relevantProjects.filter((project) => !['rejected'].includes(project.status))
-    const relevantDueSoon = relevantProjects.filter((project) => daysUntil(project.dueDate, demoToday) <= 5 && true)
-    const relevantBlocked = relevantProjects.reduce((count, project) => count + project.tasks.filter((task) => task.status === 'blocked').length, 0)
+    const relevantActive = relevantProjects.filter(countable)
+    const relevantDueSoon = relevantProjects.filter(isDueSoon)
+    const relevantBlocked = relevantProjects.filter(isBlocked)
 
     return {
       total: serviceScopedProjects.length,
       active: active.length,
       dueSoon: dueSoon.length,
-      blocked,
+      blocked: blocked.length,
       myQueue: myQueue.length,
       relevantTotal: relevantProjects.length,
       relevantActive: relevantActive.length,
       relevantDueSoon: relevantDueSoon.length,
-      relevantBlocked,
+      relevantBlocked: relevantBlocked.length,
     }
   }, [role, serviceScopedProjects])
 
   const filteredProjects = useMemo(() => {
     return queueScopedProjects
-      // 프로젝트 목록 = 현재 역할과 '관련된' 프로젝트(대시보드 '관련 프로젝트' 수치와 일치)
-      // queueScopedProjects가 이미 isProjectRelevantToRole로 스코프됨
+      .filter((project) => {
+        if (statusFilter === 'mine') return isProjectAssignedToRole(project, role)
+        if (statusFilter === 'active') return !['completion', 'rejected'].includes(project.status)
+        if (statusFilter === 'dueSoon') return daysUntil(project.dueDate, demoToday) <= 5 && !['completion', 'rejected'].includes(project.status)
+        if (statusFilter === 'blocked') return project.onHold || project.tasks.some((task) => task.status === 'blocked')
+        if (statusFilter === 'risk') return project.priority === 'urgent' || project.priority === 'high'
+        if (statusFilter === 'all') return true
+        return project.status === statusFilter
+      })
       .filter((project) => listStatusFilter === 'all' || project.status === listStatusFilter)
       .filter((project) => listTeamFilter === 'all' || project.ownerTeam === listTeamFilter)
       .filter((project) => listPriorityFilter === 'all' || project.priority === listPriorityFilter)
       .filter((project) => listTypeFilter === 'all' || project.requestType === listTypeFilter)
       .filter((project) => `${project.title} ${project.summary} ${project.code}`.toLowerCase().includes(query.toLowerCase()))
-  }, [query, queueScopedProjects, listStatusFilter, listTeamFilter, listPriorityFilter, listTypeFilter])
+  }, [query, queueScopedProjects, statusFilter, role, listStatusFilter, listTeamFilter, listPriorityFilter, listTypeFilter])
 
   // 담당 팀 필터 옵션 (현재 역할이 볼 수 있는 프로젝트 기준)
   const teamFilterOptions = useMemo(() => {
@@ -1819,18 +1828,6 @@ function App() {
             <span>대시보드</span>
           </button>
           <button
-            className={`navItem ${viewMode === 'pipeline' ? 'active' : ''}`}
-            type="button"
-            onClick={() => {
-              setViewMode('pipeline')
-              setStatusFilter('mine')
-            }}
-            title="프로젝트"
-          >
-            <ListChecks size={17} />
-            <span>프로젝트</span>
-          </button>
-          <button
             className={`navItem ${viewMode === 'requestFlow' ? 'active' : ''}`}
             type="button"
             onClick={() => setViewMode('requestFlow')}
@@ -1838,6 +1835,18 @@ function App() {
           >
             <Plus size={17} />
             <span>새 요청</span>
+          </button>
+          <button
+            className={`navItem ${viewMode === 'pipeline' ? 'active' : ''}`}
+            type="button"
+            onClick={() => {
+              setViewMode('pipeline')
+              setStatusFilter('mine')
+            }}
+            title="프로젝트 현황"
+          >
+            <ListChecks size={17} />
+            <span>프로젝트 현황</span>
           </button>
           <button
             className={`navItem ${viewMode === 'flow' ? 'active' : ''}`}
@@ -3105,52 +3114,9 @@ function DashboardOverview({
     return { service, total: serviceProjects.length, columns }
   })
 
-  const totalProjects = summary.statusCounts.reduce((sum, item) => sum + item.count, 0)
-  const maxStatusCount = Math.max(1, ...summary.statusCounts.map((item) => item.count))
-  const maxRolePending = Math.max(1, ...summary.pendingByRole.map((item) => item.count))
 
   return (
     <section className="dashboardBoard" aria-label="dashboard overview">
-      <section className="dashboardStats" aria-label="통계 요약">
-        <div className="statCard">
-          <span className="statCardLabel">전체 프로젝트</span>
-          <strong className="statCardValue">{totalProjects}<small>건</small></strong>
-          <span className="statCardSub">진행 {summary.statusCounts.filter((s) => !['completion'].includes(s.status)).reduce((a, b) => a + b.count, 0)} · 완료 {summary.completedCount}</span>
-        </div>
-        <div className="statCard">
-          <span className="statCardLabel">평균 처리 기간</span>
-          <strong className="statCardValue">{summary.avgCompletionDays}<small>일</small></strong>
-          <span className="statCardSub">완료 {summary.completedCount}건 기준 (등록→완료)</span>
-        </div>
-        <div className="statCard statCardWide">
-          <span className="statCardLabel">단계별 건수</span>
-          <div className="statBars">
-            {summary.statusCounts.map((item) => (
-              <button key={item.status} type="button" className="statBarRow" onClick={() => onOpenStatus(item.status)} title={`${item.label} ${item.count}건`}>
-                <span className="statBarName">{item.label}</span>
-                <span className="statBarTrack"><span className="statBarFill" style={{ width: `${(item.count / maxStatusCount) * 100}%` }} /></span>
-                <span className="statBarNum">{item.count}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="statCard statCardWide">
-          <span className="statCardLabel">역할별 대기 건수</span>
-          {summary.pendingByRole.length === 0 ? (
-            <p className="statEmpty">대기 중인 처리 건이 없습니다.</p>
-          ) : (
-            <div className="statBars">
-              {summary.pendingByRole.map((item) => (
-                <div key={item.role} className="statBarRow" title={`${roleLabels[item.role]} ${item.count}건`}>
-                  <span className="statBarName">{roleLabels[item.role]}</span>
-                  <span className="statBarTrack"><span className="statBarFill amber" style={{ width: `${(item.count / maxRolePending) * 100}%` }} /></span>
-                  <span className="statBarNum">{item.count}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
       <section className="dashboardPanel workflowOverview">
         <div className="panelHeader compact">
           <div className="workflowSummary">
@@ -3171,8 +3137,10 @@ function DashboardOverview({
             </select>
           </label>
         </div>
-        {serviceFlows.map((flow) => (
-          <div className="serviceFlow" key={flow.service}>
+        {serviceFlows.map((flow) => {
+          const serviceTone = flow.service === '카피킬러' ? 'copykiller' : flow.service === '프리즘' ? 'prism' : flow.service === '몬스터' ? 'monster' : 'default'
+          return (
+          <div className={`serviceFlow ${serviceTone}`} key={flow.service}>
             <div className="serviceFlowHead">
               <strong>{flow.service}</strong>
               <span>{flow.total}개 프로젝트</span>
@@ -3224,7 +3192,8 @@ function DashboardOverview({
               })}
             </div>
           </div>
-        ))}
+          )
+        })}
       </section>
     </section>
   )
@@ -4474,8 +4443,9 @@ function SettingsPanel({
 }
 
 function Metric({ icon, label, value, tone, onClick }: { icon: ReactNode; label: string; value: number; tone: string; onClick: () => void }) {
+  const disabled = value === 0
   return (
-    <button className={`metric ${tone}`} type="button" onClick={onClick}>
+    <button className={`metric ${tone}`} type="button" onClick={onClick} disabled={disabled} aria-disabled={disabled}>
       <div>{icon}</div>
       <span>{label}</span>
       <strong>{value}</strong>

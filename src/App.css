@@ -1,3 +1,7 @@
+*, *::before, *::after {
+  line-height: 1.1;
+}
+
 html {
   /* 스크롤바 자리를 항상 확보해 단계 이동 시 본문 폭이 변하지 않도록 */
   scrollbar-gutter: stable;
@@ -97,7 +101,7 @@ html {
   display: grid;
   place-items: center;
   border: 1px solid #d8dbe1;
-  border-radius: 7px;
+  border-radius: 8px;
   color: #5f6670;
   background: #fff;
 }
@@ -172,7 +176,7 @@ button {
   text-align: left;
   background: transparent;
   color: #5f6670;
-  border-radius: 7px;
+  border-radius: 8px;
 }
 
 .navItem {
@@ -216,7 +220,7 @@ button {
   height: 22px;
   display: grid;
   place-items: center;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #e1e3e8;
   font-size: 12px;
 }
@@ -241,7 +245,7 @@ button {
   height: 36px;
   border: 1px solid #cfd2d8;
   background: #fff;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 0 8px;
   font-size: 12px;
 }
@@ -293,7 +297,7 @@ button {
   color: #fff;
   font-size: 12px;
   font-weight: 600;
-  border-radius: 6px;
+  border-radius: 8px;
   white-space: nowrap;
   z-index: 9999;
   pointer-events: none;
@@ -378,14 +382,14 @@ button {
   height: 40px;
   padding: 0 12px;
   border: 1px solid #dfe3ea;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #fff;
   cursor: pointer;
 }
 .roleSwitchBtn:hover { background: #f4f6f9; }
-.roleSwitchLabel { font-size: 13px; font-weight: 800; color: #6b7280; }
-.roleSwitchCurrent { font-size: 13px; font-weight: 800; color: #2b323d; }
-.roleSwitchChevron { font-size: 11px; color: #8a909a; }
+.roleSwitchLabel { font-size: 14px; font-weight: 800; color: #6b7280; }
+.roleSwitchCurrent { font-size: 14px; font-weight: 800; color: #2b323d; }
+.roleSwitchChevron { font-size: 14px; color: #8a909a; }
 .roleSwitchPanel {
   position: absolute;
   top: 48px;
@@ -396,7 +400,7 @@ button {
   padding: 6px;
   background: #fff;
   border: 1px solid #e2e5ea;
-  border-radius: 12px;
+  border-radius: 8px;
   box-shadow: 0 12px 32px rgba(20, 30, 50, 0.16);
   z-index: 60;
   display: flex;
@@ -430,7 +434,7 @@ button {
   align-items: center;
   justify-content: center;
   border: 1px solid #dfe3ea;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #fff;
   color: #4b515c;
   cursor: pointer;
@@ -463,7 +467,7 @@ button {
   overflow-y: auto;
   background: #fff;
   border: 1px solid #e2e5ea;
-  border-radius: 12px;
+  border-radius: 8px;
   box-shadow: 0 12px 32px rgba(20, 30, 50, 0.16);
   z-index: 60;
 }
@@ -492,7 +496,7 @@ button {
   gap: 9px;
   padding: 9px 10px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 8px;
   background: transparent;
   cursor: pointer;
   text-align: left;
@@ -533,7 +537,7 @@ button {
 .roleControl select {
   height: 30px;
   border: 1px solid #cfd3da;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
   color: #20242b;
   font-size: 12px;
@@ -550,7 +554,7 @@ button {
   height: 30px;
   padding: 0 10px;
   border: 1px solid #cfd3da;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
   color: #20242b;
   font-size: 12px;
@@ -587,7 +591,7 @@ button {
   width: 100%;
   padding: 8px 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: #2a2f37;
   font-size: 13px;
@@ -634,7 +638,7 @@ button {
   padding: 28px;
   background: #fff;
   border: 1px solid #dcdfe4;
-  border-radius: 14px;
+  border-radius: 8px;
   box-shadow: 0 18px 48px rgba(15, 23, 42, 0.1);
 }
 
@@ -651,7 +655,7 @@ button {
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: 8px;
   background: linear-gradient(180deg, #d4f0df, #aee0c1);
   color: #0f5132;
 }
@@ -673,13 +677,13 @@ button {
   gap: 4px;
   padding: 4px;
   background: #f1f3f6;
-  border-radius: 9px;
+  border-radius: 8px;
 }
 
 .authTabs button {
   padding: 8px 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: #6b7280;
   font-size: 13px;
@@ -729,7 +733,7 @@ button {
   border-radius: 8px;
   background: #fdecea;
   color: #b3261e;
-  font-size: 12.5px;
+  font-size: 12px;
 }
 
 .authNotice {
@@ -744,7 +748,7 @@ button {
 .authSubmit {
   height: 44px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 8px;
   background: #1c7a4d;
   color: #fff;
   font-size: 14px;
@@ -816,7 +820,7 @@ button {
   padding: 10px;
   background: #fff;
   border: 1px solid #dcdfe4;
-  border-radius: 10px;
+  border-radius: 8px;
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
   display: grid;
   gap: 8px;
@@ -846,7 +850,7 @@ button {
   width: 100%;
   padding: 9px 10px;
   border: 1px solid #f0d3d0;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fdecea;
   color: #b3261e;
   font-size: 13px;
@@ -879,7 +883,7 @@ button {
 .serviceFilterControl select {
   height: 30px;
   border: 1px solid #cfd3da;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
   color: #20242b;
   font-size: 12px;
@@ -982,11 +986,23 @@ h3 {
 
 .metric > strong {
   grid-area: value;
+  justify-self: center;
+  text-align: center;
 }
 
 .metric:hover {
   transform: translateY(-1px);
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+.metric:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.metric:disabled:hover {
+  transform: none;
+  box-shadow: none;
 }
 
 .metric:focus-visible {
@@ -1179,10 +1195,38 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 /* 서비스별 단계 흐름 — 각 서비스를 한 행(라벨 + 6단계 칸반)으로 표시 */
 .serviceFlow {
   margin-top: 16px;
+  padding: 10px;
+  border: 1px solid var(--service-border, #eceef2);
+  border-radius: 8px;
+  background: var(--service-bg, #fff);
 }
 
 .serviceFlow:first-of-type {
   margin-top: 8px;
+}
+
+.serviceFlow.copykiller {
+  --service-bg: #f4f8ff;
+  --service-border: #c9dcff;
+  --service-accent: #2b6cf0;
+}
+
+.serviceFlow.prism {
+  --service-bg: #f7f4ff;
+  --service-border: #d9ccff;
+  --service-accent: #6d4fd0;
+}
+
+.serviceFlow.monster {
+  --service-bg: #f2fbf6;
+  --service-border: #c9ead8;
+  --service-accent: #149e5f;
+}
+
+.serviceFlow.default {
+  --service-bg: #fafbfc;
+  --service-border: #e0e4ea;
+  --service-accent: #5a6473;
 }
 
 .serviceFlowHead {
@@ -1190,13 +1234,13 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   align-items: baseline;
   gap: 10px;
   padding: 0 2px 8px;
-  border-bottom: 1px solid #eceef2;
-  margin-bottom: 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--service-accent, #5a6473) 18%, transparent);
+  margin-bottom: 8px;
 }
 
 .serviceFlowHead strong {
   font-size: 14px;
-  color: #1d2330;
+  color: var(--service-accent, #1d2330);
   letter-spacing: -0.2px;
 }
 
@@ -1513,7 +1557,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   justify-content: space-between;
   align-items: center;
   border: 1px solid #d9dde4;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fff;
   color: #20242b;
   text-align: left;
@@ -1568,7 +1612,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   padding: 0 7px;
   display: inline-flex;
   align-items: center;
-  border-radius: 6px;
+  border-radius: 8px;
   color: #9a6d00;
   background: #fff1cc;
   font-size: 10px;
@@ -1638,7 +1682,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 
 .kanbanEmpty {
   padding: 18px 12px;
-  border-radius: 7px;
+  border-radius: 8px;
   color: #98a0aa;
   background: rgba(255, 255, 255, 0.5);
   font-size: 12px;
@@ -1651,7 +1695,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   display: grid;
   align-content: space-between;
   border: 1px solid #e3e5e9;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fbfbfc;
   color: #20242b;
   text-align: left;
@@ -1685,7 +1729,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   padding: 12px;
   display: grid;
   align-content: space-between;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #f3f5f8;
 }
 
@@ -1734,7 +1778,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   row-gap: 6px;
   align-items: center;
   border: 1px solid #e3e5e9;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fff;
   color: #20242b;
   text-align: left;
@@ -1802,7 +1846,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   margin: 0;
   padding: 16px;
   border: 1px dashed #d5d8de;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fbfbfc;
 }
 
@@ -1840,7 +1884,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   display: inline-block;
   margin: 0 2px;
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: 8px;
   background: #eef1ff;
   color: #3b5bdb;
   font-weight: 800;
@@ -1891,7 +1935,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   height: 34px;
   padding: 0 10px;
   border: 1px solid #d8dbe1;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fff;
   color: #4b515c;
   font-size: 12px;
@@ -1913,7 +1957,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .flowPanel {
   background: #fff;
   border: 1px solid #dcdfe4;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 22px 24px 28px;
 }
 
@@ -1930,50 +1974,60 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   line-height: 1.55;
 }
 
-.flowLegend {
+.flowSimpleGuide {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 18px;
-  margin: 16px 0 10px;
-  padding: 12px 14px;
+  gap: 10px;
+  margin: 14px 0 10px;
+  padding: 10px 12px;
   border: 1px solid #eceef2;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #fafbfc;
 }
 
-.flowLegendItem {
-  display: inline-flex;
+.flowSimpleRule {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
   align-items: center;
   gap: 7px;
-  font-size: 12.5px;
-  font-weight: 600;
+  min-width: 0;
   color: #4b515c;
 }
 
-.flowLegendItem i {
-  width: 15px;
-  height: 15px;
-  border-radius: 4px;
-  border: 1.5px solid;
+.flowSimpleRule svg {
+  color: #2b6cf0;
   flex-shrink: 0;
+}
+
+.flowSimpleRule strong {
+  font-size: 12px;
+  font-weight: 900;
+  color: #20242b;
+  white-space: nowrap;
+}
+
+.flowSimpleRule span {
+  min-width: 0;
+  font-size: 12px;
+  color: #606772;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 가로 스텝 카드 흐름도 — ①~⑥ 한 줄 정렬 + 분기 노드 */
 .flowStage {
   margin: 0 0 12px;
-  padding: 16px 14px;
+  padding: 12px 12px;
   border: 1px solid #eceef2;
-  border-radius: 12px;
+  border-radius: 8px;
   background: #fbfcfe;
-  /* 폭이 좁으면 패널 밖으로 나가지 않고 패널 안에서 가로 스크롤 */
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: hidden;
 }
-/* 스크롤되는 실제 콘텐츠(=SVG·카드·분기노드를 한 덩어리로). 내용 폭만큼 넓어짐 */
 .flowStageInner {
   position: relative;
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
+  min-width: 0;
 }
 .flowLines {
   position: absolute;
@@ -1989,19 +2043,22 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .flowStrip {
   position: relative;
   z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 32px;
 }
 .flowConnector {
-  flex: 1 1 auto;
+  position: absolute;
+  top: 50%;
+  left: -32px;
+  width: 32px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
-  min-width: 24px;
-  padding: 0 2px;
+  transform: translateY(-50%);
   color: #1c9d5b;
 }
 .flowConnectorLabel {
@@ -2011,18 +2068,20 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   white-space: nowrap;
 }
 .flowStep {
-  flex: 0 0 110px;
-  width: 110px;
-  height: 96px;
+  position: relative;
+  width: calc(100% - 10px);
+  min-width: 0;
+  min-height: 138px;
+  justify-self: center;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 6px 6px;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 10px 10px;
   border: 1.5px solid;
-  border-radius: 12px;
+  border-radius: 8px;
   text-align: center;
   background: #fff;
 }
@@ -2030,24 +2089,38 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  font-size: 14px;
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
   font-weight: 800;
 }
 .flowStepTitle {
-  font-size: 12.5px;
-  font-weight: 800;
-  line-height: 1.3;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.1;
   color: #1d2330;
 }
-.flowStepRole {
-  display: flex;
-  flex-direction: column;
+.flowStepOwner {
+  display: inline-flex;
+  justify-content: center;
+  width: 100%;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
   font-size: 11px;
-  font-weight: 600;
-  line-height: 1.35;
-  opacity: 0.85;
+  font-weight: 900;
+}
+.flowStepWork,
+.flowStepDone {
+  display: block;
+  width: 100%;
+  font-size: 11px;
+  font-weight: 700;
+  color: #3f4651;
+  text-align: left;
+}
+.flowStepDone {
+  color: #15724b;
 }
 /* 분기 노드 (반려·보류) — 메인 행 아래, SVG 점선으로 연결 */
 .flowBranchLane {
@@ -2056,7 +2129,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   display: flex;
   justify-content: center;
   gap: 80px;
-  margin-top: 64px;
+  margin-top: 48px;
 }
 .flowBranchNode {
   display: flex;
@@ -2078,24 +2151,24 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 
 /* 단계 색 = 담당 역할 */
 .flowStep.requester { border-color: #2f6bd8; background: #f4f8ff; }
-.flowStep.requester .flowStepNum, .flowStep.requester .flowStepRole { color: #14386e; }
+.flowStep.requester .flowStepNum, .flowStep.requester .flowStepOwner { color: #14386e; }
 .flowStep.pm { border-color: #6d4fd0; background: #f6f3ff; }
-.flowStep.pm .flowStepNum, .flowStep.pm .flowStepRole { color: #392487; }
+.flowStep.pm .flowStepNum, .flowStep.pm .flowStepOwner { color: #392487; }
 .flowStep.multi { border-color: #9b51c4; background: #faf3fd; }
-.flowStep.multi .flowStepNum, .flowStep.multi .flowStepRole { color: #5a1d7a; }
+.flowStep.multi .flowStepNum, .flowStep.multi .flowStepOwner { color: #5a1d7a; }
 .flowStep.dev { border-color: #149e7e; background: #f0fbf7; }
-.flowStep.dev .flowStepNum, .flowStep.dev .flowStepRole { color: #0c5a47; }
+.flowStep.dev .flowStepNum, .flowStep.dev .flowStepOwner { color: #0c5a47; }
 .flowStep.qa { border-color: #d98324; background: #fff8f0; }
-.flowStep.qa .flowStepNum, .flowStep.qa .flowStepRole { color: #7a4500; }
+.flowStep.qa .flowStepNum, .flowStep.qa .flowStepOwner { color: #7a4500; }
 .flowStep.admin { border-color: #5a6473; background: #f4f5f8; }
-.flowStep.admin .flowStepNum, .flowStep.admin .flowStepRole { color: #2b323d; }
+.flowStep.admin .flowStepNum, .flowStep.admin .flowStepOwner { color: #2b323d; }
 
 .flowDiagram {
   position: relative;
   margin-top: 10px;
   padding: 0;
   border: 1px solid #eceef2;
-  border-radius: 10px;
+  border-radius: 8px;
   background:
     linear-gradient(#f4f6f9 1px, transparent 1px) 0 0 / 22px 22px,
     linear-gradient(90deg, #f4f6f9 1px, transparent 1px) 0 0 / 22px 22px,
@@ -2144,7 +2217,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   gap: 4px;
   padding: 4px;
   border: 1px solid #e1e5eb;
-  border-radius: 9px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 2px 8px rgba(20, 23, 28, 0.08);
   backdrop-filter: blur(4px);
@@ -2157,7 +2230,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   width: 30px;
   height: 30px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #f4f6f9;
   color: #2b323d;
   cursor: pointer;
@@ -2286,7 +2359,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .primaryButton {
   border: 1px solid #d8dbe1;
   background: #fff;
-  border-radius: 7px;
+  border-radius: 8px;
 }
 
 .iconButton {
@@ -2326,7 +2399,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   padding: 0 10px;
   gap: 6px;
   border: 1px solid #d8dbe1;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fafafa;
   color: #6b7280;
 }
@@ -2339,7 +2412,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   gap: 5px;
   padding: 0 12px;
   border: 1px solid #cdd6e4;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fff;
   color: #2b6cf0;
   font-size: 12px;
@@ -2382,7 +2455,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   align-items: center;
   gap: 8px;
   border: 1px solid #d8dbe1;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fafafa;
 }
 
@@ -2406,7 +2479,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   min-height: 38px;
   padding: 0 14px;
   border: 1px solid #d8dbe1;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fff;
   color: #5f6670;
   font-size: 12px;
@@ -2449,7 +2522,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   display: grid;
   gap: 2px;
   border: 1px solid #dfe2e7;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fbfbfc;
   color: #5f6670;
   text-align: left;
@@ -2598,7 +2671,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   height: 38px;
   padding: 0 12px;
   border: 1px solid #d8dbe1;
-  border-radius: 7px;
+  border-radius: 8px;
   font-size: 13px;
 }
 
@@ -2681,7 +2754,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 
 .holdTag {
   padding: 2px 7px;
-  border-radius: 4px;
+  border-radius: 8px;
   background: #c98a1a;
   color: #fff;
   font-size: 10px;
@@ -2696,7 +2769,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   gap: 10px;
   border: 1px solid #e0c878;
   border-left: 4px solid #c98a1a;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fff8e6;
   color: #6b4a07;
   font-size: 13px;
@@ -2704,7 +2777,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 
 .holdBanner strong {
   padding: 2px 8px;
-  border-radius: 5px;
+  border-radius: 8px;
   background: #c98a1a;
   color: #fff;
   font-size: 11px;
@@ -2725,7 +2798,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   top: 8px;
   right: 8px;
   padding: 2px 7px;
-  border-radius: 4px;
+  border-radius: 8px;
   background: #c98a1a;
   color: #fff;
   font-size: 10px;
@@ -2918,7 +2991,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   display: inline-flex;
   align-items: center;
   padding: 3px 9px;
-  border-radius: 5px;
+  border-radius: 8px;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.4px;
@@ -2987,7 +3060,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   gap: 10px;
   padding: 6px 10px;
   border: 1px solid #e3e5e9;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
   font-size: 12px;
 }
@@ -3058,7 +3131,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   padding: 16px 18px;
   background: #fff;
   border: 1px solid #e3e5e9;
-  border-radius: 10px;
+  border-radius: 8px;
   box-shadow: 0 1px 0 rgba(15, 23, 42, 0.02);
 }
 
@@ -3067,7 +3140,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   gap: 6px;
   min-width: 0;
   padding: 10px 12px;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fafbfc;
   border: 1px solid #eef0f3;
 }
@@ -3086,7 +3159,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 }
 
 .requesterField strong {
-  font-size: 17px;
+  font-size: 16px !important;
   font-weight: 800;
   color: #1a1f27;
   letter-spacing: -0.3px;
@@ -3109,7 +3182,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 
 .richEditorWrap {
   border: 1px solid #d8dbe1;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
   overflow: hidden;
 }
@@ -3130,7 +3203,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   padding: 0 6px;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: 8px;
   color: #2a2f37;
   font-size: 12px;
   font-family: inherit;
@@ -3209,7 +3282,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .richEditorContent code {
   background: #eef0f3;
   padding: 1px 4px;
-  border-radius: 3px;
+  border-radius: 8px;
   font-size: 12px;
 }
 
@@ -3217,7 +3290,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   background: #20242b;
   color: #f7f8fa;
   padding: 10px 12px;
-  border-radius: 5px;
+  border-radius: 8px;
   font-size: 12px;
   overflow-x: auto;
   white-space: pre;
@@ -3334,7 +3407,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .richEditorView code {
   background: #eef0f3;
   padding: 1px 4px;
-  border-radius: 3px;
+  border-radius: 8px;
   font-size: 12px;
 }
 
@@ -3342,7 +3415,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   background: #20242b;
   color: #f7f8fa;
   padding: 10px 12px;
-  border-radius: 5px;
+  border-radius: 8px;
   font-size: 12px;
   overflow-x: auto;
   white-space: pre;
@@ -3411,7 +3484,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   min-width: 0;
   padding: 12px;
   border: 1px solid #e1e5eb;
-  border-radius: 9px;
+  border-radius: 8px;
   background: #fff;
 }
 
@@ -3473,7 +3546,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   box-sizing: border-box;
   resize: vertical;
   border: 1px solid #d8dbe1;
-  border-radius: 7px;
+  border-radius: 8px;
   padding: 7px 9px;
   font-size: 12px;
   font-family: inherit;
@@ -3500,7 +3573,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   margin-top: 10px;
   width: 100%;
   border: 1px solid #e1e5eb;
-  border-radius: 9px;
+  border-radius: 8px;
   overflow: hidden;
   background: #fff;
 }
@@ -3646,7 +3719,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   width: 100%;
   padding: 9px 11px;
   border: 1px solid #cfd3da;
-  border-radius: 7px;
+  border-radius: 8px;
   font-size: 12.5px;
   font-family: inherit;
   resize: vertical;
@@ -3699,7 +3772,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   width: min(960px, 100%);
   max-height: 88vh;
   background: #fff;
-  border-radius: 10px;
+  border-radius: 8px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
@@ -3730,7 +3803,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   line-height: 1;
   color: #98a0aa;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 .modalClose:hover {
@@ -3794,7 +3867,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   height: 36px;
   padding: 0 12px;
   border: 1px solid #cfd3da;
-  border-radius: 7px;
+  border-radius: 8px;
   font-size: 13px;
 }
 
@@ -3826,7 +3899,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   height: 34px;
   padding: 0 10px;
   border: 1px solid #cfd3da;
-  border-radius: 7px;
+  border-radius: 8px;
   font-size: 12.5px;
   color: #c0392b;
   background: #fff;
@@ -3844,7 +3917,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   min-width: 64px;
   height: 34px;
   padding: 0 14px;
-  border-radius: 7px;
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 800;
   cursor: pointer;
@@ -3877,7 +3950,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   margin-top: 10px;
   padding: 12px;
   border: 1px solid #f1bcbc;
-  border-radius: 9px;
+  border-radius: 8px;
   background: #fff7f7;
   display: flex;
   flex-direction: column;
@@ -3896,7 +3969,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .rejectPreset {
   text-align: left;
   padding: 6px 10px;
-  border-radius: 7px;
+  border-radius: 8px;
   border: 1px solid #e3d3d3;
   background: #fff;
   color: #5a4646;
@@ -3915,7 +3988,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   width: 100%;
   resize: vertical;
   border: 1px solid #e0c4c4;
-  border-radius: 7px;
+  border-radius: 8px;
   padding: 8px;
   font-size: 13px;
   font-family: inherit;
@@ -3929,7 +4002,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   min-width: 64px;
   height: 34px;
   padding: 0 14px;
-  border-radius: 7px;
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 800;
   cursor: pointer;
@@ -3944,7 +4017,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   margin-top: 10px;
   width: 100%;
   border: 1px solid #e1e5eb;
-  border-radius: 9px;
+  border-radius: 8px;
   background: #fff;
   overflow: hidden;
 }
@@ -4078,7 +4151,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   min-height: 56px;
   padding: 8px 10px;
   border: 1px solid #cfd3da;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 12px;
   font-family: inherit;
   resize: vertical;
@@ -4186,7 +4259,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   min-height: 38px;
   padding: 8px 12px;
   border: 1px solid #d8dbe1;
-  border-radius: 7px;
+  border-radius: 8px;
   font-size: 13px;
   line-height: 1.5;
   background: #fff;
@@ -4232,7 +4305,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   gap: 4px;
   background: #f3eeff;
   border: 1px solid #d9caf8;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 6px 12px;
   color: #6d3fd1;
   font-size: 12px;
@@ -4280,7 +4353,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 
 .qaBadge {
   padding: 1px 7px;
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 10px;
   font-weight: 800;
 }
@@ -4350,7 +4423,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .stageCommentList li {
   padding: 8px 10px;
   border: 1px solid #e8ebef;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #faf8ff;
 }
 
@@ -4396,7 +4469,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .logViewToggle {
   display: inline-flex;
   border: 1px solid #d8dbe1;
-  border-radius: 7px;
+  border-radius: 8px;
   overflow: hidden;
 }
 .logViewToggle button {
@@ -4522,7 +4595,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .sectionInquiryList li {
   padding: 8px 10px;
   border: 1px solid #e8ebef;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #faf8ff;
 }
 
@@ -4570,7 +4643,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .inlineTaskForm select {
   padding: 7px 10px;
   border: 1px solid #d8dbe1;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 12px;
   background: #fff;
   min-width: 0;
@@ -4667,7 +4740,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   display: flex;
   flex-direction: column;
   background: #fff;
-  border-radius: 12px;
+  border-radius: 8px;
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.4);
   overflow: hidden;
 }
@@ -4743,7 +4816,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   color: #2a2f37;
   background: #fbfbfc;
   border: 1px solid #e3e5e9;
-  border-radius: 6px;
+  border-radius: 8px;
   max-height: 360px;
   overflow-y: auto;
 }
@@ -4795,7 +4868,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   min-height: 36px;
   padding: 0 10px;
   border: 1px solid #d8dbe1;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fff;
   font-size: 13px;
 }
@@ -4813,7 +4886,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   font-size: 12px;
   font-weight: 700;
   padding: 0 12px;
-  border-radius: 7px;
+  border-radius: 8px;
 }
 
 .scheduleCompare.onTime {
@@ -4856,7 +4929,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .commentList li {
   padding: 8px 10px;
   border: 1px solid #e8ebef;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
 }
 
@@ -4892,7 +4965,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   flex: 1;
   padding: 6px 10px;
   border: 1px solid #d8dbe1;
-  border-radius: 5px;
+  border-radius: 8px;
   font-size: 12px;
   background: #fff;
 }
@@ -4942,13 +5015,13 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   font-style: normal;
   background: #f6f7f9;
   padding: 4px 8px;
-  border-radius: 5px;
+  border-radius: 8px;
   margin-top: 2px;
 }
 
 .attachmentBadge {
   padding: 2px 7px;
-  border-radius: 5px;
+  border-radius: 8px;
   background: #f0f2f6;
   color: #555d68;
   font-size: 11px;
@@ -5042,7 +5115,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   height: 42px;
   padding: 0 12px;
   border: 1px solid #cfd3da;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fff;
   color: #20242b;
   font-size: 13px;
@@ -5096,12 +5169,12 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   background: #fff8e6;
   border: 1px solid #f3d792;
   padding: 5px 10px;
-  border-radius: 7px;
+  border-radius: 8px;
 }
 
 .flowStepper {
   list-style: none;
-  margin: 0 0 22px;
+  margin: 14px 0 22px;
   padding: 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -5168,7 +5241,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   padding: 10px 14px;
   border-left: 3px solid #1c7a4d;
   background: #f4faf6;
-  border-radius: 0 7px 7px 0;
+  border-radius: 0 8px 8px 0;
   font-size: 12.5px;
   color: #14532d;
 }
@@ -5188,7 +5261,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   padding: 12px 14px;
   border: 1.5px solid #e1e5eb;
   background: #fff;
-  border-radius: 9px;
+  border-radius: 8px;
   text-align: left;
   cursor: pointer;
   /* 모든 상태에서 박스 크기가 동일하게 유지되도록 box-shadow/transform 사용하지 않음 */
@@ -5304,7 +5377,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 
 .flowStepActions {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 10px;
   margin-top: 18px;
   padding-top: 14px;
@@ -5315,7 +5388,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   margin-top: 12px;
   padding: 14px 16px;
   border: 1px dashed #cfd3da;
-  border-radius: 9px;
+  border-radius: 8px;
   background: #fafbfc;
 }
 
@@ -5405,9 +5478,9 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 }
 
 .fieldHint {
-  margin: 0 0 14px;
+  margin: 0 0 6px;
   color: #606772;
-  line-height: 1.55;
+  line-height: 1.1;
 }
 
 .securityReviewEditor {
@@ -5429,7 +5502,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   min-height: 72px;
   padding: 10px 11px;
   border: 1px solid #cfd3da;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fff;
   color: #20242b;
   font-size: 12px;
@@ -5455,7 +5528,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   align-items: center;
   justify-content: center;
   border: 1px solid #d6dbe3;
-  border-radius: 6px;
+  border-radius: 8px;
   color: #5f6670;
   background: #fbfbfc;
   font-size: 12px;
@@ -5473,14 +5546,14 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 }
 
 .requestTypeHint {
-  margin: 10px 0 0;
+  margin: 6px 0 0;
   color: #606772;
   line-height: 1.55;
 }
 
 .approvalPreset {
-  margin-top: 12px;
-  padding: 5px;
+  margin-top: 8px;
+  padding: 8px;
   border: 1px solid #e0e4ea;
   border-radius: 8px;
   background: #fbfbfc;
@@ -5495,12 +5568,12 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 
 .requestForm {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .requestForm fieldset {
   margin: 0;
-  padding: 18px;
+  padding: 12px;
   border: 1px solid #dfe2e7;
   border-radius: 8px;
 }
@@ -5542,7 +5615,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   min-width: 0;
   box-sizing: border-box;
   border: 1px solid #cfd3da;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fff;
   color: #20242b;
   outline: 0;
@@ -5601,7 +5674,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   align-items: center;
   min-height: 22px;
   padding: 0 8px;
-  border-radius: 5px;
+  border-radius: 8px;
   color: #4a5260;
   background: transparent;
   border: 1px solid #c9ced6;
@@ -5755,9 +5828,9 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   white-space: nowrap;
   min-height: 24px;
   padding: 0 10px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 900;
   background: #eef0f3;
   color: #555d68;
   letter-spacing: -0.2px;
@@ -5996,7 +6069,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 12px;
   font-weight: 800;
 }
@@ -6033,7 +6106,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   gap: 6px;
   padding: 0 10px;
   border: 1px solid #d8dde5;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
 }
 
@@ -6201,7 +6274,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .progressTrack {
   height: 10px;
   overflow: hidden;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #eceef2;
 }
 
@@ -6259,7 +6332,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   display: inline-grid;
   place-items: center;
   text-align: center;
-  border-radius: 6px;
+  border-radius: 8px;
   color: #555d68;
   background: #eef0f3;
   font-size: 12px;
@@ -6277,7 +6350,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   min-height: 30px;
   display: grid;
   place-items: center;
-  border-radius: 7px;
+  border-radius: 8px;
   color: #555d68;
   background: #f1f3f6;
   font-size: 12px;
@@ -6288,7 +6361,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   min-height: 30px;
   display: grid;
   place-items: center;
-  border-radius: 7px;
+  border-radius: 8px;
   color: #555d68;
   background: #f1f3f6;
   font-size: 12px;
@@ -6331,7 +6404,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   margin-bottom: 14px;
   padding: 10px;
   border: 1px solid #e3e5e9;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #f7f8fa;
   font-size: 12px;
 }
@@ -6359,7 +6432,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   width: 100%;
   height: 34px;
   border: 1px solid #cfd3da;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fff;
   color: #20242b;
   padding: 0 8px;
@@ -6396,7 +6469,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   gap: 5px;
   padding: 0 8px;
   border: 1px solid #dfe3e8;
-  border-radius: 6px;
+  border-radius: 8px;
   color: #39414c;
   background: #fff;
   font-size: 12px;
@@ -6411,7 +6484,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .attachmentThumb {
   width: 18px;
   height: 18px;
-  border-radius: 3px;
+  border-radius: 8px;
   object-fit: cover;
   flex-shrink: 0;
   border: 1px solid #d6dbe2;
@@ -6465,7 +6538,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   align-items: start;
   padding: 12px;
   border: 1px solid #e3e5e9;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fff;
 }
 
@@ -6490,7 +6563,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   display: inline-flex;
   align-items: center;
   padding: 0 7px;
-  border-radius: 6px;
+  border-radius: 8px;
   color: #555d68;
   background: #f1f3f6;
   font-size: 11px;
@@ -6682,7 +6755,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   gap: 9px;
   padding: 10px;
   border: 1px solid #e3e5e9;
-  border-radius: 7px;
+  border-radius: 8px;
 }
 
 .artifact.done {
@@ -7081,7 +7154,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
     align-items: center;
     gap: 2px;
     padding: 6px 4px;
-    border-radius: 6px;
+    border-radius: 8px;
     text-align: center;
     min-height: 50px;
   }
