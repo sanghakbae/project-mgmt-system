@@ -136,8 +136,10 @@ export function SystemFlowPanel() {
                   <ChevronRight size={20} />
                 </div>
               )}
-              <span className="flowStepNum">{stage.num}</span>
-              <strong className="flowStepTitle">{stage.title}</strong>
+              <div className="flowStepTitleRow">
+                <span className="flowStepNum">{stage.num}</span>
+                <strong className="flowStepTitle">{stage.title}</strong>
+              </div>
               <span className="flowStepOwner">담당: {stage.owner}</span>
               <span className="flowStepWork">{stage.work}</span>
               <span className="flowStepDone">다음: {stage.done}</span>
