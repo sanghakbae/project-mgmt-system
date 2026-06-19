@@ -505,10 +505,12 @@ button {
 .notifTag {
   flex-shrink: 0;
   margin-top: 1px;
-  padding: 2px 8px;
+  padding: 2px 6px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 800;
+  min-width: 58px;
+  text-align: center;
 }
 .notifTag.action { background: #e7f0ff; color: #2b6cf0; }
 .notifTag.overdue { background: #d14343; color: #fff; }
@@ -965,7 +967,7 @@ h3 {
     "icon label"
     "value value";
   column-gap: 12px;
-  row-gap: 16px;
+  row-gap: 4px;
   align-items: center;
   border-radius: 8px;
   border: 0;
@@ -1484,6 +1486,12 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   border-color: #c8e2d1;
 }
 
+.kanbanColumn.phase1 .kanbanColumnHeader,
+.kanbanColumn.phase2 .kanbanColumnHeader,
+.kanbanColumn.phase3 .kanbanColumnHeader {
+  background: linear-gradient(135deg, #f4f5f7 0%, #e8eaed 100%);
+  border-color: #d0d3d9;
+}
 .kanbanColumn.phase1 .kanbanHeaderMeta small {
   color: #2767b3;
 }
@@ -1555,8 +1563,8 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   min-height: 72px;
   padding: 10px 12px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  position: relative;
   border: 1px solid #d9dde4;
   border-radius: 8px;
   background: #fff;
@@ -1598,13 +1606,24 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 }
 
 .kanbanHeaderCount {
-  display: grid;
-  justify-items: end;
-  gap: 4px;
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
 }
 
 .kanbanColumnHeader strong {
-  font-size: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 50%;
+  background: #20242b;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
   line-height: 1;
 }
 
@@ -2092,19 +2111,19 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: flex-start;
   gap: 6px;
   padding: 10px 10px;
   border: 1.5px solid;
   border-radius: 8px;
-  text-align: center;
+  text-align: left;
   background: #fff;
 }
 .flowStepTitleRow {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 6px;
   width: 100%;
 }
@@ -2126,7 +2145,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 }
 .flowStepOwner {
   display: inline-flex;
-  justify-content: center;
+  justify-content: flex-start;
   width: 100%;
   padding: 3px 6px;
   border-radius: 999px;
@@ -2575,10 +2594,13 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   display: flex;
   flex-direction: column;
   gap: 8px;
-  /* 항목이 적으면 스크롤 없이 그대로 보이고, 길어지면(예: 관리자 전체) 이 영역만 내부 스크롤 */
-  max-height: 42vh;
+  /* 3개 카드까지만 표시하고 이후 내부 스크롤 (42px × 3 + 8px × 2 + 여백) */
+  max-height: 148px;
   overflow-y: auto;
   padding: 3px 3px 4px;
+}
+.projectList .projectCard {
+  flex-shrink: 0;
 }
 
 /* 프로젝트 카드가 하나도 없으면 영역 자체를 숨김 (검색·필터·헤더 카드는 그대로 유지) */
@@ -2966,6 +2988,47 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   line-height: 1.5;
 }
 
+.skipReasonField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+}
+.skipReasonField > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #92400e;
+}
+.skipReasonField > span em {
+  font-style: normal;
+  color: #e53e3e;
+}
+.skipReasonField input,
+.skipReasonField textarea {
+  font-size: 12px;
+  border: 1px solid #fcd34d;
+  border-radius: 4px;
+  padding: 6px 8px;
+  resize: vertical;
+  background: #fff;
+  width: 100%;
+  box-sizing: border-box;
+}
+.skipReasonField input:focus,
+.skipReasonField textarea:focus {
+  outline: none;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245,158,11,0.15);
+}
+strong.required {
+  color: #e53e3e;
+  font-weight: 700;
+}
+
 .srsReadView {
   display: grid;
   gap: 14px;
@@ -3147,9 +3210,20 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   align-items: center;
 }
 
+/* 요청자 작성 내용 헤더 — 제목은 좌측, 수정 버튼은 우측 상단 */
+.requesterContent > .panelHeader.compact {
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.requesterContent > .panelHeader.compact .requesterContentBadges {
+  flex-shrink: 0;
+}
+
 .requesterSummary {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* 하단 정보 3개(대상 서비스·요청자·희망 완료일)를 한 행에 — 3열 */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 16px;
   padding: 16px 18px;
@@ -4868,11 +4942,18 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .scheduleDateRow {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   gap: 16px;
 }
 
-.scheduleDateRow label,
+/* 착수·완료 예정일: 라벨과 캘린더를 인라인(한 행)으로 */
+.scheduleDateRow label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
 .scheduleReadItem {
   display: flex;
   flex-direction: column;
@@ -4921,6 +5002,46 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .scheduleCompare.late {
   color: #c0392b;
   background: #fdf3f1;
+}
+
+/* 희망일은 희망사항일 뿐 — 개발 확정 일정이 더 늦어도 '지연'이 아닌 중립 정보로 표시 */
+.scheduleCompare.info {
+  color: #3a6ea5;
+  background: #eef4fb;
+}
+
+/* 완료·반려 배너: 텍스트 좌 · 액션 우, 세로 중앙 한 행 */
+.actionBanner.rowAction {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.actionBanner.rowAction > div:first-child {
+  flex: 1 1 auto;
+  width: auto;
+}
+.actionBanner.rowAction .actionButtons {
+  width: auto;
+  flex-shrink: 0;
+}
+
+/* 완료 처리(게시) 완료 배지 — .actionBanner span(display:block) 덮어쓰기 방지 위해 specificity 상향 */
+.actionBanner .publishedBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  min-height: 38px;
+  margin-top: 0;
+  padding: 0 16px;
+  border-radius: 8px;
+  background: #e9f7ef;
+  color: #1c7a4d;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .scheduleField,
@@ -5317,6 +5438,8 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .flowStepperItem.pending .flowStepperBtn {
   color: #98a0aa;
   background: #fafbfc;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* 사용자가 클릭해 '보고 있는' 단계 표시 (현재 단계가 아닐 때 강조)
@@ -5617,6 +5740,10 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.formGrid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .securityReviewWide {
   grid-column: 1 / -1;
 }
@@ -5784,16 +5911,45 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 }
 
 .cardMeta {
-  display: flex;
+  /* 고정폭 그리드로 행마다 열(서비스·분류·우선순위·담당팀·D-day) 정렬 — 내용에 맞춰 타이트하게 */
+  display: grid;
+  grid-template-columns: 54px 92px 28px 76px 44px;
   align-items: center;
+  justify-items: start;
   flex-shrink: 0;
-  gap: 8px;
+  gap: 6px;
   margin-top: 0;
   color: #7b818b;
   font-size: 12px;
 }
+/* 각 셀 내용이 열 폭을 넘으면 말줄임 (정렬 유지) */
+.cardMeta > * {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* D-day는 우측 정렬 */
+.cardMeta > .ddayPill {
+  justify-self: end;
+}
 
 .projectCard .statusPill {
+  flex-shrink: 0;
+}
+
+.serviceBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 4px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
   flex-shrink: 0;
 }
 
@@ -5972,6 +6128,13 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   padding: 0 14px;
   font-size: 13px;
 }
+.actionBanner .actionButtons .primaryButton:disabled {
+  height: 38px;
+  min-height: 38px;
+  padding: 0 14px;
+  font-size: 13px;
+  cursor: not-allowed;
+}
 
 .holdBanner + .actionBanner {
   margin-top: 8px;
@@ -6002,6 +6165,36 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   justify-content: flex-end;
 }
 
+/* 요청/기획 단계 배너: 메시지+토글+버튼은 한 행 고정, 사유 입력란은 그 아래 */
+.actionBanner.simpleAction {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 8px 14px;
+}
+.actionBanner.simpleAction .simpleActionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+.actionBanner.simpleAction .simpleActionRow > strong {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.actionBanner.simpleAction .actionButtons {
+  width: auto;
+  flex-shrink: 0;
+}
+/* 단계 진행 버튼: 상하 여백 축소 */
+.actionBanner.simpleAction .actionButtons .primaryButton,
+.actionBanner.simpleAction .actionButtons .primaryButton:disabled {
+  height: 32px;
+  min-height: 32px;
+  padding: 0 14px;
+}
+
 .actionBanner strong,
 .actionBanner span {
   display: block;
@@ -6019,6 +6212,56 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   margin-top: 3px;
   color: #606772;
   font-size: 12px;
+}
+
+.planningSkipSlider {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: #606772;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.planningSkipSlider > span:last-child {
+  display: inline;
+  color: inherit;
+  font-size: inherit;
+}
+.sliderTrack {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  min-width: 36px;
+  background: #d0d3d9;
+  border-radius: 999px;
+  transition: background 0.18s ease;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.planningSkipSlider.active .sliderTrack {
+  background: #d9271e;
+}
+.sliderThumb {
+  position: absolute !important;
+  display: block !important;
+  top: 3px !important;
+  left: 3px !important;
+  width: 14px !important;
+  height: 14px !important;
+  margin: 0 !important;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: left 0.18s ease;
+}
+.planningSkipSlider.active .sliderThumb {
+  left: 19px !important;
 }
 
 .actionButtons {
@@ -6096,6 +6339,24 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   border-radius: 8px;
   font-size: 12px;
   font-weight: 800;
+  cursor: default;
+  border: 1px solid transparent;
+}
+
+button.approvalPill {
+  cursor: pointer;
+  transition: opacity 0.12s ease;
+}
+
+button.approvalPill:hover {
+  opacity: 0.8;
+}
+
+.approvalPill.unchecked {
+  color: #9aa0ab;
+  border-color: #dfe2e7;
+  background: #f4f5f7;
+  text-decoration: line-through;
 }
 
 .approvalPill.pending {
@@ -6111,7 +6372,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 }
 
 .approvalGuide {
-  margin-top: 7px;
+  margin: 7px 0 0;
   color: #606772;
   font-size: 12px;
 }
@@ -6600,6 +6861,50 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   background: #ffe4e2;
 }
 
+/* 일감 수정 버튼 — 메타 줄 우측 */
+.taskEditBtn {
+  margin-left: auto;
+  min-height: 22px;
+  padding: 0 9px;
+  border: 1px solid #d8dbe1;
+  border-radius: 8px;
+  background: #fff;
+  color: #4a515c;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.taskEditBtn:hover {
+  background: #f4f6f9;
+  border-color: #c2c7cf;
+}
+.taskDeleteBtn {
+  min-height: 22px;
+  padding: 0 9px;
+  border: 1px solid #f0c8c4;
+  border-radius: 8px;
+  background: #fff;
+  color: #c0392b;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.taskDeleteBtn:hover {
+  background: #fdf3f1;
+  border-color: #e6a9a2;
+}
+.taskEditForm {
+  margin-top: 8px;
+}
+/* 일감 수정 폼의 취소/저장 버튼은 작게 */
+.taskEditForm .inlineTaskActions .primaryButton,
+.taskEditForm .inlineTaskActions .miniButton {
+  min-height: 30px;
+  height: 30px;
+  padding: 0 14px;
+  font-size: 12px;
+}
+
 .ticketMeta .priority.low {
   color: #087343;
   background: #ddf7ea;
@@ -6616,31 +6921,39 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   color: #7b818b;
 }
 
-.taskBody p {
-  margin: 6px 0 0;
-  color: #555d68;
+/* 라벨 + 값 구조로 가독성 확보 — 내용이 적어도 무슨 항목인지 명확 */
+.taskField {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #eef0f3;
   font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
-
-.statusNote {
-  color: #20242b;
+.taskFieldLabel {
+  color: #8a909a;
   font-weight: 700;
+  white-space: nowrap;
 }
-
-.statusNoteLabel {
-  display: block;
-  margin-bottom: 2px;
+.taskFieldValue {
+  min-width: 0;
+  color: #2a2f37;
+  word-break: break-word;
 }
-
-.statusNote .richEditorView {
-  font-weight: 500;
+.taskFieldValue.empty {
+  color: #b3b7be;
+  font-style: italic;
 }
-
-.statusNote .richEditorFallback {
+.taskFieldValue .richEditorView {
+  color: #2a2f37;
+}
+.taskFieldValue .richEditorFallback {
   margin: 0;
-  font-weight: 500;
-  color: #9aa0aa;
+  color: #b3b7be;
+  font-style: italic;
 }
 
 .taskStatusControl {
@@ -6720,7 +7033,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 }
 
 .requirementBlock {
-  padding: 14px 16px;
+  padding: 12px;
   border: 1px solid #e3e5e9;
   border-radius: 8px;
   background: #fff;
@@ -7338,7 +7651,8 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   }
 
   .formGrid,
-  .formGrid.two {
+  .formGrid.two,
+  .formGrid.three {
     grid-template-columns: 1fr !important;
   }
 

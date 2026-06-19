@@ -40,6 +40,7 @@ export type TaskAttachment = {
 export type WorkflowConfig = {
   requiresQcSecurity: boolean
   requiresPlanning?: boolean
+  skipReason?: string
 }
 
 export type ApprovalState = {
@@ -200,4 +201,5 @@ export type Project = {
   holdReason?: string
   rejectedReason?: string
   rejectedFromStatus?: ProjectStatus
+  published?: boolean
 }

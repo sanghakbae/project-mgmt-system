@@ -102,6 +102,14 @@ export type ProjectRow = {
   assignee_role: string
   tasks: Project['tasks']
   logs: Project['logs']
+  on_hold?: boolean
+  hold_reason?: string
+  review_docs?: { srs: string; sds: string }
+  schedule?: Project['schedule']
+  // 승인 필요 역할/워크플로 설정은 로그 메타뿐 아니라 전용 컬럼으로도 저장해 확실히 영속화
+  approval_state?: Project['approvalState']
+  workflow_config?: Project['workflowConfig']
+  published?: boolean
 }
 
 function normalizeAssigneeRole(role: string): Project['assigneeRole'] {
@@ -117,26 +125,34 @@ function normalizeAssigneeRole(role: string): Project['assigneeRole'] {
 }
 
 export function mapProjectRow(row: ProjectRow): Project {
+  const reviewDocsFromField = row.review_docs && (row.review_docs.srs || row.review_docs.sds) ? row.review_docs : null
+  const scheduleFromField = row.schedule && (row.schedule.plannedStart || row.schedule.plannedEnd || row.schedule.milestones || row.schedule.note) ? row.schedule : null
   const requestType =
     row.logs?.find((log) => log.meta?.requestType)?.meta?.requestType ?? inferRequestType(row)
   const workflowConfig =
-    row.logs?.find((log) => log.meta?.workflowConfig)?.meta?.workflowConfig ?? defaultWorkflowConfig
-  const savedApprovalState = row.logs?.find((log) => log.meta?.approvalState)?.meta?.approvalState
+    row.workflow_config ?? row.logs?.find((log) => log.meta?.workflowConfig)?.meta?.workflowConfig ?? defaultWorkflowConfig
+  const savedApprovalState =
+    (row.approval_state && Array.isArray(row.approval_state.requiredRoles) ? row.approval_state : null)
+    ?? row.logs?.find((log) => log.meta?.approvalState)?.meta?.approvalState
   const securityReview =
     row.logs?.find((log) => log.meta?.securityReview)?.meta?.securityReview ?? defaultSecurityReview
   const reviewDocs =
-    row.logs?.find((log) => log.meta?.reviewDocs)?.meta?.reviewDocs ?? defaultReviewDocs
+    reviewDocsFromField ?? row.logs?.find((log) => log.meta?.reviewDocs)?.meta?.reviewDocs ?? defaultReviewDocs
   const schedule =
-    row.logs?.find((log) => log.meta?.schedule)?.meta?.schedule ?? defaultSchedule
+    scheduleFromField ?? row.logs?.find((log) => log.meta?.schedule)?.meta?.schedule ?? defaultSchedule
   const comments = row.logs?.find((log) => log.meta?.comments)?.meta?.comments ?? []
   const qcSignoff = row.logs?.find((log) => log.meta?.qcSignoff)?.meta?.qcSignoff ?? { qa: false, security: false, pm: false }
   const requesterConfirmed = row.logs?.find((log) => log.meta?.requesterConfirmed !== undefined)?.meta?.requesterConfirmed ?? false
   const docsLocked = row.logs?.find((log) => log.meta?.docsLocked !== undefined)?.meta?.docsLocked ?? false
   const rejectedMeta = row.logs?.find((log) => log.meta?.rejectedReason)?.meta
   const baselineRoles = approvalRolesByRequestType[requestType]
+  // 요청 시 사용자가 고른 승인 대상(savedApprovalState.requiredRoles)을 우선 사용한다.
+  // 저장된 선택이 없을 때만 요청유형 기준 전체 역할로 폴백.
+  const savedRequired = (savedApprovalState?.requiredRoles ?? []).filter((item) => baselineRoles.includes(item))
+  const requiredRoles = savedRequired.length > 0 ? savedRequired : baselineRoles
   const approvalState = {
-    requiredRoles: baselineRoles,
-    approvedRoles: (savedApprovalState?.approvedRoles ?? []).filter((item) => baselineRoles.includes(item)),
+    requiredRoles,
+    approvedRoles: (savedApprovalState?.approvedRoles ?? []).filter((item) => requiredRoles.includes(item)),
     memos: savedApprovalState?.memos,
   }
   const hasSrs = reviewDocs.srs.trim().length > 0
@@ -199,6 +215,9 @@ export function mapProjectRow(row: ProjectRow): Project {
     docsLocked,
     rejectedReason: rejectedMeta?.rejectedReason,
     rejectedFromStatus: rejectedMeta?.rejectedFromStatus,
+    onHold: row.on_hold ?? false,
+    holdReason: row.hold_reason,
+    published: row.published ?? false,
   }
 }
 

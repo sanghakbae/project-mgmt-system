@@ -485,7 +485,7 @@ type ViewMode = 'dashboard' | 'requestFlow' | 'pipeline' | 'flow' | 'settings'
 
 type NotificationItem = {
   id: string
-  kind: 'approval' | 'qc' | 'due' | 'overdue'
+  kind: 'approval' | 'qc' | 'due' | 'overdue' | 'new_request'
   tone: 'action' | 'overdue' | 'soon'
   projectId: string
   projectTitle: string
@@ -508,7 +508,7 @@ type RequestFormState = {
   successMetric: string
   affectedUsers: string
   risk: string
-  skipPlanning?: boolean
+  selectedApprovalRoles: Role[]
   securityReview: SecurityReview
 }
 
@@ -550,8 +550,9 @@ function roleActsOnStatus(role: Role, status: ProjectStatus): boolean {
 
 function isProjectRelevantToRole(project: Project, role: Role) {
   if (role === 'admin') return true
-  // 요청자(영업·마케팅 포함)는 요청·기획 단계 프로젝트를 계속 열람/수정할 수 있어야 함
-  if (isRequesterRole(role) && ['request', 'planning'].includes(project.status)) return true
+  // 요청자(영업·마케팅 포함)는 본인이 올린 요청을 모든 단계에서 추적·열람할 수 있어야 함.
+  // (실제 작업/진행 권한은 canAct로 별도 제어 — 승인·개발 단계에서는 열람만 가능)
+  if (isRequesterRole(role)) return true
   if (project.status === 'dept_review') return project.approvalState.requiredRoles.includes(role)
   return isProjectAssignedToRole(project, role)
 }
@@ -605,6 +606,7 @@ const emptyRequestForm: RequestFormState = {
   successMetric: '',
   affectedUsers: '',
   risk: '',
+  selectedApprovalRoles: approvalRolesByRequestType['improvement'],
   securityReview: {
     dataClassification: '',
     accessScope: '',
@@ -714,6 +716,7 @@ function App() {
   const [listTeamFilter, setListTeamFilter] = useState<string>('all')
   const [listPriorityFilter, setListPriorityFilter] = useState<Priority | 'all'>('all')
   const [listTypeFilter, setListTypeFilter] = useState<ProjectRequestType | 'all'>('all')
+  const [listServiceFilter, setListServiceFilter] = useState<string>('all')
   const [loadState, setLoadState] = useState<'loading' | 'live' | 'error'>(hasFirebaseConfig ? 'loading' : 'error')
   const [viewMode, setViewMode] = useState<ViewMode>(restoredSession.viewMode ?? 'dashboard')
   // 프로젝트 상세에서 스텝퍼 클릭으로 보고 있는 단계(실제 프로젝트 상태와 별개)
@@ -734,6 +737,7 @@ function App() {
   const [requestForm, setRequestForm] = useState<RequestFormState>(emptyRequestForm)
   const [reviewDocsDrafts, setReviewDocsDrafts] = useState<Record<string, ReviewDocs>>({})
   const [scheduleDrafts, setScheduleDrafts] = useState<Record<string, ScheduleInfo>>({})
+  const [skipReasonDrafts, setSkipReasonDrafts] = useState<Record<string, string>>({})
   const [previewAttachment, setPreviewAttachment] = useState<{ name: string; type: string; dataUrl?: string; key?: string; size: number } | null>(null)
   const [srsCollapsed, setSrsCollapsed] = useState(false)
   const [sdsCollapsed, setSdsCollapsed] = useState(false)
@@ -863,7 +867,6 @@ function App() {
   }
   const selectedWorkflow = selected ? workflow.filter((item) => {
     if (item.status === 'qc_security') return selected.workflowConfig.requiresQcSecurity
-    if (item.status === 'planning') return isPlanningRequired(selected)
     return true
   }) : workflow
   const metrics = useMemo(() => {
@@ -895,7 +898,8 @@ function App() {
   const filteredProjects = useMemo(() => {
     return queueScopedProjects
       .filter((project) => {
-        if (statusFilter === 'mine') return isProjectAssignedToRole(project, role)
+        // 요청자는 본인 요청을 모든 단계에서 추적할 수 있도록 '내 프로젝트'에 전 단계 포함 (다른 역할은 본인 차례만)
+        if (statusFilter === 'mine') return isRequesterRole(role) ? isProjectRelevantToRole(project, role) : isProjectAssignedToRole(project, role)
         if (statusFilter === 'active') return !['completion', 'rejected'].includes(project.status)
         if (statusFilter === 'dueSoon') return daysUntil(project.dueDate, demoToday) <= 5 && !['completion', 'rejected'].includes(project.status)
         if (statusFilter === 'blocked') return project.onHold || project.tasks.some((task) => task.status === 'blocked')
@@ -907,8 +911,9 @@ function App() {
       .filter((project) => listTeamFilter === 'all' || project.ownerTeam === listTeamFilter)
       .filter((project) => listPriorityFilter === 'all' || project.priority === listPriorityFilter)
       .filter((project) => listTypeFilter === 'all' || project.requestType === listTypeFilter)
+      .filter((project) => listServiceFilter === 'all' || inferServiceOption(project, serviceOptions) === listServiceFilter)
       .filter((project) => `${project.title} ${project.summary} ${project.code}`.toLowerCase().includes(query.toLowerCase()))
-  }, [query, queueScopedProjects, statusFilter, role, listStatusFilter, listTeamFilter, listPriorityFilter, listTypeFilter])
+  }, [query, queueScopedProjects, statusFilter, role, listStatusFilter, listTeamFilter, listPriorityFilter, listTypeFilter, listServiceFilter, serviceOptions])
 
   // 담당 팀 필터 옵션 (현재 역할이 볼 수 있는 프로젝트 기준)
   const teamFilterOptions = useMemo(() => {
@@ -922,6 +927,10 @@ function App() {
     const items: NotificationItem[] = []
     for (const p of serviceScopedProjects) {
       if (p.onHold) continue
+      // PM에게 새 요청 접수 알림 — 기획 생략된 경우 PM이 할 일 없으므로 알림 제외
+      if (p.status === 'request' && isPlanningRequired(p) && (role === 'pm' || role === 'admin')) {
+        items.push({ id: `req-${p.id}`, kind: 'new_request', tone: 'action', projectId: p.id, projectTitle: p.title, text: '새 요청이 접수됐습니다. 기획 단계 진행이 필요합니다.' })
+      }
       // 내 승인 차례 (부서 승인 단계)
       if (p.status === 'dept_review' && p.approvalState.requiredRoles.includes(role) && !p.approvalState.approvedRoles.includes(role)) {
         items.push({ id: `appr-${p.id}`, kind: 'approval', tone: 'action', projectId: p.id, projectTitle: p.title, text: '내 승인 차례입니다.' })
@@ -1027,7 +1036,13 @@ function App() {
     selected && (
       role === 'admin' ||
       isProjectAssignedToRole(selected, role) ||
-      (selected.status === 'dept_review' && selectedApprovalState.requiredRoles.includes(role))
+      (selected.status === 'dept_review' && selectedApprovalState.requiredRoles.includes(role)) ||
+      (selected.status === 'request' && role === 'pm') ||
+      (selected.status === 'request' && role === 'requester' && !isPlanningRequired(selected)) ||
+      // 기획 생략 시 요청자가 직접 기획자(SRS/SDS 작성) 역할을 수행 — 기획 단계에서도 진행 가능
+      (selected.status === 'planning' && role === 'requester' && !isPlanningRequired(selected)) ||
+      // 개발 단계: PM·개발자가 진행(검토 단계로) 가능
+      (selected.status === 'development' && ['pm', 'developer'].includes(role))
     ),
   )
   const blockedTasks = selected?.tasks.filter((task) => task.status === 'blocked') ?? []
@@ -1043,7 +1058,9 @@ function App() {
   const isStepAdvanceBlocked = Boolean(
     selected?.onHold ||
     (selected?.status === 'dept_review' && pendingApprovalRoles.length > 0) ||
-    (selected?.status === 'planning' && !hasRequiredReviewDocs) ||
+    // SRS/SDS 문서를 만드는 유형(개념 A)에서만 문서 미완성 시 진행 차단.
+    // '기획 생략' 토글(개념 B)은 담당자만 바꿀 뿐 문서 필수 여부와 무관 — 생략 시에도 요청자가 직접 작성해야 함.
+    (selected?.status === 'planning' && planningRequiredByType[selected.requestType] && !hasRequiredReviewDocs) ||
     (selected?.status === 'qc_security' && !qcAllSignedOff) ||
     (selected?.status === 'completion' && !selected?.requesterConfirmed),
   )
@@ -1121,6 +1138,7 @@ function App() {
         progress: advancedProgress,
         next_action: nextAction,
         logs: nextLogs,
+        approval_state: approvalState,
       })
     } catch {
       setLoadState('error')
@@ -1135,7 +1153,7 @@ function App() {
         id: crypto.randomUUID(),
         at: logStamp(),
         actor: authorLabel,
-        message: 'PM이 기획 문서(SRS+SDS)를 업데이트했습니다.',
+        message: `${authorLabel}이(가) 기획 문서(SRS+SDS)를 업데이트했습니다.`,
         meta: { reviewDocs: currentReviewDocsDraft },
       },
       ...selected.logs,
@@ -1160,14 +1178,14 @@ function App() {
     })
     window.alert('기획 문서를 저장했습니다.')
 
-    void notifyGoogleChat('doc.update', `PM이 기획 문서를 업데이트했습니다.`, {
+    void notifyGoogleChat('doc.update', `${authorLabel}이(가) 기획 문서를 업데이트했습니다.`, {
       프로젝트: selected.title,
       코드: selected.code,
     })
 
     if (!hasFirebaseConfig) return
     try {
-      await updateProjectDoc(selected.id, { logs: nextLogs })
+      await updateProjectDoc(selected.id, { review_docs: currentReviewDocsDraft, logs: nextLogs })
     } catch {
       setLoadState('error')
     }
@@ -1215,7 +1233,7 @@ function App() {
 
     if (!hasFirebaseConfig) return
     try {
-      await updateProjectDoc(selected.id, { logs: nextLogs })
+      await updateProjectDoc(selected.id, { schedule: currentScheduleDraft, logs: nextLogs })
     } catch {
       setLoadState('error')
     }
@@ -1293,7 +1311,7 @@ function App() {
 
     if (!hasFirebaseConfig) return
     try {
-      await updateProjectDoc(projectId, { logs: nextLogs })
+      await updateProjectDoc(projectId, { on_hold: willHold, hold_reason: willHold ? reason : '', logs: nextLogs })
     } catch {
       setLoadState('error')
     }
@@ -1307,7 +1325,7 @@ function App() {
     if (!selected || !canAct) return
     if (selected.onHold) { window.alert('보류 중인 프로젝트입니다. 보류를 해제한 뒤 진행하세요.'); return }
     if (selected.status === 'dept_review' && pendingApprovalRoles.length > 0) return
-    if (selected.status === 'planning' && !hasRequiredReviewDocs) return
+    if (selected.status === 'planning' && planningRequiredByType[selected.requestType] && !hasRequiredReviewDocs) return
     if (selected.status === 'qc_security' && !qcAllSignedOff) { window.alert('QC·보안·PM 3자 검토가 모두 완료되어야 다음 단계로 진행할 수 있습니다.'); return }
     if (selected.status === 'completion' && !selected.requesterConfirmed) { window.alert('요청자 확인이 완료되어야 게시할 수 있습니다.'); return }
     // 개발 단계: 미완료 태스크가 있으면 확인
@@ -1328,7 +1346,10 @@ function App() {
       },
       ...selected.logs,
     ]
-    const nextAssigneeRole = nextRoleFor(targetStatus)
+    // 기획 생략(요청자가 직접 기획) 시, 기획 단계 담당을 요청자로 지정해 본인이 SRS/SDS 작성·진행
+    const nextAssigneeRole = (targetStatus === 'planning' && !isPlanningRequired(selected))
+      ? 'requester'
+      : nextRoleFor(targetStatus)
     const nextAction = nextActionFor(targetStatus)
     const nextProgress = Math.min(100, selected.progress + 12)
 
@@ -1398,6 +1419,10 @@ function App() {
     if (patch.assigneeRole) dbPatch.assignee_role = persistAssigneeRole(patch.assigneeRole)
     if (patch.nextAction) dbPatch.next_action = patch.nextAction
     if (patch.progress !== undefined) dbPatch.progress = patch.progress
+    // 승인 역할/워크플로 설정 변경은 전용 컬럼에도 영속화
+    if (patch.approvalState) dbPatch.approval_state = merged.approvalState
+    if (patch.workflowConfig) dbPatch.workflow_config = merged.workflowConfig
+    if (patch.published !== undefined) dbPatch.published = merged.published
     try {
       await updateProjectDoc(selected.id, dbPatch)
     } catch {
@@ -1466,6 +1491,18 @@ function App() {
     void notifyGoogleChat('project.approve', `요청자 확인 ${next ? '완료' : '취소'}`, { 프로젝트: selected.title })
   }
 
+  // 완료 보고 단계: 최종 완료 처리(게시) — 마지막 단계라 '단계 진행'이 아니라 완료/게시
+  async function finalizeProject() {
+    if (!selected || selected.status !== 'completion') return
+    if (!selected.requesterConfirmed) { window.alert('요청자 확인이 완료되어야 완료 처리(게시)할 수 있습니다.'); return }
+    if (selected.published) return
+    await patchSelectedProject(
+      { published: true, progress: 100, nextAction: '완료 처리(게시) 완료' },
+      '프로젝트를 완료 처리(게시)했습니다.',
+    )
+    void notifyGoogleChat('project.advance', '완료 처리(게시)', { 프로젝트: selected.title, 코드: selected.code })
+  }
+
   // 목표2: 단계별 문의 댓글 등록
   async function addProjectCommentForStage(stage: ProjectStatus, message: string, parentId?: string) {
     if (!selected) return
@@ -1513,10 +1550,10 @@ function App() {
     const now = new Date().toISOString()
     const projectCode = `PRJ-2505-${String(projects.length + 1).padStart(3, '0')}`
     const initialApprovalState: ApprovalState = {
-      requiredRoles: approvalRolesByRequestType[requestForm.requestType],
+      requiredRoles: requestForm.selectedApprovalRoles.length > 0 ? requestForm.selectedApprovalRoles : approvalRolesByRequestType[requestForm.requestType],
       approvedRoles: [],
     }
-    const newWorkflowConfig = { ...defaultWorkflowConfig, requiresPlanning: !(requestForm.skipPlanning ?? !planningRequiredByType[requestForm.requestType]) }
+    const newWorkflowConfig = { ...defaultWorkflowConfig, requiresPlanning: true }
     const newProject: Project = {
       id: crypto.randomUUID(),
       code: projectCode,
@@ -1586,6 +1623,8 @@ function App() {
       assignee_role: persistAssigneeRole(newProject.assigneeRole),
       tasks: newProject.tasks,
       logs: newProject.logs,
+      approval_state: initialApprovalState,
+      workflow_config: newWorkflowConfig,
     }
 
     let savedProject: Project
@@ -1683,6 +1722,59 @@ function App() {
     }
   }
 
+  // 일감 등록자(또는 관리 권한자)가 태스크 내용을 수정
+  async function editTaskInProject(projectId: string, taskId: string, patch: Partial<ProjectTask>) {
+    const target = projects.find((project) => project.id === projectId)
+    if (!target) return
+    const task = target.tasks.find((t) => t.id === taskId)
+    if (!task) return
+    const nextTasks = target.tasks.map((t) => (t.id === taskId ? { ...t, ...patch } : t))
+    const nextLogs = [
+      { id: crypto.randomUUID(), at: logStamp(), actor: authorLabel, message: `일감을 수정했습니다: ${patch.title ?? task.title}` },
+      ...target.logs,
+    ]
+    setProjects((current) =>
+      current.map((project) =>
+        project.id === projectId
+          ? { ...project, tasks: nextTasks, logs: nextLogs, updatedAt: new Date().toISOString() }
+          : project,
+      ),
+    )
+    if (!hasFirebaseConfig) return
+    try {
+      await updateProjectDoc(projectId, { tasks: nextTasks, logs: nextLogs })
+    } catch {
+      setLoadState('error')
+    }
+  }
+
+  // 일감 삭제
+  async function deleteTaskInProject(projectId: string, taskId: string) {
+    const target = projects.find((project) => project.id === projectId)
+    if (!target) return
+    const task = target.tasks.find((t) => t.id === taskId)
+    if (!task) return
+    if (!window.confirm(`일감 "${task.title}"을(를) 삭제할까요?`)) return
+    const nextTasks = target.tasks.filter((t) => t.id !== taskId)
+    const nextLogs = [
+      { id: crypto.randomUUID(), at: logStamp(), actor: authorLabel, message: `일감을 삭제했습니다: ${task.title}` },
+      ...target.logs,
+    ]
+    setProjects((current) =>
+      current.map((project) =>
+        project.id === projectId
+          ? { ...project, tasks: nextTasks, logs: nextLogs, updatedAt: new Date().toISOString() }
+          : project,
+      ),
+    )
+    if (!hasFirebaseConfig) return
+    try {
+      await updateProjectDoc(projectId, { tasks: nextTasks, logs: nextLogs })
+    } catch {
+      setLoadState('error')
+    }
+  }
+
 
   // 요청자/관리자: 요청 원본 내용 수정 (승인 전 단계만)
   async function updateRequesterContent(patch: Partial<Project>) {
@@ -1715,15 +1807,39 @@ function App() {
     }
   }
 
-  // PM/관리자: 기획 단계 필요 여부 토글
+  // 요청자/PM/관리자: 기획 단계 필요 여부 토글 (즉시 양방향 전환 — 사유는 인라인 입력란에서 별도로 받음)
   async function togglePlanningRequired() {
     if (!selected) return
-    if (!['pm', 'admin'].includes(role)) return
+    if (!['pm', 'admin', 'requester'].includes(role)) return
     if (selected.status !== 'request') { window.alert('기획 단계 설정은 요청 단계에서만 변경할 수 있습니다.'); return }
-    const next = !isPlanningRequired(selected)
+    const willSkip = isPlanningRequired(selected) // 현재 '포함'이면 이번 클릭으로 '생략'이 됨
+    if (willSkip) {
+      // 생략으로 전환 — requiresPlanning만 false로. 사유는 인라인 입력란에서 입력/저장한다.
+      await patchSelectedProject(
+        { workflowConfig: { ...selected.workflowConfig, requiresPlanning: false } },
+        '기획(SRS/SDS) 단계를 생략으로 설정했습니다. (사유 입력 필요)',
+      )
+    } else {
+      // 포함으로 되돌림 — skipReason 키는 제거(undefined 저장 금지)
+      const { skipReason: _omit, ...restConfig } = selected.workflowConfig
+      void _omit
+      setSkipReasonDrafts((d) => ({ ...d, [selected.id]: '' }))
+      await patchSelectedProject(
+        { workflowConfig: { ...restConfig, requiresPlanning: true } },
+        '기획(SRS/SDS) 단계를 포함으로 설정했습니다.',
+      )
+    }
+  }
+
+  // 기획 생략 사유 저장 (인라인 입력란 blur 시)
+  async function saveSkipReason() {
+    if (!selected || selected.status !== 'request') return
+    if (isPlanningRequired(selected)) return // 생략 상태일 때만 의미 있음
+    const reason = (skipReasonDrafts[selected.id] ?? selected.workflowConfig.skipReason ?? '').trim()
+    if (reason === (selected.workflowConfig.skipReason ?? '')) return // 변경 없으면 패치 생략
     await patchSelectedProject(
-      { workflowConfig: { ...selected.workflowConfig, requiresPlanning: next } },
-      `기획(SRS/SDS) 단계를 ${next ? '포함' : '생략'}으로 설정했습니다.`,
+      { workflowConfig: { ...selected.workflowConfig, requiresPlanning: false, skipReason: reason } },
+      reason ? `기획 생략 사유 입력 — ${reason}` : '기획 생략 사유를 비웠습니다.',
     )
   }
 
@@ -2008,6 +2124,18 @@ function App() {
                   ))}
                 </select>
               </div>
+              <div className="listFilterBox">
+                <select
+                  value={listServiceFilter}
+                  onChange={(event) => setListServiceFilter(event.target.value)}
+                  aria-label="서비스 필터"
+                >
+                  <option value="all">전체 서비스</option>
+                  {serviceOptions.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
               <button
                 type="button"
                 className="csvExportButton"
@@ -2037,6 +2165,7 @@ function App() {
                   <span className={`statusPill ${project.status}`}>{statusLabels[project.status]}</span>
                   <strong>{project.title}</strong>
                   <span className="cardMeta">
+                    <span className="serviceBadge">{inferServiceOption(project, serviceOptions)}</span>
                     <span className="requestTypePill">{requestTypeLabels[project.requestType]}</span>
                     <span className={`priority ${project.priority}`}>{priorityLabels[project.priority]}</span>
                     <span>{project.ownerTeam}</span>
@@ -2070,8 +2199,9 @@ function App() {
                       <button
                         type="button"
                         className="flowStepperBtn"
+                        disabled={state === 'pending'}
                         onClick={() => setViewedStageIndex(index)}
-                        title={`${item.label} 단계 보기`}
+                        title={state === 'pending' ? `${item.label} 단계는 아직 진행되지 않았습니다` : `${item.label} 단계 보기`}
                       >
                         <span className="flowStepNum">{state === 'done' ? <Check size={13} /> : index + 1}</span>
                         <span className="flowStepText">
@@ -2118,18 +2248,18 @@ function App() {
               </div>
             </section>
             ) : (
-            <section className={`requirementsPanel numberedSection sectionSrsSds ${role === 'pm' && !selected.docsLocked && selected.status === 'planning' ? 'neonHighlight' : ''}`} data-section="기획 (SRS+SDS)" data-section-tone="planning">
+            <section className={`requirementsPanel numberedSection sectionSrsSds ${['pm', 'requester'].includes(role) && !selected.docsLocked && selected.status === 'planning' ? 'neonHighlight' : ''}`} data-section="기획 (SRS+SDS)" data-section-tone="planning">
               <div className="panelHeader compact">
-                <h3>PM이 등록한 기획 문서 (SRS · SDS){role === 'pm' && !selected.docsLocked && selected.status === 'planning' && <span className="neonTag">작성 필요</span>}</h3>
-                <span>{selected.docsLocked ? '승인 완료 · 잠김 (수정하려면 이전 단계로 회송)' : role === 'pm' ? 'PM 작성 · 항목별 입력 · 첨부 가능' : 'PM이 작성하는 영역 · 읽기 전용'}</span>
+                <h3>기획 문서 (SRS · SDS)</h3>
+                <span>{selected.docsLocked ? '승인 완료 · 잠김 (수정하려면 이전 단계로 회송)' : ['pm', 'requester'].includes(role) ? '항목별 입력 · 첨부 가능' : '읽기 전용'}</span>
               </div>
-              {role === 'pm' && !selected.docsLocked ? (
+              {(['pm', 'requester'].includes(role) || role === 'admin') && !selected.docsLocked ? (
                 <>
                   <div className={`srsSdsRow ${srsCollapsed ? 'srsCollapsed' : ''} ${sdsCollapsed ? 'sdsCollapsed' : ''}`}>
                     <section className={`requirementsPanel docCard srsCard ${srsCollapsed ? 'collapsed' : ''}`}>
                       <div className="panelHeader compact docCardHeader" role="button" onClick={() => { const next = !srsCollapsed; setSrsCollapsed(next); if (next) setSdsCollapsed(false) }} title={srsCollapsed ? '펼치기' : '접기'}>
                         <h3><span className="docTag srsTag">SRS</span> <span className="docTitle">요구사항 정의서</span></h3>
-                        <span className="docSubtitle">PM 작성 · 항목별 입력 · 첨부 가능</span>
+                        <span className="docSubtitle">항목별 입력 · 첨부 가능</span>
                       </div>
                       <div className="requestForm securityReviewEditor">
                         <div className="srsSectionGroup">
@@ -2171,7 +2301,7 @@ function App() {
                     <section className={`requirementsPanel docCard sdsCard ${sdsCollapsed ? 'collapsed' : ''}`}>
                       <div className="panelHeader compact docCardHeader" role="button" onClick={() => { const next = !sdsCollapsed; setSdsCollapsed(next); if (next) setSrsCollapsed(false) }} title={sdsCollapsed ? '펼치기' : '접기'}>
                         <h3><span className="docTag sdsTag">SDS</span> <span className="docTitle">설계 명세서</span></h3>
-                        <span className="docSubtitle">PM 작성 · 설계 검토 · 첨부 가능</span>
+                        <span className="docSubtitle">설계 검토 · 첨부 가능</span>
                       </div>
                       <div className="requestForm securityReviewEditor">
                         <div className="formGrid">
@@ -2199,7 +2329,7 @@ function App() {
                   </div>
                   <div className="docSaveBar">
                     <button className="primaryButton" type="button" onClick={() => void updateSelectedReviewDocs()}>
-                      PM 문서 저장
+                      문서 저장
                     </button>
                   </div>
                 </>
@@ -2279,10 +2409,10 @@ function App() {
                         onChange={(e) => setScheduleDrafts((c) => ({ ...c, [selected.id]: { ...currentScheduleDraft, plannedEnd: e.target.value } }))}
                       />
                     </label>
-                    <span className={`scheduleCompare ${currentScheduleDraft.plannedEnd && currentScheduleDraft.plannedEnd > selected.dueDate ? 'late' : 'onTime'}`}>
+                    <span className={`scheduleCompare ${currentScheduleDraft.plannedEnd && currentScheduleDraft.plannedEnd > selected.dueDate ? 'info' : 'onTime'}`}>
                       {currentScheduleDraft.plannedEnd
                         ? currentScheduleDraft.plannedEnd > selected.dueDate
-                          ? `희망일보다 ${Math.ceil((new Date(currentScheduleDraft.plannedEnd).getTime() - new Date(selected.dueDate).getTime()) / 86_400_000)}일 지연`
+                          ? `희망일 +${Math.ceil((new Date(currentScheduleDraft.plannedEnd).getTime() - new Date(selected.dueDate).getTime()) / 86_400_000)}일 (개발 확정 일정)`
                           : '희망일 내 완료 예정'
                         : '완료 예정일 미정'}
                     </span>
@@ -2333,6 +2463,8 @@ function App() {
                   onStatusChange={changeTaskStatus}
                   onAddComment={(taskId, message) => void addTaskComment(taskId, message)}
                   onAddTask={(task) => void addTaskToProject(selected.id, task)}
+                  onEditTask={(taskId, patch) => void editTaskInProject(selected.id, taskId, patch)}
+                  onDeleteTask={(taskId) => void deleteTaskInProject(selected.id, taskId)}
                   onPreviewAttachment={setPreviewAttachment}
                   currentRole={role}
                   label={taskLabel}
@@ -2365,8 +2497,70 @@ function App() {
               </div>
             )}
 
+            {viewedStep === currentStep && ['request', 'planning', 'development'].includes(viewedStatus) && (() => {
+              const canEditSkip = viewedStatus === 'request' && ['pm', 'requester', 'admin'].includes(role)
+              const skipEnabled = !isPlanningRequired(selected)
+              const skipReasonValue = skipReasonDrafts[selected.id] ?? selected.workflowConfig.skipReason ?? ''
+              // 생략 사유 검증은 요청 단계에서만 적용
+              const skipReasonMissing = viewedStatus === 'request' && skipEnabled && skipReasonValue.trim().length === 0
+              const canAdvance = viewedStatus === 'request'
+                ? (['pm', 'admin'].includes(role) || (skipEnabled && role === 'requester'))
+                : viewedStatus === 'development'
+                  ? ['pm', 'developer', 'admin'].includes(role)
+                  : ['pm', 'requester', 'admin'].includes(role)
+              const isDisabled = !canAdvance || isStepAdvanceBlocked || selected.onHold || skipReasonMissing
+              const bannerMsg = selected.nextAction || (
+                viewedStatus === 'request' ? '요청 내용을 검토한 뒤 기획 단계로 진행하세요.'
+                : viewedStatus === 'development' ? '개발 완료 후 검토 단계로 진행하세요.'
+                : 'SRS·SDS 문서를 등록하면 승인 단계로 진행할 수 있습니다.')
+              return (
+            <div className="actionBanner simpleAction">
+              <div className="simpleActionRow">
+                <strong>{bannerMsg}</strong>
+                <div className="actionButtons">
+                  {canEditSkip && (
+                    <button
+                      type="button"
+                      className={`planningSkipSlider ${skipEnabled ? 'active' : ''}`}
+                      title="PM 기획 단계를 거치지 않고 요청자가 직접 기획·SRS/SDS를 작성"
+                      onClick={() => void togglePlanningRequired()}
+                    >
+                      <span className="sliderTrack">
+                        <span className="sliderThumb" />
+                      </span>
+                      <span>기획 생략</span>
+                    </button>
+                  )}
+                  <button
+                    className="primaryButton"
+                    type="button"
+                    disabled={isDisabled}
+                    title={skipReasonMissing ? '기획 생략 사유를 입력해야 진행할 수 있습니다.' : undefined}
+                    onClick={() => void advanceSelectedProject()}
+                  >
+                    <Send size={16} />
+                    단계 진행
+                  </button>
+                </div>
+              </div>
+              {skipEnabled && canEditSkip && (
+                <label className="skipReasonField">
+                  <span>기획 단계 생략 사유 <em>(필수)</em></span>
+                  <input
+                    type="text"
+                    value={skipReasonValue}
+                    placeholder="PM 기획 단계 없이 직접 기획·SRS/SDS를 작성하려는 사유를 입력하세요"
+                    onChange={(e) => setSkipReasonDrafts((d) => ({ ...d, [selected.id]: e.target.value }))}
+                    onBlur={() => void saveSkipReason()}
+                  />
+                </label>
+              )}
+            </div>
+              )
+            })()}
+
             {viewedStep === currentStep && ['dept_review', 'qc_security', 'completion', 'rejected'].includes(viewedStatus) && (
-            <div className={`actionBanner ${canAct && !selected.onHold ? 'neonHighlight' : ''}`} data-section="현재 단계 액션" data-section-tone="approval">
+            <div className={`actionBanner ${['completion', 'rejected'].includes(viewedStatus) ? 'rowAction' : ''} ${canAct && !selected.onHold ? 'neonHighlight' : ''}`} data-section="현재 단계 액션" data-section-tone="approval">
               <div>
                 <strong>{selected.status === 'dept_review' ? '승인 단계' : selected.status === 'qc_security' ? 'QC·보안·PM 3자 검토' : (canAct ? selected.nextAction : `${roleLabels[role]} 역할은 현재 단계에서 대기 상태입니다.`)}</strong>
                 <span>담당: {selected.status === 'qc_security' ? 'QC · 보안 · PM' : roleLabels[selected.assigneeRole]} · 마감 {formatDate(selected.dueDate)}</span>
@@ -2597,13 +2791,26 @@ function App() {
                 )}
               </div>
               <div className="actionButtons">
-                {selected.status === 'completion' && (role === 'requester' || role === 'admin') && (
+                {selected.status === 'completion' && !selected.published && (role === 'requester' || role === 'admin') && (
                   <button className="miniButton approveButton" type="button" onClick={() => void confirmByRequester()}>
                     요청자 확인 {selected.requesterConfirmed ? '취소' : '완료'}
                   </button>
                 )}
+                {selected.status === 'completion' && canAct && !selected.onHold && !isStepAdvanceBlocked && viewedStep === currentStep && (
+                  selected.published ? (
+                    <span className="publishedBadge"><Check size={15} /> 게시 완료</span>
+                  ) : (
+                    <button className="primaryButton" type="button" onClick={() => void finalizeProject()}>
+                      <Send size={16} />
+                      완료 처리
+                    </button>
+                  )
+                )}
                 {selected.status !== 'dept_review' &&
                   selected.status !== 'rejected' &&
+                  selected.status !== 'request' &&
+                  selected.status !== 'planning' &&
+                  selected.status !== 'completion' &&
                   !selected.onHold &&
                   canAct &&
                   !isStepAdvanceBlocked &&
@@ -2615,11 +2822,6 @@ function App() {
                   >
                     <Send size={16} />
                     단계 진행
-                  </button>
-                )}
-                {['pm', 'admin'].includes(role) && selected.status === 'request' && (
-                  <button className="miniButton" type="button" onClick={() => void togglePlanningRequired()}>
-                    {isPlanningRequired(selected) ? '기획 생략' : '기획 포함'}
                   </button>
                 )}
               </div>
@@ -3008,7 +3210,7 @@ function NotificationBell({ items, onOpenProject }: { items: NotificationItem[];
     window.addEventListener('click', close)
     return () => window.removeEventListener('click', close)
   }, [open])
-  const kindLabel: Record<NotificationItem['kind'], string> = { approval: '승인', qc: '검토', due: '임박', overdue: '지연' }
+  const kindLabel: Record<NotificationItem['kind'], string> = { approval: '승인', qc: '검토', due: '임박', overdue: '지연', new_request: '신규 요청' }
   return (
     <div className="notifBell" onClick={(e) => e.stopPropagation()}>
       <button type="button" className="notifBellBtn" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open} title="알림">
@@ -3204,6 +3406,8 @@ function ProjectTasksPanel({
   onStatusChange,
   onAddComment,
   onAddTask,
+  onEditTask,
+  onDeleteTask,
   onPreviewAttachment,
   currentRole,
   label = '개발 태스크(일감) 등록',
@@ -3212,6 +3416,8 @@ function ProjectTasksPanel({
   onStatusChange: (taskId: string, status: TaskStatus, statusNote: string) => void
   onAddComment: (taskId: string, message: string) => void
   onAddTask?: (task: ProjectTask) => void
+  onEditTask?: (taskId: string, patch: Partial<ProjectTask>) => void
+  onDeleteTask?: (taskId: string) => void
   onPreviewAttachment?: (attachment: { name: string; type: string; dataUrl?: string; key?: string; size: number }) => void
   currentRole: Role
   label?: string
@@ -3223,6 +3429,32 @@ function ProjectTasksPanel({
   const [taskFilter, setTaskFilter] = useState<TaskStatus>('todo')
   const emptyNewTask = { title: '', type: 'task' as IssueType, owner: '', priority: 'normal' as Priority, dueDate: '', note: '', attachments: [] as TaskAttachment[] }
   const [newTask, setNewTask] = useState(emptyNewTask)
+  // 일감 수정: 편집 중인 태스크 id + 임시 입력값
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [editTask, setEditTask] = useState({ title: '', type: 'task' as IssueType, owner: '', priority: 'normal' as Priority, dueDate: '' })
+
+  function startEditTask(task: ProjectTask) {
+    setEditingTaskId(task.id)
+    setEditTask({
+      title: task.title,
+      type: task.type ?? 'task',
+      owner: task.owner,
+      priority: task.priority ?? 'normal',
+      dueDate: task.dueDate ?? '',
+    })
+  }
+
+  function submitEditTask() {
+    if (!onEditTask || !editingTaskId || !editTask.title.trim()) return
+    onEditTask(editingTaskId, {
+      title: editTask.title.trim(),
+      type: editTask.type,
+      owner: editTask.owner.trim(),
+      priority: editTask.priority,
+      dueDate: editTask.dueDate,
+    })
+    setEditingTaskId(null)
+  }
 
   function handleNewTaskFiles(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -3430,14 +3662,59 @@ function ProjectTasksPanel({
                 <span>{task.key ?? project.code}</span>
                 <span>{issueTypeLabels[task.type ?? 'task']}</span>
                 <span className={`priority ${task.priority ?? 'normal'}`}>{priorityLabels[task.priority ?? 'normal']}</span>
+                {onEditTask && editingTaskId !== task.id && (
+                  <button type="button" className="taskEditBtn" onClick={() => startEditTask(task)}>수정</button>
+                )}
+                {onDeleteTask && editingTaskId !== task.id && (
+                  <button type="button" className="taskDeleteBtn" onClick={() => onDeleteTask(task.id)}>삭제</button>
+                )}
               </div>
-              <strong>{task.title}</strong>
-              <small>{statusLabels[task.stage ?? project.status]} · 담당 {task.owner} · 보고 {task.reporter ?? project.requester} · {formatDate(task.dueDate)} {(() => { const dd = dDayInfo(task.dueDate, demoToday); const tone = task.status === 'done' ? 'normal' : dd.tone; return <span className={`ddayPill ${tone}`}>{dd.label}</span> })()} · {task.estimate ?? 0}pt</small>
-              <p>{task.output || '산출물/완료 기준 미입력'}</p>
-              <p>{task.acceptanceCriteria || '인수 조건 미입력'}</p>
-              <div className="statusNote">
-                <span className="statusNoteLabel">최근 상태 메모</span>
-                <RichTextView html={task.statusNote ?? ''} fallback="아직 기록 없음" />
+              {onEditTask && editingTaskId === task.id ? (
+                <div className="inlineTaskForm taskEditForm">
+                  <div className="inlineTaskGrid">
+                    <input placeholder="태스크 제목" value={editTask.title} onChange={(e) => setEditTask((s) => ({ ...s, title: e.target.value }))} />
+                    <select value={editTask.type} onChange={(e) => setEditTask((s) => ({ ...s, type: e.target.value as IssueType }))}>
+                      <option value="task">Task (작업)</option>
+                      <option value="story">Story (스토리)</option>
+                      <option value="bug">Bug (버그)</option>
+                      <option value="change">Change (변경)</option>
+                      <option value="epic">Epic (에픽)</option>
+                    </select>
+                    <input placeholder="담당자" value={editTask.owner} onChange={(e) => setEditTask((s) => ({ ...s, owner: e.target.value }))} />
+                    <select value={editTask.priority} onChange={(e) => setEditTask((s) => ({ ...s, priority: e.target.value as Priority }))}>
+                      <option value="low">낮음</option>
+                      <option value="normal">보통</option>
+                      <option value="high">높음</option>
+                      <option value="urgent">긴급</option>
+                    </select>
+                    <input type="date" value={editTask.dueDate} onChange={(e) => setEditTask((s) => ({ ...s, dueDate: e.target.value }))} />
+                  </div>
+                  <div className="inlineTaskActions">
+                    <button className="miniButton" type="button" onClick={() => setEditingTaskId(null)}>취소</button>
+                    <button className="primaryButton" type="button" onClick={submitEditTask} disabled={!editTask.title.trim()}>저장</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <strong>{task.title}</strong>
+                  <small>{statusLabels[task.stage ?? project.status]} · 담당 {task.owner} · 보고 {task.reporter ?? project.requester} · {formatDate(task.dueDate)} {(() => { const dd = dDayInfo(task.dueDate, demoToday); const tone = task.status === 'done' ? 'normal' : dd.tone; return <span className={`ddayPill ${tone}`}>{dd.label}</span> })()} · {task.estimate ?? 0}pt</small>
+                </>
+              )}
+              {task.output?.trim() && (
+                <div className="taskField">
+                  <span className="taskFieldLabel">산출물 · 완료 기준</span>
+                  <span className="taskFieldValue">{task.output}</span>
+                </div>
+              )}
+              {task.acceptanceCriteria?.trim() && (
+                <div className="taskField">
+                  <span className="taskFieldLabel">인수 조건</span>
+                  <span className="taskFieldValue">{task.acceptanceCriteria}</span>
+                </div>
+              )}
+              <div className="taskField">
+                <span className="taskFieldLabel">최근 상태 메모</span>
+                <span className="taskFieldValue"><RichTextView html={task.statusNote ?? ''} fallback="아직 기록 없음" /></span>
               </div>
               {(task.attachments?.length ?? 0) > 0 && (
                 <div className="taskAttachments" aria-label={`${task.title} 첨부 파일`}>
@@ -3603,46 +3880,47 @@ function RequestFlowPanel({
         <p className="flowSectionLead">현재 작업 단계: <b>1 · 요청</b> — 요청자가 입력하는 단계입니다. 아래 정보를 모두 작성한 뒤 등록하면 다음 단계로 자동 진행됩니다.</p>
         <fieldset>
             <legend>요청 분류</legend>
-            <p className="fieldHint">요청 성격을 먼저 고르면 입력 문구와 승인 흐름이 맞춰집니다.</p>
             <div className="requestTypeSelector" role="tablist" aria-label="요청 분류 선택">
               {requestTypeOptions.map((item) => (
                 <button
                   key={item.type}
                   className={`requestTypeButton ${form.requestType === item.type ? 'active' : ''}`}
                   type="button"
-                  onClick={() => updateField('requestType', item.type)}
+                  onClick={() => setForm((s) => ({ ...s, requestType: item.type, selectedApprovalRoles: approvalRolesByRequestType[item.type] }))}
                 >
                   {item.label}
                 </button>
               ))}
             </div>
-            <p className="requestTypeHint">{config.intro}</p>
             <div className="approvalPreset">
               <strong>승인 필요 역할</strong>
               <div className="approvalSummary">
-                {requestApprovalRoles.map((item) => (
-                  <span key={item} className="approvalPill pending">{approvalStepLabels[item]}</span>
-                ))}
+                {requestApprovalRoles.map((item) => {
+                  const checked = form.selectedApprovalRoles.includes(item)
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      className={`approvalPill ${checked ? 'pending' : 'unchecked'}`}
+                      onClick={() => setForm((s) => ({
+                        ...s,
+                        selectedApprovalRoles: checked
+                          ? s.selectedApprovalRoles.filter((r) => r !== item)
+                          : [...s.selectedApprovalRoles, item],
+                      }))}
+                    >
+                      {approvalStepLabels[item]}
+                    </button>
+                  )
+                })}
               </div>
-              <p className="approvalGuide">이 요청 유형은 위 역할의 확인 완료 후 다음 단계로 진행됩니다.</p>
+              <p className="approvalGuide">체크된 역할만 승인이 필요합니다.</p>
             </div>
-            <label className="planningSkipToggle">
-              <input
-                type="checkbox"
-                checked={form.skipPlanning ?? !planningRequiredByType[form.requestType]}
-                onChange={(event) => updateField('skipPlanning', event.target.checked)}
-              />
-              <span>
-                <strong>기획 단계(SRS/SDS) 생략</strong>
-                <em>체크하면 기획 문서 작성 없이 요청 → 승인으로 바로 진행합니다.</em>
-              </span>
-            </label>
           </fieldset>
 
         <fieldset>
             <legend>기본 정보</legend>
-            <p className="fieldHint">누가 요청했고 어떤 서비스와 범위에 대한 요청인지 분명하게 남깁니다.</p>
-            <div className="formGrid two">
+            <div className="formGrid three">
               <label>
                 <span>요청 제목</span>
                 <input required value={form.title} onChange={(event) => updateField('title', event.target.value)} placeholder={config.titlePlaceholder} />
@@ -3678,7 +3956,6 @@ function RequestFlowPanel({
 
         <fieldset>
             <legend>요구사항 이해</legend>
-            <p className="fieldHint">이후 승인자, 개발, QC, 보안이 함께 참고할 기준 정보를 정리합니다.</p>
             <div className="formGrid">
               <label>
                 <span>{config.summaryLabel}</span>
@@ -3709,7 +3986,6 @@ function RequestFlowPanel({
 
         <fieldset>
             <legend>검토 · 제출</legend>
-            <p className="fieldHint">우선순위를 정하고 입력한 내용을 한 번 확인한 뒤 등록합니다.</p>
             <div className="formGrid two">
               <label>
                 <span>우선순위</span>
@@ -3730,7 +4006,6 @@ function RequestFlowPanel({
               <div className="flowReviewRow"><span>서비스 / 영역</span><strong>{form.serviceName} · {form.serviceArea || '—'}</strong></div>
               <div className="flowReviewRow"><span>요청자 / 부서</span><strong>{form.requester || '—'} · {form.ownerTeam || '—'}</strong></div>
               <div className="flowReviewRow"><span>희망 완료일</span><strong>{form.dueDate || '미정'}</strong></div>
-              <div className="flowReviewRow"><span>기획 단계</span><strong>{(form.skipPlanning ?? !planningRequiredByType[form.requestType]) ? '생략 (요청 → 승인)' : '포함 (SRS+SDS)'}</strong></div>
             </div>
           </fieldset>
 
