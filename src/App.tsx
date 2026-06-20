@@ -717,6 +717,8 @@ function App() {
   const [listPriorityFilter, setListPriorityFilter] = useState<Priority | 'all'>('all')
   const [listTypeFilter, setListTypeFilter] = useState<ProjectRequestType | 'all'>('all')
   const [listServiceFilter, setListServiceFilter] = useState<string>('all')
+  // 모바일: 필터 bottom sheet 열림 여부 (데스크톱은 항상 인라인 노출)
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false)
   const [loadState, setLoadState] = useState<'loading' | 'live' | 'error'>(hasFirebaseConfig ? 'loading' : 'error')
   const [viewMode, setViewMode] = useState<ViewMode>(restoredSession.viewMode ?? 'dashboard')
   // 프로젝트 상세에서 스텝퍼 클릭으로 보고 있는 단계(실제 프로젝트 상태와 별개)
@@ -914,6 +916,16 @@ function App() {
       .filter((project) => listServiceFilter === 'all' || inferServiceOption(project, serviceOptions) === listServiceFilter)
       .filter((project) => `${project.title} ${project.summary} ${project.code}`.toLowerCase().includes(query.toLowerCase()))
   }, [query, queueScopedProjects, statusFilter, role, listStatusFilter, listTeamFilter, listPriorityFilter, listTypeFilter, listServiceFilter, serviceOptions])
+
+  // 적용된 목록 필터(칩 표시용) — 모바일에서 한 줄로 압축 노출
+  const activeListFilters = [
+    listStatusFilter !== 'all' && { key: 'status', label: statusLabels[listStatusFilter] ?? '단계', clear: () => setListStatusFilter('all') },
+    listTeamFilter !== 'all' && { key: 'team', label: listTeamFilter, clear: () => setListTeamFilter('all') },
+    listPriorityFilter !== 'all' && { key: 'priority', label: priorityLabels[listPriorityFilter], clear: () => setListPriorityFilter('all') },
+    listTypeFilter !== 'all' && { key: 'type', label: requestTypeLabels[listTypeFilter], clear: () => setListTypeFilter('all') },
+    listServiceFilter !== 'all' && { key: 'service', label: listServiceFilter, clear: () => setListServiceFilter('all') },
+  ].filter(Boolean) as Array<{ key: string; label: string; clear: () => void }>
+  const clearAllListFilters = () => { setListStatusFilter('all'); setListTeamFilter('all'); setListPriorityFilter('all'); setListTypeFilter('all'); setListServiceFilter('all') }
 
   // 담당 팀 필터 옵션 (현재 역할이 볼 수 있는 프로젝트 기준)
   const teamFilterOptions = useMemo(() => {
@@ -1965,7 +1977,7 @@ function App() {
             <span>프로젝트 현황</span>
           </button>
           <button
-            className={`navItem ${viewMode === 'flow' ? 'active' : ''}`}
+            className={`navItem flowNavItem ${viewMode === 'flow' ? 'active' : ''}`}
             type="button"
             onClick={() => setViewMode('flow')}
             title="프로젝트 흐름도"
@@ -2074,6 +2086,27 @@ function App() {
                 <Search size={17} />
                 <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="프로젝트 검색" />
               </div>
+              {/* 모바일 전용: 필터 열기 버튼 */}
+              <button type="button" className="filterTriggerBtn" onClick={() => setFilterSheetOpen(true)}>
+                <SlidersHorizontal size={15} />
+                필터{activeListFilters.length > 0 && <b className="filterTriggerCount">{activeListFilters.length}</b>}
+              </button>
+              {/* 모바일 전용: 적용된 필터 칩 */}
+              {activeListFilters.length > 0 && (
+                <div className="filterChips">
+                  {activeListFilters.map((f) => (
+                    <button key={f.key} type="button" className="filterChip" onClick={f.clear} title={`${f.label} 필터 해제`}>
+                      {f.label} <span aria-hidden="true">✕</span>
+                    </button>
+                  ))}
+                  <button type="button" className="filterChipClear" onClick={clearAllListFilters}>전체 해제</button>
+                </div>
+              )}
+              <div className={`filterControls ${filterSheetOpen ? 'sheetOpen' : ''}`}>
+                <div className="filterSheetHeader">
+                  <strong>필터</strong>
+                  <button type="button" className="filterSheetClose" onClick={() => setFilterSheetOpen(false)} aria-label="필터 닫기">✕</button>
+                </div>
               <div className="listFilterBox">
                 <SlidersHorizontal size={15} />
                 <select
@@ -2136,6 +2169,12 @@ function App() {
                   ))}
                 </select>
               </div>
+                {/* 모바일 sheet 하단 액션 */}
+                <div className="filterSheetFooter">
+                  <button type="button" className="filterSheetReset" onClick={clearAllListFilters}>전체 해제</button>
+                  <button type="button" className="filterSheetApply" onClick={() => setFilterSheetOpen(false)}>적용</button>
+                </div>
+              </div>
               <button
                 type="button"
                 className="csvExportButton"
@@ -2153,6 +2192,8 @@ function App() {
                 <Download size={15} /> CSV
               </button>
             </div>
+            {/* 모바일 필터 시트 배경 */}
+            {filterSheetOpen && <div className="filterSheetBackdrop" onClick={() => setFilterSheetOpen(false)} aria-hidden="true" />}
 
             <div className="projectList">
               {filteredProjects.map((project) => (

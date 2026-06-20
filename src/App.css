@@ -7523,7 +7523,8 @@ button.approvalPill:hover {
 
   /* 본문 영역 하단 여백 (네비바 가림 방지) */
   .main {
-    padding: 14px 14px 96px;
+    /* 하단 고정 탭바(≈103px + safe-area)에 콘텐츠가 가리지 않도록 충분히 확보 */
+    padding: 14px 14px calc(112px + env(safe-area-inset-bottom, 0px));
   }
 
   /* 상단바 줄바꿈 + 컴팩트 */
@@ -7681,14 +7682,21 @@ button.approvalPill:hover {
   }
 
   /* 설정 페이지 모바일 */
+  /* 보류/삭제 버튼을 카드 우측 상단으로 */
   .projectHoldRow {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 5px;
   }
-
-  .projectHoldRow .miniButton {
-    align-self: flex-end;
+  .projectHoldRow .projectHoldInfo { flex: 1 1 auto; min-width: 0; }
+  .projectHoldRow .projectManageActions {
+    align-self: flex-start;
+    flex-shrink: 0;
   }
+  .projectHoldRow .miniButton { align-self: auto; }
+  /* 목록 간격 5px */
+  .projectHoldList { gap: 5px !important; margin-top: 5px !important; }
 
   /* 첨부 미리보기 모달 */
   .attachmentModal {
@@ -7776,33 +7784,765 @@ button.approvalPill:hover {
     grid-auto-columns: minmax(0, 1fr) !important;
   }
   .navItem span {
-    font-size: 8px !important;
+    font-size: 11px !important;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  /* ③ 폰트 정규화 — 모바일 최대 10px / 최소 8px */
-  /* 기본 본문 9px */
-  .appShell, .appShell p, .appShell span, .appShell div, .appShell a,
+  /* ③ 폰트 3단계 — 최대 12px / 중간 10px / 최소 8px */
+  /* 중간(본문·입력·버튼·리스트 텍스트) = 10px */
+  .appShell p, .appShell span, .appShell div, .appShell a,
   .appShell li, .appShell td, .appShell th, .appShell label,
   .appShell button, .appShell input, .appShell select, .appShell textarea,
-  .appShell h1, .appShell h2, .appShell h3, .appShell h4, .appShell strong, .appShell b, .appShell em, .appShell small {
-    font-size: 9px !important;
-    line-height: 1.35 !important;
-  }
-  /* 제목·핵심 수치 최대 10px */
-  .appShell h1, .appShell h2, .appShell h3,
-  .metric strong, .statCardValue, .workflowSummary strong,
-  .detailTitle, .projectCard strong, .kanbanCard strong, .flowStepTitle {
+  .appShell strong, .appShell b, .appShell em {
     font-size: 10px !important;
+    line-height: 1.4 !important;
   }
-  .statCardValue small, .metric span { font-size: 9px !important; }
-  /* 보조·메타·배지 최소 8px */
-  .appShell small, .cardMeta, .cardMeta *, .navItem span,
-  .flowConnectorLabel, .statCardSub, .statCardLabel, .statBarName, .statBarNum,
-  .ddayPill, .priority, .requestTypePill, .statusPill, .flowChip,
-  .notifItemText, .flowStepRole, .flowStepRole span {
+  /* 최대(화면 제목·KPI 수치·섹션 제목) = 12px */
+  .appShell h1, .appShell h2, .appShell h3, .appShell h4,
+  .appShell .detailTitle,
+  .appShell .metric strong, .appShell .statCardValue,
+  .appShell .workflowSummary strong {
+    font-size: 12px !important;
+  }
+  /* 최소(배지·메타·보조 라벨·캡션) = 8px (중간보다 높은 specificity로 고정) */
+  .appShell small, .appShell .cardMeta, .appShell .cardMeta *,
+  .appShell .statCardSub, .appShell .statCardLabel, .appShell .statBarName, .appShell .statBarNum,
+  .appShell .ddayPill, .appShell .priority, .appShell .requestTypePill, .appShell .statusPill,
+  .appShell .flowChip, .appShell .notifItemText, .appShell .metric span,
+  .appShell .flowConnectorLabel, .appShell .flowStepRole, .appShell .flowStepRole span,
+  .appShell .eyebrow, .appShell .flowCurrentStep,
+  .appShell .flowStepText strong, .appShell .flowStepText em {
     font-size: 8px !important;
+  }
+  /* 하단 탭바 라벨: 최소 8px */
+  .sidebar .navItem span { font-size: 11px !important; letter-spacing: -0.3px; }
+}
+
+/* =========================================================================
+   프로젝트 현황(목록) — CLAUDE.md 모바일 표준 적용
+   · 데스크톱(lg+)은 기존 인라인 필터 레이아웃 그대로 유지
+   · 모바일: 필터를 "필터" 버튼 → bottom sheet로 접고, 폰트/패딩 가독성 교정
+   ========================================================================= */
+
+/* 데스크톱 기본: 모바일 전용 요소 숨김, 필터는 인라인 흐름 유지 */
+.filterTriggerBtn,
+.searchFilterRow .filterChips,
+.filterSheetHeader,
+.filterSheetFooter,
+.filterSheetBackdrop {
+  display: none;
+}
+.filterControls {
+  display: contents; /* 래퍼 무시 → 5개 select가 기존처럼 searchFilterRow에 인라인 배치 */
+}
+
+@media (max-width: 768px) {
+  /* --- 필터: 트리거 버튼 + 칩 + bottom sheet --- */
+  .searchFilterRow .filterTriggerBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    height: 40px;
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid #cdd6e4;
+    border-radius: 8px;
+    background: #fff;
+    color: #2b323d;
+    font-size: 14px !important;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .searchFilterRow .filterTriggerCount {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: #2b6cf0;
+    color: #fff;
+    font-size: 11px !important;
+    font-weight: 800;
+  }
+
+  /* 적용된 필터 칩(한 줄 압축) */
+  .searchFilterRow .filterChips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+    margin: 2px 0 0;
+  }
+  .searchFilterRow .filterChip,
+  .searchFilterRow .filterChipClear {
+    height: 30px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid #cdd6e4;
+    background: #eef2ff;
+    color: #2b4a8f;
+    font-size: 13px !important;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .filterChipClear {
+    background: #fff;
+    color: #6b7280;
+  }
+  .searchFilterRow .filterChip span { font-size: 11px !important; opacity: 0.7; }
+
+  /* 기본 상태에서 select 묶음은 숨기고(시트로 이동), 검색은 항상 노출 */
+  .filterControls {
+    display: none;
+  }
+  .filterControls.sheetOpen {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    max-height: 82vh;
+    overflow-y: auto;
+    padding: 14px 16px calc(env(safe-area-inset-bottom, 12px) + 16px);
+    background: #fff;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -8px 30px rgba(15, 23, 42, 0.18);
+  }
+  .filterControls.sheetOpen .listFilterBox {
+    width: 100%;
+    height: 48px;
+    min-height: 48px;
+    padding: 0 12px;
+  }
+  .filterControls.sheetOpen .listFilterBox select {
+    width: 100%;
+    font-size: 16px !important; /* 14px 이상 + iOS 포커스 확대 방지 */
+    font-weight: 600;
+  }
+  .filterSheetHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 4px;
+  }
+  .filterControls .filterSheetHeader strong { font-size: 16px !important; font-weight: 800; }
+  .filterControls .filterSheetClose {
+    width: 32px; height: 32px;
+    border: 0; background: #f1f3f6; border-radius: 8px;
+    font-size: 15px !important; color: #5f6670; cursor: pointer;
+  }
+  .filterSheetFooter {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .filterControls .filterSheetReset,
+  .filterControls .filterSheetApply {
+    flex: 1 1 0;
+    height: 46px;
+    border-radius: 10px;
+    font-size: 15px !important;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .filterSheetReset { border: 1px solid #d8dbe1; background: #fff; color: #5f6670; }
+  .filterSheetApply { border: 0; background: #2b6cf0; color: #fff; }
+  .filterSheetBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(15, 23, 42, 0.4);
+  }
+
+  /* --- 검색창: 터치 타겟 확보 + 본문 14px --- */
+  .queuePanel .searchBox {
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 5px !important;
+    flex: 1 1 auto;
+  }
+  .queuePanel .searchBox input {
+    padding: 0 2px !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  /* --- 리스트 카드: 폰트 키우고(제목 14 / 메타 12 / 배지 12) 줄바꿈 허용 --- */
+  .queuePanel .projectList {
+    max-height: 52vh; /* 더 많은 카드가 첫 화면에 들어오도록 */
+  }
+  .queuePanel .projectCard {
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 2px;
+    column-gap: 5px;
+    padding: 2.5px 2px !important;
+  }
+  .queuePanel .projectCard strong {
+    flex: 1 1 auto;
+  }
+  .queuePanel .projectCard .statusPill {
+    height: 22px;
+  }
+  /* 메타 배지는 다음 줄로 내려 한 줄 가독성 확보 (폰트는 전역 3단계 8px 사용) */
+  .queuePanel .cardMeta {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .queuePanel .cardMeta .ddayPill { justify-self: auto; }
+}
+
+/* =========================================================================
+   새 요청/상세 헤더·스텝퍼 모바일 미세 교정 (CLAUDE.md: 개행 줄이고 정보 노출)
+   ========================================================================= */
+@media (max-width: 768px) {
+  /* ① 상단바: 역할 전환 + 알림을 우측 정렬 */
+  .topbarActions { justify-content: flex-end !important; }
+
+  /* ② 헤더 eyebrow / 현재 단계 배지: 줄바꿈 금지 + 폰트 축소 */
+  .requestPanel .eyebrow,
+  .detailHeaderPanel .eyebrow {
+    font-size: 11px !important;
+    white-space: nowrap;
+    letter-spacing: -0.2px;
+  }
+  .flowHeadActions .flowCurrentStep {
+    font-size: 11px !important;
+    white-space: nowrap;
+    padding: 4px 9px;
+  }
+
+  /* ③ 진행 단계 스텝퍼: 번호 아래에 단계명 표시(개행 없이 작은 폰트) */
+  .flowStepper.projectFlowStepper .flowStepperBtn {
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 6px 2px;
+    text-align: center;
+  }
+  .flowStepper.projectFlowStepper .flowStepText { align-items: center; }
+  .flowStepper.projectFlowStepper .flowStepText strong {
+    font-size: 9.5px !important;
+    line-height: 1.2 !important;
+    white-space: nowrap;
+  }
+  /* 담당자(요청자/PM 등)는 공간상 생략 */
+  .flowStepper.projectFlowStepper .flowStepText em { display: none; }
+
+  /* ④ 요청 분류: 2열 그리드로 배치(터치·가독 ↑) */
+  .requestTypeSelector {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+  }
+  .requestTypeSelector .requestTypeButton {
+    width: 100%;
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 5px !important;
+  }
+}
+
+/* =========================================================================
+   흐름도 보드 + 승인역할 칩 모바일 교정
+   ========================================================================= */
+@media (max-width: 768px) {
+  /* 흐름도 6단계: 가로 6열 → 세로 스택(각 단계 풀폭 한 행). 글자가 가로로 읽힘 */
+  .flowStrip {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  .flowStrip .flowStep {
+    width: 100% !important;
+    min-height: 0 !important;
+  }
+  /* 가로 연결 화살표·SVG 라인은 세로 스택에서 의미 없어 숨김 */
+  .flowConnector { display: none !important; }
+  .flowLines { display: none !important; }
+
+  /* 새 요청 '승인 필요 역할' 칩: 한 행에 표시(넘치면 가로 스크롤) */
+  /* min-width:0 으로 nowrap 콘텐츠의 min-content가 상위(fieldset/form)를 밀어내지 않게 — 페이지 가로 오버플로 방지 */
+  .flowRequestForm fieldset,
+  .requestPanel fieldset,
+  .approvalPreset {
+    min-width: 0;
+  }
+  .approvalSummary {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    gap: 6px !important;
+    padding-bottom: 2px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .approvalSummary .approvalPill {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
+
+/* =========================================================================
+   사용자 요청: 모바일 패딩 5px(상하좌우) + 패널 간격 5px (모든 요소)
+   ========================================================================= */
+@media (max-width: 768px) {
+  /* 패널·카드·섹션·필드·폼컨트롤 패딩 5px */
+  .appShell .panel,
+  .appShell .detailPanel,
+  .appShell .detailHeaderPanel,
+  .appShell .requirementsPanel,
+  .appShell .queuePanel,
+  .appShell .dashboardPanel,
+  .appShell .requestPanel,
+  .appShell section[data-section],
+  .appShell .card,
+  .appShell .projectCard,
+  .appShell .kanbanCard,
+  .appShell .metric,
+  .appShell .flowStep,
+  .appShell .scheduleField,
+  .appShell .taskRow,
+  .appShell .requesterField,
+  .appShell .requirementBlock,
+  .appShell .actionBanner,
+  .appShell .searchBox,
+  .appShell .listFilterBox,
+  .appShell input,
+  .appShell select,
+  .appShell textarea {
+    padding: 5px !important;
+  }
+
+  /* 패널과 패널 사이 간격 5px (스택 마진 + 컨테이너 gap) */
+  .appShell .workArea,
+  .appShell .detailPanel,
+  .appShell .requestForm,
+  .appShell .formGrid,
+  .appShell .scheduleEditor,
+  .appShell .requesterSummary,
+  .appShell .requirementGrid,
+  .appShell .metricGrid,
+  .appShell .projectList,
+  .appShell .taskList {
+    gap: 5px !important;
+  }
+  .appShell .detailPanel > section,
+  .appShell .requirementsPanel,
+  .appShell .actionBanner,
+  .appShell .dashboardPanel,
+  .appShell section[data-section] {
+    margin-top: 5px !important;
+    margin-bottom: 5px !important;
+  }
+}
+
+/* 사용자 요청: 모바일 KPI 카드 5개를 한 행에 */
+@media (max-width: 768px) {
+  .appShell .metricGrid {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+  }
+  .appShell .metric {
+    padding: 5px !important;
+    min-height: 0;
+  }
+  /* 모바일에서는 아이콘 숨김 — 좁은 칸에 라벨·수치만 */
+  .appShell .metric > div { display: none !important; }
+  .appShell .metric span { line-height: 0.95 !important; word-break: keep-all; }
+}
+
+/* 대시보드 칸반(전체 단계 흐름) 내부 패널도 패딩/간격 5px */
+@media (max-width: 768px) {
+  .appShell .serviceFlow,
+  .appShell .dashboardKanban,
+  .appShell .kanbanColumn,
+  .appShell .kanbanColumnHeader,
+  .appShell .kanbanCard,
+  .appShell .kanbanCardList {
+    padding: 5px !important;
+  }
+  .appShell .dashboardKanban,
+  .appShell .kanbanCardList,
+  .appShell .serviceFlow {
+    gap: 5px !important;
+  }
+}
+
+/* KPI 카드: 라벨 좌측 여분 간격 제거(아이콘 숨김 후 column-gap 잔여) */
+@media (max-width: 768px) {
+  .appShell .metric {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px !important;
+  }
+}
+
+/* =========================================================================
+   사용자 요청: 모바일 — 패널(중첩 포함)·버튼·입력·선택·텍스트영역 패딩 일괄 5px
+   (PC >768px 미적용)
+   ========================================================================= */
+@media (max-width: 768px) {
+  .appShell button,
+  .appShell input,
+  .appShell select,
+  .appShell textarea,
+  .appShell fieldset,
+  .appShell section,
+  .appShell [class*="panel"], .appShell [class*="Panel"],
+  .appShell [class*="card"],  .appShell [class*="Card"],
+  .appShell [class*="box"],   .appShell [class*="Box"],
+  .appShell [class*="preset"], .appShell [class*="Preset"],
+  .appShell [class*="block"], .appShell [class*="Block"],
+  .appShell [class*="field"], .appShell [class*="Field"],
+  .appShell [class*="group"], .appShell [class*="Group"] {
+    padding: 5px !important;
+  }
+}
+
+/* =========================================================================
+   사용자 요청: 모바일은 고정(sticky) 없이 전체 스크롤
+   ========================================================================= */
+@media (max-width: 768px) {
+  .appShell .topbar { position: static !important; top: auto !important; }
+  .appShell .topStickyArea { position: static !important; top: auto !important; z-index: auto; }
+  .appShell .detailHeaderPanel { position: static !important; top: auto !important; }
+  /* 리스트 내부 스크롤 캡 제거 → 페이지 전체 스크롤 */
+  .appShell .queuePanel .projectList { max-height: none !important; }
+}
+
+/* =========================================================================
+   사용자 요청: 모바일 패널 간 간격 전부 5px
+   ========================================================================= */
+@media (max-width: 768px) {
+  /* 레이아웃 컨테이너 gap 5px */
+  .appShell .workArea,
+  .appShell .topStickyArea,
+  .appShell .searchFilterRow,
+  .appShell .queuePanel,
+  .appShell .detailPanel,
+  .appShell .dashboardBoard,
+  .appShell .serviceFlow {
+    gap: 5px !important;
+  }
+  /* 패널 스택 마진 5px */
+  .appShell .topStickyArea,
+  .appShell .queuePanel,
+  .appShell .detailHeaderPanel,
+  .appShell .detailPanel,
+  .appShell .dashboardPanel,
+  .appShell .requestPanel,
+  .appShell .searchBox,
+  .appShell .searchFilterRow,
+  .appShell .metricGrid,
+  .appShell section[data-section],
+  .appShell .requirementsPanel,
+  .appShell .actionBanner {
+    margin-top: 5px !important;
+    margin-bottom: 5px !important;
+  }
+}
+
+/* 대시보드 칸반(전체 단계 흐름) 내부 간격도 5px */
+@media (max-width: 768px) {
+  .appShell .serviceFlow { margin: 5px 0 !important; gap: 5px !important; }
+  .appShell .serviceFlow > * { margin-top: 5px !important; margin-bottom: 5px !important; }
+  .appShell .dashboardKanban { margin: 5px 0 !important; }
+  .appShell .kanbanColumnHeader { margin: 0 0 5px !important; }
+  .appShell .metricGrid { margin: 5px 0 !important; }
+}
+
+/* =========================================================================
+   사용자 요청: 모바일 — 헤더/섹션/폼 간격도 전부 5px
+   ========================================================================= */
+@media (max-width: 768px) {
+  /* 패널 헤더 ↔ 본문 간격 */
+  .appShell .panelHeader,
+  .appShell .panelHeader.compact {
+    margin: 0 0 5px !important;
+    gap: 5px !important;
+    row-gap: 5px !important;
+  }
+  .appShell .panelHeader h2 + span,
+  .appShell .panelHeader h2 + p,
+  .appShell .panelHeader h3 + span,
+  .appShell .panelHeader h3 + p,
+  .appShell .panelHeader > div > h3 + span,
+  .appShell .panelHeader > div > h3 + p {
+    margin-top: 2px !important;
+  }
+  /* 설정 섹션 간격 */
+  .appShell .settingsPanel,
+  .appShell .settingsSection {
+    gap: 5px !important;
+    margin-top: 5px !important;
+    margin-bottom: 5px !important;
+  }
+  /* 폼 필드 간격 + 라벨↔입력 간격 */
+  .appShell .formGrid,
+  .appShell .formGrid.two {
+    gap: 5px !important;
+  }
+  .appShell .formGrid label,
+  .appShell .requestForm label,
+  .appShell .scheduleField {
+    gap: 3px !important;
+  }
+  /* 서비스 목록 항목 간격 */
+  .appShell .serviceListRow,
+  .appShell .settingsSection ul,
+  .appShell .settingsSection li {
+    gap: 5px !important;
+    margin: 0 0 5px !important;
+  }
+}
+
+/* 상세/요청 헤더: 모바일에서 세로 스택 + 배지 줄바꿈 → '현재 단계' 배지 넘침 방지 */
+@media (max-width: 768px) {
+  .appShell .flowRequestHead {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px !important;
+  }
+  .appShell .flowHeadActions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 5px !important;
+    max-width: 100%;
+  }
+  .appShell .flowCurrentStep {
+    white-space: normal;
+    max-width: 100%;
+  }
+}
+
+/* 사용자 요청: 모바일 모든 라운드(테두리 둥글기) 8px */
+@media (max-width: 768px) {
+  .appShell button,
+  .appShell input,
+  .appShell select,
+  .appShell textarea,
+  .appShell [class*="panel"], .appShell [class*="Panel"],
+  .appShell [class*="card"],  .appShell [class*="Card"],
+  .appShell [class*="box"],   .appShell [class*="Box"],
+  .appShell [class*="pill"],  .appShell [class*="Pill"],
+  .appShell [class*="chip"],  .appShell [class*="Chip"],
+  .appShell [class*="badge"], .appShell [class*="Badge"],
+  .appShell [class*="preset"], .appShell [class*="Preset"],
+  .appShell [class*="block"], .appShell [class*="Block"],
+  .appShell [class*="field"], .appShell [class*="Field"],
+  .appShell .metric,
+  .appShell .requestTypeButton,
+  .appShell .flowStep,
+  .appShell .taskRow,
+  .appShell .priority,
+  .appShell .statusPill {
+    border-radius: 8px !important;
+  }
+}
+
+/* =========================================================================
+   사용자 요청: 모바일 전부 더 작게 — 고정 높이 제거(내용+5px), 폰트 축소, 상단 간격 축소
+   ========================================================================= */
+@media (max-width: 768px) {
+  /* 모든 컨트롤 높이 = 내용 + 5px 패딩만 (고정 height/min-height 제거) */
+  .appShell button,
+  .appShell input,
+  .appShell select,
+  .appShell textarea,
+  .appShell .searchBox,
+  .appShell .listFilterBox,
+  .appShell .filterTriggerBtn,
+  .appShell .csvExportButton,
+  .appShell .requestTypeButton,
+  .appShell .actionButtons .primaryButton,
+  .appShell .actionButtons .primaryButton:disabled,
+  .appShell .miniButton {
+    min-height: 0 !important;
+    height: auto !important;
+  }
+  /* 필터/CSV 버튼 = 중간 10px, 칩·카운트 = 최소 8px */
+  .searchFilterRow .filterTriggerBtn,
+  .csvExportButton { font-size: 10px !important; }
+  .searchFilterRow .filterChip,
+  .searchFilterRow .filterChipClear,
+  .searchFilterRow .filterTriggerCount { font-size: 8px !important; }
+  /* 상단바 ↔ 본문 간격 축소 */
+  .appShell .topbar { padding-bottom: 5px !important; }
+  .appShell .topStickyArea { margin-top: 5px !important; }
+  .appShell .queuePanel { margin-top: 0 !important; }
+}
+
+/* =========================================================================
+   사용자 요청: 모바일 — 흐름도 탭 제거 + 누락 컨테이너 패딩 5px
+   ========================================================================= */
+@media (max-width: 768px) {
+  /* 하단 탭에서 프로젝트 흐름도 숨김 */
+  .sidebar .flowNavItem { display: none !important; }
+
+  /* 패딩 5px — 이전에 누락된 클래스/컨테이너 보강 */
+  .appShell [class*="ection"],   /* settingsSection 등 */
+  .appShell [class*="Item"], .appShell [class*="item"],
+  .appShell [class*="List"], .appShell [class*="list"],
+  .appShell [class*="Row"], .appShell [class*="row"],
+  .appShell .serviceList,
+  .appShell .serviceListItem,
+  .appShell .settingsSection,
+  .appShell .officeApiForm,
+  .appShell .requestIntro,
+  .appShell form {
+    padding: 5px !important;
+  }
+}
+
+/* 사용자 요청: 모바일 모든 텍스트 줄간격(line-height) 1.1 */
+@media (max-width: 768px) {
+  .appShell p, .appShell span, .appShell div, .appShell a, .appShell li,
+  .appShell td, .appShell th, .appShell label, .appShell button,
+  .appShell input, .appShell select, .appShell textarea,
+  .appShell strong, .appShell b, .appShell em, .appShell small, .appShell p,
+  .appShell h1, .appShell h2, .appShell h3, .appShell h4,
+  .appShell .metric strong, .appShell .metric span,
+  .appShell .flowStepText strong, .appShell .flowStepText em {
+    line-height: 1.1 !important;
+  }
+}
+
+/* 칸반 컬럼: 헤더↔카드 간격 5px */
+@media (max-width: 768px) {
+  .appShell .kanbanColumn { gap: 5px !important; }
+  .appShell .kanbanColumnHeader { margin-bottom: 0 !important; }
+}
+
+/* 설정 패널: 항목 마진 제거(grid gap 5px만) + intro 여백 제거 */
+@media (max-width: 768px) {
+  .appShell .requestIntro { margin: 0 !important; }
+  .appShell .settingsPanel > *,
+  .appShell .settingsPanel > .settingsSection,
+  .appShell .settingsPanel > .requestIntro {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+  }
+}
+
+/* 상단바 높이를 내용에 맞춰 축소(고정 66px 제거) — 버튼 아래 빈 공간 제거 */
+@media (max-width: 768px) {
+  .appShell .topbar {
+    height: auto !important;
+    min-height: 0 !important;
+    padding-top: 5px !important;
+    padding-bottom: 5px !important;
+  }
+}
+
+/* =========================================================================
+   사용자 요청: 모바일 — 좌우 패딩 2px, 상하 패딩/간격 50% 축소(5→2.5px), 설명문 자간 축소
+   ========================================================================= */
+@media (max-width: 768px) {
+  /* 패딩: 상하 2.5px / 좌우 2px */
+  .appShell button,
+  .appShell input,
+  .appShell select,
+  .appShell textarea,
+  .appShell fieldset,
+  .appShell section,
+  .appShell form,
+  .appShell [class*="panel"], .appShell [class*="Panel"],
+  .appShell [class*="card"],  .appShell [class*="Card"],
+  .appShell [class*="box"],   .appShell [class*="Box"],
+  .appShell [class*="preset"], .appShell [class*="Preset"],
+  .appShell [class*="block"], .appShell [class*="Block"],
+  .appShell [class*="field"], .appShell [class*="Field"],
+  .appShell [class*="ection"],
+  .appShell [class*="Item"], .appShell [class*="item"],
+  .appShell [class*="List"], .appShell [class*="list"],
+  .appShell .metric, .appShell .requestTypeButton, .appShell .flowStep,
+  .appShell .kanbanColumn, .appShell .kanbanColumnHeader, .appShell .kanbanCard, .appShell .kanbanCardList,
+  .appShell .serviceListItem, .appShell .settingsSection, .appShell .officeApiForm, .appShell .requestIntro {
+    padding: 2.5px 2px !important;
+  }
+  /* 간격(gap/margin): 5 → 2.5px */
+  .appShell .workArea, .appShell .topStickyArea, .appShell .searchFilterRow,
+  .appShell .queuePanel, .appShell .detailPanel, .appShell .dashboardBoard,
+  .appShell .serviceFlow, .appShell .dashboardKanban, .appShell .kanbanCardList,
+  .appShell .settingsPanel, .appShell .formGrid, .appShell .metricGrid,
+  .appShell .projectList, .appShell .taskList, .appShell .kanbanColumn,
+  .appShell .scheduleEditor, .appShell .requesterSummary, .appShell .requirementGrid,
+  .appShell .projectHoldList {
+    gap: 2.5px !important;
+  }
+  .appShell .panelHeader, .appShell .panelHeader.compact { margin-bottom: 2.5px !important; }
+
+  /* 패널 헤더 설명문: 줄바꿈 방지 + 자간 축소 */
+  .appShell .panelHeader p,
+  .appShell .panelHeader span {
+    white-space: nowrap;
+    letter-spacing: -0.6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* 산출물/활동로그 등 패널 헤더: 아이콘+제목 한 줄(아이콘 왼쪽, 텍스트 오른쪽) */
+@media (max-width: 768px) {
+  .appShell .infoPanel > .panelHeader {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  /* h3와 형제로 떨어진 아이콘을 제목 앞(왼쪽)으로 */
+  .appShell .infoPanel > .panelHeader > svg {
+    order: -1;
+    flex-shrink: 0;
+  }
+  .appShell .infoPanel > .panelHeader > h3 { flex: 1 1 auto; }
+}
+
+/* 진행 단계 스텝퍼: 단계 사이 간격 12px → 5px */
+@media (max-width: 768px) {
+  .appShell .flowStepper.projectFlowStepper { gap: 2px !important; }
+}
+
+/* 사용자 요청: 기본정보 2열 + 스텝퍼↔상세 간격 70% 축소 */
+@media (max-width: 768px) {
+  /* 기본 정보 입력 2개씩 한 행 */
+  .appShell .formGrid.three,
+  .appShell .formGrid.two {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  /* 스텝퍼(상단 고정영역)↔상세 첫 패널 간격 37px → ~11px */
+  .appShell .topStickyArea { padding-bottom: 3px !important; }
+  .appShell .detailPanel { padding-top: 2px !important; }
+  .appShell .detailPanel > section:first-child,
+  .appShell .detailPanel > .requirementsPanel:first-child,
+  .appShell .detailPanel > .actionBanner:first-child {
+    margin-top: 2px !important;
+  }
+}
+
+/* 스텝퍼↔상세 간격 추가 축소: 관련 마진 제거 */
+@media (max-width: 768px) {
+  .appShell .detailHeaderPanel { margin-bottom: 0 !important; }
+  .appShell .topStickyArea { margin-bottom: 0 !important; }
+  .appShell .detailPanel { margin-top: 0 !important; }
+}
+
+/* 활동 로그 타임라인: 점(dot)이 작성자 텍스트를 덮지 않도록 좌측 패딩 복구 */
+@media (max-width: 768px) {
+  .appShell .logTimelineItem {
+    padding: 2.5px 2px 2.5px 22px !important;
   }
 }
