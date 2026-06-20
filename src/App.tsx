@@ -52,6 +52,17 @@ const statusLabels: Record<ProjectStatus, string> = {
   rejected: '반려',
 }
 
+// 모바일 리스트 카드용 짧은 단계 라벨('단계' 생략) — PC는 statusLabels 사용
+const shortStatusLabels: Record<ProjectStatus, string> = {
+  request: '요청',
+  dept_review: '승인',
+  planning: '기획',
+  development: '개발',
+  qc_security: '검토',
+  completion: '완료',
+  rejected: '반려',
+}
+
 const approvalStepLabels: Record<Role, string> = {
   requester: '요청자',
   sales: '영업',
@@ -491,7 +502,7 @@ type NotificationItem = {
   projectTitle: string
   text: string
 }
-type StatusFilter = ProjectStatus | 'all' | 'active' | 'dueSoon' | 'mine' | 'risk' | 'blocked'
+type StatusFilter = ProjectStatus | 'all' | 'active' | 'dueSoon' | 'mine' | 'queue' | 'risk' | 'blocked'
 
 type RequestFormState = {
   requestType: ProjectRequestType
@@ -548,11 +559,11 @@ function roleActsOnStatus(role: Role, status: ProjectStatus): boolean {
   }
 }
 
-function isProjectRelevantToRole(project: Project, role: Role) {
+function isProjectRelevantToRole(project: Project, role: Role, currentName?: string) {
   if (role === 'admin') return true
-  // 요청자(영업·마케팅 포함)는 본인이 올린 요청을 모든 단계에서 추적·열람할 수 있어야 함.
+  // 요청자(영업·마케팅 포함)는 "본인이 올린 요청"만 모든 단계에서 추적·열람한다.
   // (실제 작업/진행 권한은 canAct로 별도 제어 — 승인·개발 단계에서는 열람만 가능)
-  if (isRequesterRole(role)) return true
+  if (isRequesterRole(role)) return Boolean(currentName) && project.requester === currentName
   if (project.status === 'dept_review') return project.approvalState.requiredRoles.includes(role)
   return isProjectAssignedToRole(project, role)
 }
@@ -749,6 +760,9 @@ function App() {
   // 작성자 표기 — "이름(역할)" 형식. 이름이 없으면 역할만 표시
   const authorName = account?.fullName?.trim()
   const authorLabel = authorName ? `${authorName}(${roleLabels[role]})` : roleLabels[role]
+  // 요청자 "본인 요청" 판별용 현재 사용자 이름.
+  // 실로그인 시 계정 이름, 데모(DEV_NO_LOGIN)에서는 새 요청 폼의 요청자 값(기본 '이영업')을 신원으로 사용.
+  const currentUserName = (!DEV_NO_LOGIN && authorName) ? authorName : requestForm.requester
   const requestTypeConfig = requestTypeOptions.find((item) => item.type === requestForm.requestType) ?? requestTypeOptions[0]
 
   // 로그인하면 계정의 고정 역할을 적용. 관리자가 아니면 설정 화면에서 대시보드로 이동.
@@ -835,8 +849,8 @@ function App() {
     [projects, serviceFilter, serviceOptions],
   )
   const queueScopedProjects = useMemo(
-    () => serviceScopedProjects.filter((project) => isProjectRelevantToRole(project, role)),
-    [role, serviceScopedProjects],
+    () => serviceScopedProjects.filter((project) => isProjectRelevantToRole(project, role, currentUserName)),
+    [role, serviceScopedProjects, currentUserName],
   )
   useEffect(() => {
     const selectedProjectInScope = serviceScopedProjects.find((project) => project.id === selectedId)
@@ -879,7 +893,7 @@ function App() {
     const dueSoon = serviceScopedProjects.filter(isDueSoon)
     const blocked = serviceScopedProjects.filter(isBlocked)
     const myQueue = serviceScopedProjects.filter((project) => isProjectAssignedToRole(project, role))
-    const relevantProjects = serviceScopedProjects.filter((project) => isProjectRelevantToRole(project, role))
+    const relevantProjects = serviceScopedProjects.filter((project) => isProjectRelevantToRole(project, role, currentUserName))
     const relevantActive = relevantProjects.filter(countable)
     const relevantDueSoon = relevantProjects.filter(isDueSoon)
     const relevantBlocked = relevantProjects.filter(isBlocked)
@@ -895,13 +909,14 @@ function App() {
       relevantDueSoon: relevantDueSoon.length,
       relevantBlocked: relevantBlocked.length,
     }
-  }, [role, serviceScopedProjects])
+  }, [role, serviceScopedProjects, currentUserName])
 
   const filteredProjects = useMemo(() => {
     return queueScopedProjects
       .filter((project) => {
         // 요청자는 본인 요청을 모든 단계에서 추적할 수 있도록 '내 프로젝트'에 전 단계 포함 (다른 역할은 본인 차례만)
-        if (statusFilter === 'mine') return isRequesterRole(role) ? isProjectRelevantToRole(project, role) : isProjectAssignedToRole(project, role)
+        if (statusFilter === 'mine') return isRequesterRole(role) ? isProjectRelevantToRole(project, role, currentUserName) : isProjectAssignedToRole(project, role)
+        if (statusFilter === 'queue') return isProjectAssignedToRole(project, role)
         if (statusFilter === 'active') return !['completion', 'rejected'].includes(project.status)
         if (statusFilter === 'dueSoon') return daysUntil(project.dueDate, demoToday) <= 5 && !['completion', 'rejected'].includes(project.status)
         if (statusFilter === 'blocked') return project.onHold || project.tasks.some((task) => task.status === 'blocked')
@@ -915,7 +930,7 @@ function App() {
       .filter((project) => listTypeFilter === 'all' || project.requestType === listTypeFilter)
       .filter((project) => listServiceFilter === 'all' || inferServiceOption(project, serviceOptions) === listServiceFilter)
       .filter((project) => `${project.title} ${project.summary} ${project.code}`.toLowerCase().includes(query.toLowerCase()))
-  }, [query, queueScopedProjects, statusFilter, role, listStatusFilter, listTeamFilter, listPriorityFilter, listTypeFilter, listServiceFilter, serviceOptions])
+  }, [query, queueScopedProjects, statusFilter, role, currentUserName, listStatusFilter, listTeamFilter, listPriorityFilter, listTypeFilter, listServiceFilter, serviceOptions])
 
   // 적용된 목록 필터(칩 표시용) — 모바일에서 한 줄로 압축 노출
   const activeListFilters = [
@@ -2031,11 +2046,11 @@ function App() {
                 <Metric icon={<ListChecks size={20} />} label="진행 중" value={metrics.active} tone="amber" onClick={() => { setViewMode('pipeline'); setStatusFilter('active') }} />
                 <Metric icon={<CalendarDays size={20} />} label="마감 임박" value={metrics.dueSoon} tone="green" onClick={() => { setViewMode('pipeline'); setStatusFilter('dueSoon') }} />
                 <Metric icon={<AlertTriangle size={20} />} label="보류" value={metrics.blocked} tone="wine" onClick={() => { setViewMode('pipeline'); setStatusFilter('blocked') }} />
-                <Metric icon={<Users size={20} />} label="내 처리 대기" value={metrics.myQueue} tone="blue" onClick={() => { setViewMode('pipeline'); setStatusFilter('mine') }} />
+                <Metric icon={<Users size={20} />} label="내 처리 대기" value={metrics.myQueue} tone="blue" onClick={() => { setViewMode('pipeline'); setStatusFilter('queue') }} />
               </>
             ) : (
               <>
-                <Metric icon={<Users size={20} />} label="확인 필요" value={metrics.myQueue} tone="red" onClick={() => { setViewMode('pipeline'); setStatusFilter('mine') }} />
+                <Metric icon={<Users size={20} />} label="확인 필요" value={metrics.myQueue} tone="red" onClick={() => { setViewMode('pipeline'); setStatusFilter('queue') }} />
                 <Metric icon={<ListChecks size={20} />} label="관련 진행" value={metrics.relevantActive} tone="amber" onClick={() => { setViewMode('pipeline'); setStatusFilter('active') }} />
                 <Metric icon={<CalendarDays size={20} />} label="마감 임박" value={metrics.relevantDueSoon} tone="green" onClick={() => { setViewMode('pipeline'); setStatusFilter('dueSoon') }} />
                 <Metric icon={<AlertTriangle size={20} />} label="보류" value={metrics.relevantBlocked} tone="wine" onClick={() => { setViewMode('pipeline'); setStatusFilter('blocked') }} />
@@ -2063,6 +2078,7 @@ function App() {
         ) : viewMode === 'dashboard' ? (
           <DashboardOverview
             role={role}
+            currentName={currentUserName}
             projects={projects}
             serviceFilter={serviceFilter}
             serviceOptions={serviceOptions}
@@ -2203,7 +2219,10 @@ function App() {
                   type="button"
                   onClick={() => setSelectedId(project.id)}
                 >
-                  <span className={`statusPill ${project.status}`}>{statusLabels[project.status]}</span>
+                  <span className={`statusPill ${project.status}`}>
+                    <span className="stageFull">{statusLabels[project.status]}</span>
+                    <span className="stageShort">{shortStatusLabels[project.status]}</span>
+                  </span>
                   <strong>{project.title}</strong>
                   <span className="cardMeta">
                     <span className="serviceBadge">{inferServiceOption(project, serviceOptions)}</span>
@@ -3321,6 +3340,7 @@ type DashboardSummary = {
 
 function DashboardOverview({
   role,
+  currentName,
   projects,
   serviceFilter,
   serviceOptions,
@@ -3330,6 +3350,7 @@ function DashboardOverview({
   onOpenStatus,
 }: {
   role: Role
+  currentName?: string
   projects: Project[]
   serviceFilter: ServiceFilter
   serviceOptions: string[]
@@ -3338,13 +3359,14 @@ function DashboardOverview({
   onOpenProject: (projectId: string) => void
   onOpenStatus: (filter: StatusFilter) => void
 }) {
-  const focusProjects = summary.assignedProjects
   const serviceScopeLabel = serviceFilter === 'all' ? '전체 서비스' : serviceFilter
   const visibleStatuses = summary.projectsByStatus
   const phaseFor = (index: number) => (index < 3 ? 1 : index < 5 ? 2 : 3)
 
   // 서비스별 단계 흐름: 역할 관련 프로젝트를 서비스별로 묶고, 각 서비스마다 6단계 칸반을 그림
-  const relevantAll = projects.filter((project) => role === 'admin' || isProjectRelevantToRole(project, role))
+  const relevantAll = projects.filter((project) => role === 'admin' || isProjectRelevantToRole(project, role, currentName))
+  // 헤더의 "N개 프로젝트"는 보드에 실제로 그려지는 관련 프로젝트 수와 일치시킨다.
+  const focusProjects = relevantAll
   const servicesToShow = serviceFilter === 'all' ? serviceOptions : [serviceFilter]
   const serviceFlows = servicesToShow.map((service) => {
     const serviceProjects = relevantAll.filter((project) => inferServiceOption(project, serviceOptions) === service)
@@ -3612,10 +3634,8 @@ function ProjectTasksPanel({
             <input placeholder="태스크 제목" value={newTask.title} onChange={(e) => setNewTask((s) => ({ ...s, title: e.target.value }))} />
             <select value={newTask.type} onChange={(e) => setNewTask((s) => ({ ...s, type: e.target.value as IssueType }))}>
               <option value="task">Task (작업)</option>
-              <option value="story">Story (스토리)</option>
               <option value="bug">Bug (버그)</option>
               <option value="change">Change (변경)</option>
-              <option value="epic">Epic (에픽)</option>
             </select>
             <input placeholder={`담당자 (기본: ${roleLabels[currentRole]})`} value={newTask.owner} onChange={(e) => setNewTask((s) => ({ ...s, owner: e.target.value }))} />
             <select value={newTask.priority} onChange={(e) => setNewTask((s) => ({ ...s, priority: e.target.value as Priority }))}>
@@ -3716,10 +3736,8 @@ function ProjectTasksPanel({
                     <input placeholder="태스크 제목" value={editTask.title} onChange={(e) => setEditTask((s) => ({ ...s, title: e.target.value }))} />
                     <select value={editTask.type} onChange={(e) => setEditTask((s) => ({ ...s, type: e.target.value as IssueType }))}>
                       <option value="task">Task (작업)</option>
-                      <option value="story">Story (스토리)</option>
                       <option value="bug">Bug (버그)</option>
                       <option value="change">Change (변경)</option>
-                      <option value="epic">Epic (에픽)</option>
                     </select>
                     <input placeholder="담당자" value={editTask.owner} onChange={(e) => setEditTask((s) => ({ ...s, owner: e.target.value }))} />
                     <select value={editTask.priority} onChange={(e) => setEditTask((s) => ({ ...s, priority: e.target.value as Priority }))}>

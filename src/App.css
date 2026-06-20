@@ -7397,9 +7397,12 @@ button.approvalPill:hover {
     grid-template-columns: 1fr;
   }
 
-  .taskSummary,
   .taskForm {
     grid-template-columns: 1fr;
+  }
+  /* 일감 상태 필터(대기·진행·보류·완료)는 모바일에서도 한 행 4열 */
+  .taskSummary {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .requestFooter {
@@ -8545,4 +8548,210 @@ button.approvalPill:hover {
   .appShell .logTimelineItem {
     padding: 2.5px 2px 2.5px 22px !important;
   }
+}
+
+/* 상단바: 역할 버튼과 알림 버튼 높이 동일하게 */
+@media (max-width: 768px) {
+  .appShell .topbarActions { align-items: center; }
+  .appShell .topbarActions .roleSwitchBtn,
+  .appShell .topbarActions .notifBellBtn {
+    height: 30px !important;
+    min-height: 30px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* 단계 헤더·프로젝트 카드: 좌우 패딩 확보(텍스트가 왼쪽에 붙지 않게) */
+@media (max-width: 768px) {
+  .appShell .kanbanColumnHeader,
+  .appShell .kanbanCard,
+  .appShell .projectCard {
+    padding: 5px 10px !important;
+  }
+  .appShell .topbarActions .roleSwitchBtn { padding: 2.5px 12px !important; }
+}
+
+/* 칸반 카드: 배지+제목+메타를 한 행으로(공간 부족 시 줄바꿈), 중복 서비스 설명 숨김 */
+@media (max-width: 768px) {
+  .appShell .kanbanCard {
+    display: flex !important;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+  }
+  .appShell .kanbanCard .kanbanCardTop { display: contents; }
+  .appShell .kanbanCard > strong { flex: 1 1 auto; min-width: 0; }
+  .appShell .kanbanCard > p { display: none; }            /* 카피킬러·표절검사 등 서비스 설명(중복) 숨김 */
+  .appShell .kanbanCard .kanbanMeta { display: inline-flex; gap: 5px; flex: 0 0 auto; margin: 0; }
+}
+
+/* 리스트 카드 단계 라벨: 기본(PC)은 '요청 단계' 풀라벨만 표시 */
+.stageShort { display: none; }
+
+/* 프로젝트 현황 리스트 카드: 한 행에 다 넣고, 단계 앞 점 제거, '요청'만 표시 */
+@media (max-width: 768px) {
+  .appShell .queuePanel .cardMeta {
+    flex-basis: auto;            /* 다음 줄로 내리지 않고 같은 행에 */
+    flex: 0 0 auto;
+    min-width: 0;
+    flex-wrap: nowrap;           /* D-day까지 한 줄에 */
+    justify-content: flex-end;
+    gap: 4px;
+  }
+  /* 한 행 확보: 담당팀(폭 큰 보조 정보)은 모바일에서 숨김 */
+  .appShell .queuePanel .cardMeta > span:not([class]) { display: none; }
+  .appShell .queuePanel .projectCard { flex-wrap: nowrap; }
+  .appShell .queuePanel .projectCard > strong { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .appShell .queuePanel .projectCard .statusPill::before { display: none; }   /* 앞 점 제거 */
+  .appShell .queuePanel .projectCard .statusPill { padding: 0 6px; }
+  .appShell .queuePanel .projectCard .stageFull { display: none; }            /* '요청 단계' 숨김 */
+  .appShell .queuePanel .projectCard .stageShort { display: inline; }         /* '요청'만 표시 */
+}
+
+/* 칸반 단계 헤더: 번호·단계명·담당을 한 행으로 (카운트 배지는 우측 절대배치 유지) */
+@media (max-width: 768px) {
+  .appShell .kanbanHeaderMeta {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0 6px;
+  }
+  .appShell .kanbanColumnHeader { padding-right: 38px !important; }   /* 우측 카운트 자리 확보 */
+}
+
+/* 가로 넘침 차단: 어떤 폭의 기기에서도 콘텐츠가 좌/우 여백으로 넘어가지 않게 */
+@media (max-width: 768px) {
+  html, body { overflow-x: hidden; max-width: 100%; }
+  .appShell { overflow-x: hidden; max-width: 100%; }
+  .appShell .topbar,
+  .appShell .sidebar {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    box-sizing: border-box;
+  }
+}
+
+/* 프로젝트 현황 리스트 카드 추가 교정 (모바일) */
+@media (max-width: 768px) {
+  /* '분류' 단어 제거 — 배지엔 유형명만 */
+  .appShell .queuePanel .requestTypePill::before { content: none !important; }
+  /* 서비스·분류·우선순위·D-day 메타를 우측 정렬(행마다 우측 끝 정렬되어 어긋나 보이지 않게) */
+  .appShell .queuePanel .cardMeta { margin-left: auto; }
+}
+
+/* 새 요청 폼 폰트 통일 (모바일): 본문 10px, 섹션 제목만 12px */
+@media (max-width: 768px) {
+  .appShell .requestPanel label,
+  .appShell .requestPanel input,
+  .appShell .requestPanel select,
+  .appShell .requestPanel textarea,
+  .appShell .requestPanel p,
+  .appShell .requestPanel span,
+  .appShell .requestPanel strong,
+  .appShell .requestPanel em,
+  .appShell .requestPanel .requestTypeButton,
+  .appShell .requestPanel .eyebrow,
+  .appShell .requestPanel .flowCurrentStep,
+  .appShell .requestPanel .flowStepText,
+  .appShell .requestPanel .flowStepText strong,
+  .appShell .requestPanel .approvalGuide,
+  .appShell .requestPanel .flowSectionLead {
+    font-size: 10px !important;
+  }
+  .appShell .requestPanel h2,
+  .appShell .requestPanel h3,
+  .appShell .requestPanel legend {
+    font-size: 12px !important;
+  }
+}
+
+/* 새 요청 폼: 본문(legend·필드·버튼)을 헤더 좌측 라인에 맞추고 좌우 패딩 대칭(0) — 왼쪽/오른쪽 여백 동일 (모바일) */
+@media (max-width: 768px) {
+  .appShell .requestForm { padding-left: 0 !important; padding-right: 0 !important; }
+  .appShell .requestForm fieldset { padding-left: 0 !important; padding-right: 0 !important; }
+  .appShell .requestForm legend { padding-left: 0 !important; padding-right: 0 !important; }
+  .appShell .requestPanel .flowSectionLead { padding-left: 0 !important; padding-right: 0 !important; }
+}
+
+/* A. 태스크 등록 헤더: 3개 배지 · CSV · +태스크 추가 높이 통일 (모바일) */
+@media (max-width: 768px) {
+  .appShell .taskPanel .taskHeaderRight .taskTotal,
+  .appShell .taskPanel .taskHeaderRight .miniButton {
+    height: 30px !important;
+    min-height: 30px !important;
+    box-sizing: border-box;
+  }
+}
+
+/* C/D. 승인 단계 매트릭스: 좌우 여백 줄이고, 3열 네모 그리드로 정돈(역할명 잘림 방지) (모바일) */
+@media (max-width: 768px) {
+  .appShell .approvalGrid { margin-top: 5px !important; }
+  .appShell .approvalUnitGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;  /* 6 → 3열 2행 */
+    gap: 5px !important;
+    padding: 6px !important;
+  }
+  .appShell .approvalUnitHead {
+    padding: 4px 2px !important;
+    font-size: 10px !important;
+    line-height: 1.2 !important;
+  }
+  .appShell .approvalCellPill { height: 26px !important; font-size: 10px !important; }
+  .appShell .approvalGridFoot { padding: 5px 6px !important; }
+}
+
+/* E. 새 요청 폼: 화면 좌우 5px 여백으로 (거의 풀폭). main 패딩(14px)을 음수 마진으로 상쇄 후 5px 패딩 (모바일) */
+@media (max-width: 768px) {
+  .appShell .requestPanel {
+    margin-left: -9px !important;
+    margin-right: -9px !important;
+    padding-left: 5px !important;
+    padding-right: 5px !important;
+  }
+}
+
+/* 태스크 패널 상하 여백 축소 (모바일): 폼 패딩·행 간격·상태바·에디터 본문 높이 */
+@media (max-width: 768px) {
+  .appShell .inlineTaskForm { gap: 4px !important; padding: 6px !important; margin-bottom: 6px !important; }
+  .appShell .inlineTaskGrid { gap: 4px !important; }
+  .appShell .inlineTaskNoteField { gap: 2px !important; }
+  .appShell .inlineTaskNoteField .richEditorContent { min-height: 56px !important; }
+  .appShell .inlineTaskActions { margin-top: 2px !important; }
+  .appShell .taskSummary { gap: 4px !important; margin: 4px 0 !important; }
+  .appShell .taskSummary .taskFilterPill { min-height: 26px !important; padding: 3px 8px !important; }
+}
+
+/* 일정 조율 패널 정돈 (모바일): 날짜 2열(라벨↑입력↓) · 배지 풀폭 · 간격/에디터 축소 */
+@media (max-width: 768px) {
+  .appShell .scheduleEditor { gap: 8px !important; }
+  .appShell .scheduleDateRow {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px !important;
+    align-items: end;
+  }
+  .appShell .scheduleDateRow label {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 2px !important;
+    white-space: normal !important;
+  }
+  .appShell .scheduleDateRow input[type='date'] {
+    width: 100% !important;
+    min-height: 32px !important;
+    box-sizing: border-box;
+  }
+  .appShell .scheduleCompare {
+    grid-column: 1 / -1;
+    justify-content: center;
+    min-height: 28px !important;
+  }
+  .appShell .scheduleField { gap: 3px !important; }
+  .appShell .scheduleField .richEditorContent { min-height: 56px !important; }
 }
