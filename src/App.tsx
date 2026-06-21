@@ -1397,7 +1397,8 @@ function App() {
     if (!selected || !canAct) return
     if (selected.onHold) { window.alert('보류 중인 프로젝트입니다. 보류를 해제한 뒤 진행하세요.'); return }
     if (selected.status === 'dept_review' && pendingApprovalRoles.length > 0) return
-    if (selected.status === 'planning' && planningRequiredByType[selected.requestType] && !hasRequiredReviewDocs) return
+    if (selected.status === 'planning' && planningRequiredByType[selected.requestType] && !hasSrsDraft) { window.alert('요구사항 정의서(SRS)를 작성해야 다음 단계로 진행할 수 있습니다.'); return }
+    if (selected.status === 'development' && planningRequiredByType[selected.requestType] && !hasSdsDraft) { window.alert('설계 명세서(SDS)를 작성해야 검토 단계로 진행할 수 있습니다.'); return }
     if (selected.status === 'qc_security' && !qcAllSignedOff) { window.alert('QC·보안·PM 3자 검토가 모두 완료되어야 다음 단계로 진행할 수 있습니다.'); return }
     if (selected.status === 'completion' && !selected.requesterConfirmed) { window.alert('요청자 확인이 완료되어야 게시할 수 있습니다.'); return }
     // 개발 단계: 미완료 태스크가 있으면 확인
