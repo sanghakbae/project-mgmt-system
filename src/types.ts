@@ -24,7 +24,7 @@ export type ProjectStatus =
 
 export type TaskStatus = 'todo' | 'doing' | 'blocked' | 'done'
 
-export type IssueType = 'epic' | 'story' | 'task' | 'bug' | 'change'
+export type IssueType = 'epic' | 'story' | 'task' | 'bug' | 'change' | 'vulnerability'
 
 export type TaskAttachment = {
   id: string

@@ -957,6 +957,9 @@ h3 {
   gap: 12px;
   margin-bottom: 18px;
 }
+/* 카드 개수에 맞춰 열 수 정렬 (관리자 5장 / 그 외 4장) */
+.metricGrid.cols4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.metricGrid.cols5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 
 .metric {
   min-height: 106px;
@@ -2314,13 +2317,10 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   background: #fff;
 }
 
-/* 상단 sticky 컨테이너 — queuePanel + detailHeaderPanel을 한 덩어리로 고정 (topbar 아래) */
+/* 상단 영역 — 리스트 + 스텝퍼. 고정(sticky) 없이 본문과 함께 통째로 스크롤 */
 .topStickyArea {
-  position: sticky;
-  top: 66px; /* topbar 높이(66px)와 정확히 맞춤 → 겹침/간격 변동 방지 */
-  z-index: 20;
+  position: static;
   background: #f4f5f7;
-  /* 상단 간격은 topbar 자체 하단 패딩(12px)이 담당 → 여기는 0, 하단은 스크롤 콘텐츠 가림막 */
   padding: 0 0 12px;
   display: flex;
   flex-direction: column;
@@ -2594,9 +2594,9 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   display: flex;
   flex-direction: column;
   gap: 8px;
-  /* 3개 카드까지만 표시하고 이후 내부 스크롤 (42px × 3 + 8px × 2 + 여백) */
-  max-height: 148px;
-  overflow-y: auto;
+  /* 통 스크롤: 리스트 내부 스크롤 제거 — 페이지 전체와 함께 스크롤 */
+  max-height: none;
+  overflow-y: visible;
   padding: 3px 3px 4px;
 }
 .projectList .projectCard {
@@ -2770,32 +2770,47 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 }
 
 .projectHoldInfo {
-  display: grid;
-  gap: 4px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
+/* 배지를 한 행에 인라인으로 흐르게 */
 .projectHoldTop {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
+  display: contents;
 }
 
 .projectHoldInfo strong {
   font-size: 13px;
   color: #1a1f27;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 0 1 auto;
 }
 
 .projectHoldInfo small {
   color: #7b818b;
-  font-size: 11px;
+  font-size: 13px;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .projectHoldInfo em {
   color: #876900;
-  font-size: 11px;
+  font-size: 13px;
   font-style: normal;
+}
+
+/* 행 내 모든 텍스트·배지 폰트 통일 */
+.projectHoldInfo .statusPill,
+.projectHoldInfo .requestTypePill,
+.projectHoldInfo .ddayPill {
+  font-size: 13px;
 }
 
 .holdTag {
@@ -2878,6 +2893,8 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   gap: 14px;
   align-items: start;
 }
+/* SDS가 개발 단계로 분리되어 기획 단계엔 SRS 카드 하나만 → 전체 폭 사용 */
+.srsSdsRow:has(> .docCard:only-child) { grid-template-columns: minmax(0, 1fr); }
 
 /* 접기: SRS는 좌측, SDS는 우측으로 */
 .srsSdsRow.srsCollapsed {
@@ -3029,25 +3046,44 @@ strong.required {
   font-weight: 700;
 }
 
-.srsReadView {
-  display: grid;
-  gap: 14px;
-}
+.srsReadView { width: 100%; }
 
-.srsReadSection h4 {
-  margin: 0 0 5px;
-  font-size: 14px;
+/* SRS 읽기: 항목 | 내용 2열 테이블 */
+.srsReadTable {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #e1e5eb;
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 13px;
+}
+.srsReadTable tr { border-bottom: 1px solid #eceef2; }
+.srsReadTable tr:last-child { border-bottom: 0; }
+.srsReadTable th[scope="row"] {
+  width: 168px;
+  vertical-align: top;
+  text-align: left;
+  padding: 10px 12px;
+  background: #f7f9fc;
+  border-right: 1px solid #eceef2;
   font-weight: 800;
   color: #1a1f27;
   letter-spacing: -0.2px;
 }
-
-.srsReadSection h4 em {
+.srsReadTable th .srsRowKo { display: block; }
+.srsReadTable th em {
+  display: block;
+  margin-top: 2px;
   color: #98a0aa;
   font-style: normal;
   font-weight: 500;
   font-size: 11px;
-  margin-left: 4px;
+}
+.srsReadTable td { vertical-align: top; padding: 10px 14px; }
+.srsReadTable td .richEditorView { font-size: 13px; line-height: 1.6; }
+@media (max-width: 768px) {
+  .appShell .srsReadTable th[scope="row"] { width: 92px; padding: 6px 8px; }
+  .appShell .srsReadTable td { padding: 6px 8px; }
 }
 
 .srsSdsRow > .docCard {
@@ -3346,7 +3382,7 @@ strong.required {
 }
 
 .richEditorContent p {
-  margin: 0 0 6px;
+  margin: 0 0 8px;
 }
 
 .richEditorContent p:last-child {
@@ -3356,17 +3392,22 @@ strong.required {
 .richEditorContent ul,
 .richEditorContent ol {
   padding-left: 22px;
-  margin: 4px 0;
+  margin: 6px 0 12px;
 }
+
+.richEditorContent li { margin-bottom: 4px; }
+.richEditorContent li > p { margin: 0; }
 
 .richEditorContent h2 {
   font-size: 15px;
-  margin: 10px 0 4px;
+  margin: 18px 0 8px;
 }
+.richEditorContent h2:first-child { margin-top: 0; }
 
 .richEditorContent h3 {
   font-size: 14px;
-  margin: 8px 0 4px;
+  margin: 18px 0 6px;
+  padding-top: 4px;
 }
 
 .richEditorContent blockquote {
@@ -3596,8 +3637,9 @@ strong.required {
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
-  font-size: 13px;
+  font-size: 11px;
 }
+.qcReviewBlock .qcReviewHead strong { font-size: 11px !important; }
 
 .qcReviewBadge {
   align-self: flex-start;
@@ -8150,12 +8192,13 @@ button.approvalPill:hover {
   }
 }
 
-/* 사용자 요청: 모바일 KPI 카드 5개를 한 행에 */
+/* 사용자 요청: 모바일 KPI 카드를 한 행에 (관리자 5 / 그 외 4) */
 @media (max-width: 768px) {
   .appShell .metricGrid {
     grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
     gap: 5px !important;
   }
+  .appShell .metricGrid.cols4 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
   .appShell .metric {
     padding: 5px !important;
     min-height: 0;
@@ -8754,4 +8797,222 @@ button.approvalPill:hover {
   }
   .appShell .scheduleField { gap: 3px !important; }
   .appShell .scheduleField .richEditorContent { min-height: 56px !important; }
+}
+
+/* 보류 사유 목록 (riskPanel 안) */
+.blockedReasonList {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.blockedReasonList li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(192, 57, 43, 0.06);
+}
+.blockedReasonList li b { font-size: 13px; color: #20242b; }
+.blockedReasonList li span { font-size: 12px; color: #8a5a2b; }
+@media (max-width: 768px) {
+  .appShell .blockedReasonList li b { font-size: 10px; }
+  .appShell .blockedReasonList li span { font-size: 10px; }
+  .appShell .blockedReasonList { gap: 3px; margin: 4px 0; }
+}
+
+/* 전체 프로젝트 별도 페이지: 목록 카드 폰트 12px 통일 */
+.allProjectsPage .projectList { max-height: none; overflow: visible; }
+.allProjectsPage .projectCard,
+.allProjectsPage .projectCard strong,
+.allProjectsPage .projectCard .cardMeta,
+.allProjectsPage .projectCard .cardMeta *,
+.allProjectsPage .projectCard .statusPill {
+  font-size: 12px;
+}
+@media (max-width: 768px) {
+  .appShell .allProjectsPage .projectCard,
+  .appShell .allProjectsPage .projectCard strong,
+  .appShell .allProjectsPage .projectCard .cardMeta,
+  .appShell .allProjectsPage .projectCard .cardMeta *,
+  .appShell .allProjectsPage .projectCard .statusPill {
+    font-size: 12px !important;
+  }
+}
+
+/* 전체 프로젝트: 정적 카드(클릭 불가) — 포인터·호버 효과 제거 */
+.projectCard.projectCardStatic { cursor: default; }
+.projectCard.projectCardStatic:hover { border-color: #dfe2e7; box-shadow: none; background: #fff; }
+
+/* 전체 프로젝트 헤더: 제목 좌측 / '대시보드' 버튼 우측 상단 정렬 */
+.allProjectsPage .panelHeader {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+.allProjectsPage .panelHeader > .miniButton { flex: 0 0 auto; }
+@media (max-width: 768px) {
+  .appShell .allProjectsPage .panelHeader { flex-direction: row !important; align-items: flex-start; }
+}
+
+/* 전체 프로젝트 목록: 카드·배지 라운드 5px 통일 */
+.allProjectsPage .projectCard,
+.allProjectsPage .projectCard .statusPill,
+.allProjectsPage .projectCard .serviceBadge,
+.allProjectsPage .projectCard .requestTypePill,
+.allProjectsPage .projectCard .priority,
+.allProjectsPage .projectCard .ddayPill {
+  border-radius: 5px !important;
+}
+
+/* 전체 프로젝트 목록: '분류' 접두어 제거 — 유형명만 표시 */
+.allProjectsPage .requestTypePill::before { content: none !important; }
+
+/* 전체 프로젝트: 컬럼 헤더가 있는 테이블 레이아웃 */
+.allProjectsTableWrap { width: 100%; overflow-x: auto; }
+.allProjectsTable { display: flex; flex-direction: column; gap: 4px; min-width: 720px; }
+.allProjectsHead,
+.allProjectsRow {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) 88px 96px 60px 92px 64px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+}
+.allProjectsHead {
+  font-size: 14px;
+  font-weight: 800;
+  color: #111418;
+  background: #f4f5f7;
+  border-radius: 5px;
+  text-align: center;
+}
+.allProjectsHead > span { text-align: center; }
+.allProjectsRow {
+  border: 1px solid #e5e7eb;
+  border-radius: 5px;
+  background: #fff;
+  font-size: 12px;
+}
+/* 데이터 셀도 헤더처럼 가운데 정렬 */
+.allProjectsRow > * { justify-self: center; text-align: center; }
+.allProjectsRow strong {
+  font-weight: 700;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.allProjectsRow .statusPill,
+.allProjectsRow .serviceBadge,
+.allProjectsRow .requestTypePill,
+.allProjectsRow .priority,
+.allProjectsRow .ddayPill {
+  justify-self: center;
+  border-radius: 5px !important;
+  font-size: 12px;
+}
+.allProjectsRow .requestTypePill::before { content: none !important; }
+.allProjectsRow .allProjectsTeam { color: #4b515c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 작업 목록 카드: 내부 배지만 라운드 3px (카드 외곽은 유지) */
+.queuePanel .projectCard .statusPill,
+.queuePanel .projectCard .serviceBadge,
+.queuePanel .projectCard .requestTypePill,
+.queuePanel .projectCard .priority,
+.queuePanel .projectCard .ddayPill {
+  border-radius: 3px !important;
+}
+
+/* 리치 에디터: 처음엔 한 줄 높이로 시작하고 내용이 넘치면 아래로 확장 (인라인 min-height 무력화) */
+.appShell .richEditorContent { min-height: 38px !important; }
+
+/* 리치 에디터 본문 가독성: 모바일 전역 줄간격(1.1)·여백 압축에서 예외 처리 */
+@media (max-width: 768px) {
+  .appShell .richEditorContent,
+  .appShell .richEditorContent p,
+  .appShell .richEditorContent li,
+  .appShell .richEditorContent h2,
+  .appShell .richEditorContent h3 { line-height: 1.55 !important; }
+  .appShell .richEditorContent h2 { margin: 16px 0 8px !important; }
+  .appShell .richEditorContent h3 { margin: 16px 0 6px !important; }
+  .appShell .richEditorContent p { margin: 0 0 8px !important; }
+  .appShell .richEditorContent ul,
+  .appShell .richEditorContent ol { margin: 6px 0 12px !important; }
+}
+
+/* 전체 프로젝트 테이블: 컬럼명(헤더)은 가운데, 프로젝트명 데이터만 좌측 정렬 */
+.allProjectsRow strong { justify-self: start !important; text-align: left !important; }
+
+/* 보류 활성(보류 중) 버튼 강조 */
+.miniButton.holdActive { background: #fff1cc; color: #9a6d00; border-color: #e0c878; }
+
+/* 일감 등록 폼은 항상 목록 아래로 (CSS order) */
+.taskPanel { display: flex; flex-direction: column; }
+.taskPanel > .inlineTaskForm { order: 10; margin-top: 12px; margin-bottom: 0; }
+
+/* 일감 행 가독성 개선 */
+.taskRow { padding: 14px 16px; gap: 12px; }
+.taskRow .taskBody strong { display: block; font-size: 14px; font-weight: 800; line-height: 1.4; margin-bottom: 2px; }
+.taskRow .ticketMeta { margin-bottom: 8px; align-items: center; }
+/* 수정·삭제는 우측으로 분리해 키·유형·우선순위와 안 겹치게 */
+.taskRow .ticketMeta .taskEditBtn { margin-left: auto; }
+.taskRow .taskBody small { line-height: 1.6; }
+.taskRow .taskField { margin-top: 10px; padding-top: 10px; }
+.taskRow .taskStatusControl { margin-top: 10px; padding-top: 10px; gap: 8px; }
+
+/* 모든 배지 라운드 3px 통일 */
+.appShell .statusPill,
+.appShell .requestTypePill,
+.appShell .serviceBadge,
+.appShell .ddayPill,
+.appShell .priority,
+.appShell .qcReviewBadge,
+.appShell .approvalPill,
+.appShell .approvalCellPill,
+.appShell .taskState,
+.appShell .docTag,
+.appShell .flowChip,
+.appShell .notifBadge {
+  border-radius: 3px !important;
+}
+
+/* 일감 목록 테이블 (행=일감, 클릭 시 상세 확장) */
+.taskTableWrap { width: 100%; overflow-x: auto; }
+.taskTable { width: 100%; border-collapse: collapse; min-width: 760px; font-size: 13px; }
+.taskTable thead th {
+  text-align: center;
+  font-size: 12px; font-weight: 800; color: #6b7280;
+  background: #f4f5f7; padding: 8px 10px; border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+.taskTable tbody td { padding: 9px 10px; border-bottom: 1px solid #eef0f3; vertical-align: middle; text-align: center; }
+.taskTr { cursor: pointer; }
+.taskTr:hover { background: #f8fafc; }
+.taskTr.expanded { background: #f4f7ff; }
+.taskTr .taskState { display: inline-flex; min-height: 22px; padding: 1px 8px; }
+.taskTrTitle { text-align: left !important; }
+.taskTrTitle strong { display: block; font-weight: 700; }
+.taskTrTitle .taskKey { display: block; font-size: 11px; color: #98a0aa; margin-top: 1px; }
+.taskTrOwner { white-space: nowrap; color: #4b515c; }
+.taskTrDue { white-space: nowrap; }
+.taskTrMemo { text-align: left !important; color: #6b7280; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.taskTrManage { white-space: nowrap; }
+.taskTrManage .taskEditBtn, .taskTrManage .taskDeleteBtn { margin-left: 4px; }
+.taskExpandRow > td { background: #fbfcfe; padding: 0; }
+.taskExpand { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
+
+/* 일감 펼침 영역: 첫 항목의 상단 구분선·여백 제거(빈 띠 방지) + 상단 패딩 축소 */
+.taskExpand { padding-top: 10px; }
+.taskExpand > .taskField:first-child,
+.taskExpand > *:first-child {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  border-top: 0 !important;
 }
