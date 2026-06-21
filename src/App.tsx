@@ -3553,9 +3553,7 @@ function DashboardOverview({
                   >
                   <button className="kanbanColumnHeader" type="button" disabled={!active} onClick={() => onOpenStatus(item.status)}>
                     <div className="kanbanHeaderMeta">
-                      <small>{String(index + 1).padStart(2, '0')}</small>
-                      <span>{item.label}</span>
-                      <em>{item.owner}</em>
+                      <span>{item.label} <em>({item.owner})</em></span>
                     </div>
                     <div className="kanbanHeaderCount">
                       <strong>{item.projects.length}</strong>
@@ -4056,7 +4054,7 @@ function SystemGuidePanel() {
       <div className="guideSection">
         <h3>6. KPI 정의</h3>
         <div className="guideTableWrap">
-          <table className="guideTable">
+          <table className="guideTable kpiGuideTable">
             <thead><tr><th>지표</th><th>의미</th></tr></thead>
             <tbody>
               <tr><td><strong>처리 대기</strong></td><td>내가 승인해야 할 건(승인 단계, 미승인분)</td></tr>
