@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react'
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react'
 import {
   AlertTriangle,
   BarChart3,
@@ -26,8 +26,6 @@ import {
 import './App.css'
 import { RichEditor, RichTextView } from './RichEditor'
 import { notifyGoogleChat } from './notify'
-
-const SystemFlowPanel = lazy(() => import('./SystemFlowPanel').then((m) => ({ default: m.SystemFlowPanel })))
 import { roleLabels, workflow } from './data'
 import {
   deleteProject as deleteProjectDoc,
@@ -909,10 +907,6 @@ function App() {
     const active = serviceScopedProjects.filter(countable)
     const dueSoon = serviceScopedProjects.filter(isDueSoon)
     const blocked = serviceScopedProjects.filter(isBlocked)
-    const myQueue = serviceScopedProjects.filter((project) => isProjectAssignedToRole(project, role))
-    const relevantProjects = serviceScopedProjects.filter((project) => isProjectRelevantToRole(project, role, currentUserName))
-    const relevantActive = relevantProjects.filter(countable)
-    const relevantBlocked = relevantProjects.filter(isBlocked)
     // 내 차례인 작업(작업 목록과 동일). 요청자 계열은 본인이 올린 요청만 거른다.
     const inRoleScope = (project: Project) => !isRequesterRole(role) || project.requester === currentUserName
     const myTurn = serviceScopedProjects.filter((p) => inRoleScope(p) && isProjectAssignedToRole(p, role) && roleActsOnStatus(role, p.status))
@@ -926,11 +920,7 @@ function App() {
       active: active.length,
       dueSoon: dueSoon.length,
       blocked: blocked.length,
-      myQueue: myQueue.length,
-      relevantTotal: relevantProjects.length,
-      relevantActive: relevantActive.length,
       relevantDueSoon: relevantDueSoon.length,
-      relevantBlocked: relevantBlocked.length,
       relevantWaiting: relevantWaiting.length,
       relevantInProgress: relevantInProgress.length,
     }
@@ -2043,10 +2033,10 @@ function App() {
             className={`navItem flowNavItem ${viewMode === 'flow' ? 'active' : ''}`}
             type="button"
             onClick={() => setViewMode('flow')}
-            title="프로젝트 흐름도"
+            title="시스템 가이드"
           >
             <Workflow size={17} />
-            <span>프로젝트 흐름도</span>
+            <span>시스템 가이드</span>
           </button>
           {role === 'admin' && (
             <button className={`navItem ${viewMode === 'settings' ? 'active' : ''}`} type="button" title="설정" onClick={() => setViewMode('settings')}>
@@ -2087,14 +2077,13 @@ function App() {
         </header>
 
         {viewMode === 'dashboard' && (
-          <section className={`metricGrid ${role === 'admin' ? 'cols5' : 'cols4'}`} aria-label="project metrics">
+          <section className="metricGrid cols4" aria-label="project metrics">
             {role === 'admin' ? (
               <>
                 <Metric icon={<BarChart3 size={20} />} label="전체 프로젝트" value={metrics.total} tone="red" onClick={() => { setViewMode('pipeline'); setStatusFilter('all') }} />
                 <Metric icon={<ListChecks size={20} />} label="진행 중" value={metrics.active} tone="amber" onClick={() => { setViewMode('pipeline'); setStatusFilter('active') }} />
                 <Metric icon={<CalendarDays size={20} />} label="마감 임박" value={metrics.dueSoon} tone="green" onClick={() => { setViewMode('pipeline'); setStatusFilter('dueSoon') }} />
                 <Metric icon={<AlertTriangle size={20} />} label="보류" value={metrics.blocked} tone="wine" onClick={() => { setViewMode('pipeline'); setStatusFilter('blocked') }} />
-                <Metric icon={<Users size={20} />} label="내 처리 대기" value={metrics.myQueue} tone="blue" onClick={() => { setViewMode('pipeline'); setStatusFilter('queue') }} />
               </>
             ) : (
               <>
@@ -2110,9 +2099,7 @@ function App() {
         {viewMode === 'requestFlow' ? (
           <RequestFlowPanel form={requestForm} serviceOptions={serviceOptions} setForm={setRequestForm} onSubmit={submitRequest} />
         ) : viewMode === 'flow' ? (
-          <Suspense fallback={<div className="flowPanel"><p className="flowLoading">흐름도를 불러오는 중…</p></div>}>
-            <SystemFlowPanel />
-          </Suspense>
+          <SystemGuidePanel />
         ) : viewMode === 'settings' && role === 'admin' ? (
           <SettingsPanel
             serviceOptions={serviceOptions}
@@ -2175,7 +2162,12 @@ function App() {
                     {allProjectsList.map((project) => {
                       const dd = dDayInfo(project.dueDate, demoToday)
                       return (
-                        <div key={project.id} className="allProjectsRow">
+                        <div
+                          key={project.id}
+                          className={`allProjectsRow ${role === 'admin' ? 'clickable' : ''}`}
+                          onClick={role === 'admin' ? () => { setSelectedId(project.id); setFocusedId(project.id); setViewMode('pipeline') } : undefined}
+                          title={role === 'admin' ? '클릭하면 상세·단계별 내용 보기' : undefined}
+                        >
                           <span className={`statusPill ${project.status}`}>
                             <span className="stageFull">{statusLabels[project.status]}</span>
                             <span className="stageShort">{shortStatusLabels[project.status]}</span>
@@ -3986,6 +3978,123 @@ function ProjectTasksPanel({
             })}
           </tbody>
         </table>
+      </div>
+    </section>
+  )
+}
+
+// 프로젝트 관리 시스템 가이드 — 워크플로·역할·산출물·화면·KPI 전반 설명
+function SystemGuidePanel() {
+  return (
+    <section className="guidePanel" aria-label="시스템 가이드">
+      <div className="guideHead">
+        <h2>프로젝트 관리 시스템 가이드</h2>
+        <p>요청 접수부터 완료까지의 워크플로, 역할별 책임, 단계별 산출물, 화면·지표 사용법을 한 곳에 정리했습니다.</p>
+      </div>
+
+      <div className="guideSection">
+        <h3>1. 개요</h3>
+        <p>본 시스템은 사내 서비스(카피킬러·프리즘·몬스터 등)의 개선·신규 요청을 <strong>요청 → 기획 → 승인 → 개발 → 검토 → 완료</strong> 6단계로 표준화해 관리합니다. 각 단계마다 책임 주체와 산출물이 정해져 있으며, 모든 상태 변경은 활동 로그로 기록됩니다.</p>
+      </div>
+
+      <div className="guideSection">
+        <h3>2. 워크플로 6단계</h3>
+        <div className="guideTableWrap">
+          <table className="guideTable">
+            <thead><tr><th>단계</th><th>주체</th><th>산출물</th><th>핵심 활동</th></tr></thead>
+            <tbody>
+              <tr><td><span className="statusPill request">요청</span></td><td>요청자(영업·마케팅·운영 등)</td><td>요청서(니즈)</td><td>요청 분류 선택, 요청 내용·배경 작성 후 제출</td></tr>
+              <tr><td><span className="statusPill planning">기획</span></td><td>PM / 기획자</td><td><strong>요구사항 정의서(SRS)</strong></td><td>요구사항 12개 항목 작성, 승인 필요 역할 지정</td></tr>
+              <tr><td><span className="statusPill dept_review">승인</span></td><td>지정 승인자(CEM·개발·정보보호·인프라·QA·특허)</td><td>승인 내역</td><td>역할별 검토·승인, 전원 승인 시 자동 진행</td></tr>
+              <tr><td><span className="statusPill development">개발</span></td><td>개발자(리더)</td><td><strong>설계 명세서(SDS)</strong> · 일감(Task)</td><td>설계 작성, 일정 조율, 개발 태스크 수행</td></tr>
+              <tr><td><span className="statusPill qc_security">검토</span></td><td>QC · 보안 · PM</td><td>Bug · 취약점 · Change</td><td>SRS·SDS 대조 검증, 3자(QC·보안·PM) 합의</td></tr>
+              <tr><td><span className="statusPill completion">완료</span></td><td>PM / 관리자</td><td>완료 보고</td><td>요청자 확인 후 게시·완료 처리</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="guideSection">
+        <h3>3. 역할</h3>
+        <div className="guideTableWrap">
+          <table className="guideTable">
+            <thead><tr><th>역할</th><th>담당</th><th>처리 단계</th></tr></thead>
+            <tbody>
+              <tr><td>요청자 / 영업 / 마케팅</td><td>요청 작성·추적</td><td>요청 (본인이 올린 요청은 전 단계 열람)</td></tr>
+              <tr><td>PM</td><td>기획(SRS)·일정·검토</td><td>기획, 검토</td></tr>
+              <tr><td>CEM · 인프라 · 특허</td><td>승인</td><td>승인</td></tr>
+              <tr><td>개발자</td><td>설계(SDS)·개발</td><td>승인, 개발</td></tr>
+              <tr><td>QC</td><td>품질 검토(Bug)</td><td>승인, 검토</td></tr>
+              <tr><td>보안</td><td>보안 검토(취약점)</td><td>승인, 검토</td></tr>
+              <tr><td>관리자</td><td>전체 열람·운영</td><td>모든 프로젝트 열람(직접 처리 없음)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="guideSection">
+        <h3>4. 산출물</h3>
+        <ul>
+          <li><strong>요청 내용</strong> — 요청 단계에서 작성(요청 내용 + 배경/현재 상황). 상세 분석은 기획 단계로 미룸.</li>
+          <li><strong>요구사항 정의서(SRS)</strong> — 기획 단계에서 PM이 작성. 개요·요약·배경·목표·목표가 아닌 것·이외 고려사항·요구사항 상세·설계 고려사항·다국어/모바일·개발 가이드라인·리스크·참고자료 12개 항목.</li>
+          <li><strong>설계 명세서(SDS)</strong> — 개발 단계에서 개발(리더)이 작성. 아키텍처·구성요소·데이터모델·API·처리흐름·보안·성능·배포·테스트 전략.</li>
+          <li><strong>일감(Task/Bug/Change/취약점)</strong> — 개발·검토 단계에서 등록. 상태(대기·진행·보류·완료) 관리, 댓글·첨부 지원.</li>
+        </ul>
+      </div>
+
+      <div className="guideSection">
+        <h3>5. 화면 안내</h3>
+        <ul>
+          <li><strong>대시보드</strong> — 내 KPI 4종 + 역할 관점 단계 흐름 보드(본인 관련 프로젝트의 진행 위치).</li>
+          <li><strong>작업 목록</strong> — 내가 직접 처리할 차례인 일감만(= 처리 대기 + 진행 중). 일감은 테이블로, 행 클릭 시 상세·상태변경·댓글 펼침.</li>
+          <li><strong>새 요청</strong> — 누구나 요청 분류에 따라 작성. 기본 정보 + 요청 내용/배경.</li>
+          <li><strong>전체 프로젝트</strong> — 모든 프로젝트를 단계와 함께 표로 열람. 관리자는 행 클릭 시 상세·단계별 내용 확인.</li>
+          <li><strong>설정</strong>(관리자) — 서비스 목록·외부 연동·프로젝트 보류/삭제 관리.</li>
+        </ul>
+      </div>
+
+      <div className="guideSection">
+        <h3>6. KPI 정의</h3>
+        <div className="guideTableWrap">
+          <table className="guideTable">
+            <thead><tr><th>지표</th><th>의미</th></tr></thead>
+            <tbody>
+              <tr><td><strong>처리 대기</strong></td><td>내가 승인해야 할 건(승인 단계, 미승인분)</td></tr>
+              <tr><td><strong>진행 중</strong></td><td>그 외 내가 직접 수행하는 작업(기획·개발·검토)</td></tr>
+              <tr><td><strong>작업 목록</strong></td><td>처리 대기 + 진행 중 = 내 차례인 전체 일감</td></tr>
+              <tr><td><strong>마감 임박</strong></td><td>내 작업 중 마감 D-5 이내</td></tr>
+              <tr><td><strong>전체/관련 프로젝트</strong></td><td>관리자=전체, 그 외=본인 관련 프로젝트 수</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="guideSection">
+        <h3>7. 일감 유형 (단계별)</h3>
+        <ul>
+          <li><strong>개발 단계</strong> — Task(작업) · Bug(버그) · Change(변경)</li>
+          <li><strong>검토 단계</strong> — Bug(QC) · 취약점(보안) · Change(PM) — 역할별 기본 유형 자동 지정</li>
+        </ul>
+      </div>
+
+      <div className="guideSection">
+        <h3>8. 승인 · 보류 · 알림</h3>
+        <ul>
+          <li><strong>승인</strong> — 기획 단계에서 지정한 역할만 승인 단계에서 검토·승인. 전원 승인 시 개발 단계로 자동 진행.</li>
+          <li><strong>보류</strong> — 각 단계 담당자가 사유와 함께 프로젝트를 보류. 보류 중에는 단계 진행이 잠김.</li>
+          <li><strong>알림</strong> — 내 승인/검토 차례, 새 요청 접수(PM), 마감 임박/지연을 벨에 모아 표시.</li>
+        </ul>
+      </div>
+
+      <div className="guideSection">
+        <h3>9. 단계 진행 규칙</h3>
+        <ul>
+          <li>기획 → 승인: <strong>SRS 작성 완료</strong> 필요</li>
+          <li>승인 → 개발: <strong>지정 승인자 전원 승인</strong></li>
+          <li>개발 → 검토: <strong>SDS 작성 완료</strong> 필요</li>
+          <li>검토 → 완료: <strong>QC·보안·PM 3자 합의</strong></li>
+          <li>완료(게시): <strong>요청자 확인</strong> 후 처리</li>
+        </ul>
       </div>
     </section>
   )

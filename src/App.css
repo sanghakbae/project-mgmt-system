@@ -9016,3 +9016,27 @@ button.approvalPill:hover {
   padding-top: 0 !important;
   border-top: 0 !important;
 }
+
+/* 전체 프로젝트: 관리자 클릭 가능 행 */
+.allProjectsRow.clickable { cursor: pointer; }
+.allProjectsRow.clickable:hover { background: #f4f7ff; }
+
+/* 시스템 가이드 */
+.guidePanel { max-width: 980px; }
+.guideHead { margin-bottom: 18px; }
+.guideHead h2 { font-size: 22px; font-weight: 800; color: #1a1f27; margin: 0 0 6px; }
+.guideHead p { color: #5f6670; font-size: 14px; line-height: 1.6; margin: 0; }
+.guideSection { background: #fff; border: 1px solid #e1e5eb; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+.guideSection h3 { font-size: 16px; font-weight: 800; color: #20242b; margin: 0 0 10px; }
+.guideSection p { font-size: 13px; line-height: 1.7; color: #3a414b; margin: 0 0 6px; }
+.guideSection ul { margin: 0; padding-left: 20px; }
+.guideSection li { font-size: 13px; line-height: 1.8; color: #3a414b; }
+.guideTableWrap { width: 100%; overflow-x: auto; }
+.guideTable { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 520px; }
+.guideTable th { text-align: left; background: #f4f5f7; color: #4b515c; font-weight: 800; padding: 8px 10px; border-bottom: 1px solid #e5e7eb; white-space: nowrap; }
+.guideTable td { padding: 9px 10px; border-bottom: 1px solid #eef0f3; color: #3a414b; vertical-align: top; line-height: 1.6; }
+.guideTable td .statusPill { display: inline-flex; min-height: 22px; padding: 1px 8px; }
+@media (max-width: 768px) {
+  .appShell .guideHead h2 { font-size: 18px; }
+  .appShell .guideSection { padding: 12px 14px; }
+}
