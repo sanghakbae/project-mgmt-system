@@ -2338,7 +2338,7 @@ function App() {
 
           </div>
 
-          {selected && !(role !== 'admin' && !canAct && !isProjectAssignedToRole(selected, role) && !(role === 'requester' && ['request', 'planning'].includes(selected.status))) && (
+          {selected && !(role !== 'admin' && !canAct && !isProjectAssignedToRole(selected, role) && !(isRequesterRole(role) && selected.requester === currentUserName)) && (
             <div className="detailHeaderPanel">
               <div className="flowRequestHead">
                 <div>
@@ -2390,7 +2390,7 @@ function App() {
 
           </div>
 
-          {selected && role !== 'admin' && !canAct && !isProjectAssignedToRole(selected, role) && !(role === 'requester' && ['request', 'planning'].includes(selected.status)) ? (
+          {selected && role !== 'admin' && !canAct && !isProjectAssignedToRole(selected, role) && !(isRequesterRole(role) && selected.requester === currentUserName) ? (
           <div className="detailPanel emptyStatePanel">
             <strong>{roleLabels[role]} 역할의 작업이 없습니다.</strong>
             <span>이 프로젝트의 현재 단계는 {statusLabels[selected.status]}이며, {roleLabels[role]} 차례가 아닙니다.</span>
