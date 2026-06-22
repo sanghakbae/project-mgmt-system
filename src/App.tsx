@@ -4008,18 +4008,20 @@ function ProjectTasksPanel({
 // ─── 감사 로그 패널 ────────────────────────────────────────────────────────────
 function AuditLogPanel({ projects }: { projects: Project[] }) {
   const [tab, setTab] = useState<'access' | 'changes'>('changes')
-  const [accessLogs, setAccessLogs] = useState<AccessLogEntry[]>([])
-  const [accessLoading, setAccessLoading] = useState(false)
+  const [accessLogs, setAccessLogs] = useState<AccessLogEntry[] | null>(null)
   const [changeSearch, setChangeSearch] = useState('')
 
-  // 접근 로그 로드 (탭 진입 시)
+  // accessLoading: 접근 탭인데 아직 데이터가 없으면 로딩 중
+  const accessLoading = tab === 'access' && accessLogs === null
+
+  // 접근 로그 로드 (탭 진입 시) — setState는 비동기 콜백 안에서만 호출
   useEffect(() => {
     if (tab !== 'access') return
-    setAccessLoading(true)
+    let cancelled = false
     fetchAccessLogs(300)
-      .then(setAccessLogs)
-      .catch(() => setAccessLogs([]))
-      .finally(() => setAccessLoading(false))
+      .then(logs => { if (!cancelled) setAccessLogs(logs) })
+      .catch(() => { if (!cancelled) setAccessLogs([]) })
+    return () => { cancelled = true }
   }, [tab])
 
   // 프로젝트 변경 로그: 모든 프로젝트의 logs를 평탄화 + 시간 역순
@@ -4071,7 +4073,7 @@ function AuditLogPanel({ projects }: { projects: Project[] }) {
           item.log.actor,
           item.log.message,
         ])
-      : accessLogs.map((entry) => [
+      : (accessLogs ?? []).map((entry) => [
           entry.at,
           entry.actor,
           roleLabels[entry.role as Role] ?? entry.role,
@@ -4153,7 +4155,7 @@ function AuditLogPanel({ projects }: { projects: Project[] }) {
         <div className="auditContent">
           {accessLoading ? (
             <div className="dashboardEmpty">로딩 중…</div>
-          ) : accessLogs.length === 0 ? (
+          ) : (accessLogs ?? []).length === 0 ? (
             <div className="dashboardEmpty">접근 기록이 없습니다. (데모 모드에서는 역할 전환 시 기록됩니다)</div>
           ) : (
             <div className="auditTableWrap">
@@ -4168,7 +4170,7 @@ function AuditLogPanel({ projects }: { projects: Project[] }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {accessLogs.map((entry) => (
+                  {(accessLogs ?? []).map((entry) => (
                     <tr key={entry.id}>
                       <td className="auditTime">{formatAt(entry.at)}</td>
                       <td className="auditActor">{entry.actor}</td>
