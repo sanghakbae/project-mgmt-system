@@ -2,10 +2,12 @@
 // 문서 1건 = 프로젝트 1건. 문서 데이터는 기존 Supabase 행과 동일한 snake_case 스키마를 유지해
 // mapProjectRow 로직을 그대로 재사용한다(상태 메타는 logs[].meta 스냅샷에서 복원).
 import {
+  addDoc,
   collection,
   deleteDoc,
   doc,
   getDocs,
+  limit,
   orderBy,
   query,
   setDoc,
@@ -259,3 +261,29 @@ export async function deleteProjects(ids: string[]): Promise<void> {
 }
 
 export { hasFirebaseConfig }
+
+// ─── 감사 로그 (접근·프로젝트 변경) ───────────────────────────────────────────
+const ACCESS_LOG_COLLECTION = 'pms_access_logs'
+
+export type AccessLogEntry = {
+  id?: string
+  at: string
+  actor: string        // 사용자명 또는 '데모'
+  role: string         // 접근 당시 역할
+  action: 'login' | 'role_switch' | 'page_view' | 'logout'
+  detail?: string      // 추가 설명
+  userAgent?: string
+}
+
+export async function writeAccessLog(entry: Omit<AccessLogEntry, 'id'>): Promise<void> {
+  if (!db) return
+  await addDoc(collection(db, ACCESS_LOG_COLLECTION), entry)
+}
+
+export async function fetchAccessLogs(maxEntries = 200): Promise<AccessLogEntry[]> {
+  if (!db) return []
+  const snap = await getDocs(
+    query(collection(db, ACCESS_LOG_COLLECTION), orderBy('at', 'desc'), limit(maxEntries))
+  )
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AccessLogEntry, 'id'>) }))
+}

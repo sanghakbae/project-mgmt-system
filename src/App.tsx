@@ -19,6 +19,7 @@ import {
   Plus,
   Search,
   Send,
+  Shield,
   SlidersHorizontal,
   Users,
   Workflow,
@@ -31,9 +32,12 @@ import {
   deleteProject as deleteProjectDoc,
   deleteProjects as deleteProjectsDoc,
   fetchProjects,
+  fetchAccessLogs,
   hasFirebaseConfig,
   insertProject,
   updateProject as updateProjectDoc,
+  writeAccessLog,
+  type AccessLogEntry,
   type ProjectRow,
 } from './projectsRepo'
 import { registerWithEmail, signInWithEmail } from './authRepo'
@@ -503,7 +507,7 @@ function isRequesterRole(role: Role) {
 }
 const demoToday = new Date('2026-05-17T09:00:00+09:00')
 
-type ViewMode = 'dashboard' | 'requestFlow' | 'pipeline' | 'flow' | 'settings' | 'allProjects'
+type ViewMode = 'dashboard' | 'requestFlow' | 'pipeline' | 'flow' | 'settings' | 'allProjects' | 'auditLog'
 
 type NotificationItem = {
   id: string
@@ -839,6 +843,19 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(sessionStateStorageKey, JSON.stringify({ viewMode, role, selectedId }))
   }, [viewMode, role, selectedId])
+
+  // 역할 전환 + 접근 로그 기록
+  const handleRoleChange = useCallback((next: Role) => {
+    setRole(next)
+    void writeAccessLog({
+      at: new Date().toISOString(),
+      actor: currentUserName || '데모',
+      role: next,
+      action: 'role_switch',
+      detail: `역할 전환 → ${roleLabels[next]}`,
+      userAgent: navigator.userAgent,
+    })
+  }, [currentUserName])
 
   function replaceServiceOptions(nextOptions: string[]) {
     const normalized = Array.from(new Set(nextOptions.map((item) => item.trim()).filter(Boolean)))
@@ -2039,10 +2056,16 @@ function App() {
             <span>시스템 가이드</span>
           </button>
           {role === 'admin' && (
-            <button className={`navItem ${viewMode === 'settings' ? 'active' : ''}`} type="button" title="설정" onClick={() => setViewMode('settings')}>
-              <SlidersHorizontal size={17} />
-              <span>설정</span>
-            </button>
+            <>
+              <button className={`navItem ${viewMode === 'auditLog' ? 'active' : ''}`} type="button" title="감사 로그" onClick={() => setViewMode('auditLog')}>
+                <Shield size={17} />
+                <span>감사 로그</span>
+              </button>
+              <button className={`navItem ${viewMode === 'settings' ? 'active' : ''}`} type="button" title="설정" onClick={() => setViewMode('settings')}>
+                <SlidersHorizontal size={17} />
+                <span>설정</span>
+              </button>
+            </>
           )}
         </nav>
       </aside>
@@ -2062,7 +2085,7 @@ function App() {
           <div />
           <div className="topbarActions">
             {/* 임시 데모: 역할 필터 — 클릭 시 아래로 펼쳐지는 드롭다운 */}
-            <RoleSwitcher role={role} onChange={setRole} />
+            <RoleSwitcher role={role} onChange={handleRoleChange} />
             <NotificationBell
               items={notifications}
               onOpenProject={(projectId) => {
@@ -2100,6 +2123,8 @@ function App() {
           <RequestFlowPanel form={requestForm} serviceOptions={serviceOptions} setForm={setRequestForm} onSubmit={submitRequest} />
         ) : viewMode === 'flow' ? (
           <SystemGuidePanel />
+        ) : viewMode === 'auditLog' && role === 'admin' ? (
+          <AuditLogPanel projects={projects} />
         ) : viewMode === 'settings' && role === 'admin' ? (
           <SettingsPanel
             serviceOptions={serviceOptions}
@@ -3085,8 +3110,7 @@ function App() {
             <div className="bottomGrid">
               <section className="infoPanel">
                 <div className="panelHeader compact">
-                  <h3>산출물</h3>
-                  <FileText size={17} />
+                  <h3><FileText size={15} style={{verticalAlign:'middle', marginRight:5}} />산출물</h3>
                 </div>
                 <div className="artifactList">
                   <Artifact label="요청 승인 기록" state="승인됨" />
@@ -3981,6 +4005,186 @@ function ProjectTasksPanel({
   )
 }
 
+// ─── 감사 로그 패널 ────────────────────────────────────────────────────────────
+function AuditLogPanel({ projects }: { projects: Project[] }) {
+  const [tab, setTab] = useState<'access' | 'changes'>('changes')
+  const [accessLogs, setAccessLogs] = useState<AccessLogEntry[]>([])
+  const [accessLoading, setAccessLoading] = useState(false)
+  const [changeSearch, setChangeSearch] = useState('')
+
+  // 접근 로그 로드 (탭 진입 시)
+  useEffect(() => {
+    if (tab !== 'access') return
+    setAccessLoading(true)
+    fetchAccessLogs(300)
+      .then(setAccessLogs)
+      .catch(() => setAccessLogs([]))
+      .finally(() => setAccessLoading(false))
+  }, [tab])
+
+  // 프로젝트 변경 로그: 모든 프로젝트의 logs를 평탄화 + 시간 역순
+  const changeLogs = useMemo(() => {
+    const all: Array<{ projectId: string; projectTitle: string; log: (typeof projects)[0]['logs'][0] }> = []
+    for (const p of projects) {
+      for (const log of (p.logs ?? [])) {
+        all.push({ projectId: p.id, projectTitle: p.title, log })
+      }
+    }
+    all.sort((a, b) => b.log.at.localeCompare(a.log.at))
+    return all
+  }, [projects])
+
+  const filteredChanges = useMemo(() => {
+    if (!changeSearch.trim()) return changeLogs
+    const q = changeSearch.toLowerCase()
+    return changeLogs.filter(
+      (item) =>
+        item.projectTitle.toLowerCase().includes(q) ||
+        item.log.actor.toLowerCase().includes(q) ||
+        item.log.message.toLowerCase().includes(q),
+    )
+  }, [changeLogs, changeSearch])
+
+  function formatAt(at: string) {
+    if (!at) return '—'
+    const d = new Date(at)
+    if (isNaN(d.getTime())) return at.slice(0, 16).replace('T', ' ')
+    return d.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+  }
+
+  const actionLabels: Record<string, string> = {
+    login: '로그인',
+    logout: '로그아웃',
+    role_switch: '역할 전환',
+    page_view: '페이지 조회',
+  }
+
+  function exportCsv() {
+    const isChanges = tab === 'changes'
+    const headers = isChanges
+      ? ['일시', '프로젝트', '담당자', '변경 내용']
+      : ['일시', '사용자', '역할', '유형', '상세']
+    const rows = isChanges
+      ? filteredChanges.map((item) => [
+          item.log.at,
+          item.projectTitle,
+          item.log.actor,
+          item.log.message,
+        ])
+      : accessLogs.map((entry) => [
+          entry.at,
+          entry.actor,
+          roleLabels[entry.role as Role] ?? entry.role,
+          actionLabels[entry.action] ?? entry.action,
+          entry.detail ?? '',
+        ])
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `audit_${tab}_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <section className="workArea auditLogPage">
+      <div className="panelHeader compact">
+        <div>
+          <h2>감사 로그</h2>
+          <p>접근 기록 및 프로젝트 변경 이력</p>
+        </div>
+        <button type="button" className="csvExportButton" onClick={exportCsv}>
+          <Download size={14} /> CSV
+        </button>
+      </div>
+
+      <div className="auditTabBar">
+        <button type="button" className={`auditTab ${tab === 'changes' ? 'active' : ''}`} onClick={() => setTab('changes')}>
+          <ClipboardList size={15} /> 프로젝트 변경
+          <span className="auditTabCount">{changeLogs.length}</span>
+        </button>
+        <button type="button" className={`auditTab ${tab === 'access' ? 'active' : ''}`} onClick={() => setTab('access')}>
+          <Shield size={15} /> 접근 기록
+        </button>
+      </div>
+
+      {tab === 'changes' && (
+        <div className="auditContent">
+          <div className="searchBox auditSearch">
+            <Search size={15} />
+            <input value={changeSearch} onChange={(e) => setChangeSearch(e.target.value)} placeholder="프로젝트·담당자·내용 검색" />
+          </div>
+          {filteredChanges.length === 0 ? (
+            <div className="dashboardEmpty">변경 이력이 없습니다.</div>
+          ) : (
+            <div className="auditTableWrap">
+              <table className="auditTable">
+                <thead>
+                  <tr>
+                    <th>일시</th>
+                    <th>프로젝트</th>
+                    <th>담당자</th>
+                    <th>변경 내용</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredChanges.map(({ projectId, projectTitle, log }) => (
+                    <tr key={`${projectId}-${log.id}`}>
+                      <td className="auditTime">{formatAt(log.at)}</td>
+                      <td className="auditProject">{projectTitle}</td>
+                      <td className="auditActor">{log.actor}</td>
+                      <td className="auditMessage">{log.message}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'access' && (
+        <div className="auditContent">
+          {accessLoading ? (
+            <div className="dashboardEmpty">로딩 중…</div>
+          ) : accessLogs.length === 0 ? (
+            <div className="dashboardEmpty">접근 기록이 없습니다. (데모 모드에서는 역할 전환 시 기록됩니다)</div>
+          ) : (
+            <div className="auditTableWrap">
+              <table className="auditTable">
+                <thead>
+                  <tr>
+                    <th>일시</th>
+                    <th>사용자</th>
+                    <th>역할</th>
+                    <th>유형</th>
+                    <th>상세</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {accessLogs.map((entry) => (
+                    <tr key={entry.id}>
+                      <td className="auditTime">{formatAt(entry.at)}</td>
+                      <td className="auditActor">{entry.actor}</td>
+                      <td><span className="statusPill request">{roleLabels[entry.role as Role] ?? entry.role}</span></td>
+                      <td><span className={`auditActionBadge action-${entry.action}`}>{actionLabels[entry.action] ?? entry.action}</span></td>
+                      <td className="auditMessage">{entry.detail ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
 // 프로젝트 관리 시스템 가이드 — 워크플로·역할·산출물·화면·KPI 전반 설명
 function SystemGuidePanel() {
   return (
@@ -4855,13 +5059,17 @@ function SettingsPanel({
       </div>
 
       <div className="settingsSection">
-        <div className="panelHeader compact">
-          <div>
-            <h3>동사무소 게시판 API</h3>
-            <p>완료된 프로젝트를 동사무소 게시판에 자동 게시하기 위한 API 연결 정보입니다.</p>
-          </div>
-        </div>
         <form className="officeApiForm" onSubmit={saveOfficeApi}>
+          <div className="panelHeader compact officeApiHeader">
+            <div>
+              <h3>동사무소 게시판 API</h3>
+              <p>완료된 프로젝트를 동사무소 게시판에 자동 게시하기 위한 API 연결 정보입니다.</p>
+            </div>
+            <div className="officeApiActions">
+              {officeApiSaved && <span className="officeApiSavedHint">저장되었습니다 ✓</span>}
+              <button className="primaryButton" type="submit">저장</button>
+            </div>
+          </div>
           <div className="formGrid two">
             <label>
               <span>Base URL</span>
@@ -4901,10 +5109,6 @@ function SettingsPanel({
                 autoComplete="new-password"
               />
             </label>
-          </div>
-          <div className="officeApiActions">
-            {officeApiSaved && <span className="officeApiSavedHint">저장되었습니다 ✓</span>}
-            <button className="primaryButton" type="submit">저장</button>
           </div>
         </form>
       </div>
