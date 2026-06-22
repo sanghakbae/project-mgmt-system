@@ -2738,11 +2738,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   align-items: flex-start;
   margin-bottom: 8px;
 }
-.auditLogPage .panelHeader.compact {
-  flex-direction: row !important;
-  align-items: center;
-  justify-content: space-between;
-}
+.auditLogHead { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; }
 .officeApiActions {
   display: flex;
   align-items: center;
@@ -9098,7 +9094,7 @@ button.approvalPill:hover {
 }
 
 /* ─── 감사 로그 패널 ──────────────────────────────────────────────────────── */
-.auditLogPage { display: flex; flex-direction: column; gap: 12px; padding: 20px 24px; width: 100%; max-width: 100%; box-sizing: border-box; }
+.auditLogPage { display: flex; flex-direction: column; align-items: stretch; gap: 12px; width: 100%; max-width: 100%; box-sizing: border-box; }
 .auditTabBar { display: flex; gap: 4px; border-bottom: 2px solid #e5e7eb; padding-bottom: 0; }
 .auditTab {
   display: inline-flex; align-items: center; gap: 6px;
@@ -9114,21 +9110,24 @@ button.approvalPill:hover {
   padding: 1px 6px; border-radius: 10px; min-width: 20px; text-align: center;
 }
 .auditContent { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
-.auditSearch { max-width: 360px; }
+.auditSearch { flex: 1; max-width: 400px; margin-left: auto; align-self: center; margin-bottom: 6px; }
 .auditTableWrap { width: 100%; overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
 .auditTable {
-  width: 100%; border-collapse: collapse; font-size: 13px;
+  width: 100%; border-collapse: collapse; font-size: 10px;
 }
 .auditTable th {
-  background: #f8f9fb; color: #4b515c; font-weight: 700; font-size: 12px;
-  padding: 9px 12px; text-align: left; border-bottom: 1px solid #e5e7eb;
+  background: #fff; color: #4b515c; font-weight: 700; font-size: 10px;
+  padding: 7px 10px; text-align: left; border-bottom: 1px solid #e5e7eb;
   white-space: nowrap;
 }
-.auditTable td { padding: 8px 12px; border-bottom: 1px solid #f0f1f4; vertical-align: middle; }
+.auditTable td { padding: 6px 10px; border-bottom: 1px solid #f0f1f4; vertical-align: middle; font-size: 10px; background: #fff; }
 .auditTable tbody tr:last-child td { border-bottom: none; }
-.auditTable tbody tr:hover { background: #f8f9fc; }
-.auditTime { color: #6b7280; font-size: 12px; white-space: nowrap; }
-.auditProject { font-weight: 600; color: #20242b; max-width: 200px; }
+.auditTable tbody tr:hover td { background: #f5f6fa; }
+.auditTime { color: #6b7280; font-size: 10px; white-space: nowrap; text-align: center; width: 1%; }
+.auditProject { font-weight: 600; color: #20242b; white-space: nowrap; text-align: center; width: 1%; }
+.auditActor { text-align: center; white-space: nowrap; width: 1%; }
+.auditTable th { text-align: center; }
+.auditTable td:last-child { text-align: left; }
 .auditActor { color: #374151; white-space: nowrap; }
 .auditMessage { color: #4b5563; line-height: 1.5; }
 .auditActionBadge {
@@ -9142,6 +9141,6 @@ button.approvalPill:hover {
 @media (max-width: 768px) {
   .auditLogPage { padding: 10px 8px; gap: 8px; }
   .auditTab { padding: 6px 10px; font-size: 12px; }
-  .auditTable th, .auditTable td { padding: 6px 8px; font-size: 12px; }
-  .auditProject { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .auditTable th, .auditTable td { padding: 5px 6px; font-size: 10px; }
+  .auditProject { width: 28%; }
 }

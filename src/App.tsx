@@ -4091,8 +4091,8 @@ function AuditLogPanel({ projects }: { projects: Project[] }) {
   }
 
   return (
-    <section className="workArea auditLogPage">
-      <div className="panelHeader compact">
+    <section className="guidePanel auditLogPage">
+      <div className="guideHead auditLogHead">
         <div>
           <h2>감사 로그</h2>
           <p>접근 기록 및 프로젝트 변경 이력</p>
@@ -4110,14 +4110,16 @@ function AuditLogPanel({ projects }: { projects: Project[] }) {
         <button type="button" className={`auditTab ${tab === 'access' ? 'active' : ''}`} onClick={() => setTab('access')}>
           <Shield size={15} /> 접근 기록
         </button>
-      </div>
-
-      {tab === 'changes' && (
-        <div className="auditContent">
+        {tab === 'changes' && (
           <div className="searchBox auditSearch">
             <Search size={15} />
             <input value={changeSearch} onChange={(e) => setChangeSearch(e.target.value)} placeholder="프로젝트·담당자·내용 검색" />
           </div>
+        )}
+      </div>
+
+      {tab === 'changes' && (
+        <div className="auditContent">
           {filteredChanges.length === 0 ? (
             <div className="dashboardEmpty">변경 이력이 없습니다.</div>
           ) : (
