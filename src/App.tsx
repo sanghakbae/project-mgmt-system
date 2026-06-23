@@ -1018,7 +1018,7 @@ function App() {
       // 내 검토 차례 (QC·보안·PM 검토 단계)
       if (p.status === 'qc_security' && (role === 'qa' || role === 'security' || role === 'pm')) {
         if (!p.qcSignoff?.[role]) {
-          items.push({ id: `qc-${p.id}`, kind: 'qc', tone: 'action', projectId: p.id, projectTitle: p.title, text: `${role === 'qa' ? 'QC' : role === 'security' ? '보안' : 'PM'} 검토가 필요합니다.` })
+          items.push({ id: `qc-${p.id}`, kind: 'qc', tone: 'action', projectId: p.id, projectTitle: p.title, text: `${role === 'qa' ? 'QA' : role === 'security' ? '보안' : 'PM'} 검토가 필요합니다.` })
         }
       }
       // 마감 임박 / 지연 (내 할 일 프로젝트만)
@@ -1406,7 +1406,7 @@ function App() {
     if (selected.status === 'dept_review' && pendingApprovalRoles.length > 0) return
     if (selected.status === 'planning' && planningRequiredByType[selected.requestType] && !hasSrsDraft) { window.alert('요구사항 정의서(SRS)를 작성해야 다음 단계로 진행할 수 있습니다.'); return }
     if (selected.status === 'development' && planningRequiredByType[selected.requestType] && !hasSdsDraft) { window.alert('설계 명세서(SDS)를 작성해야 검토 단계로 진행할 수 있습니다.'); return }
-    if (selected.status === 'qc_security' && !qcAllSignedOff) { window.alert('QC·보안·PM 3자 검토가 모두 완료되어야 다음 단계로 진행할 수 있습니다.'); return }
+    if (selected.status === 'qc_security' && !qcAllSignedOff) { window.alert('QA·보안·PM 3자 검토가 모두 완료되어야 다음 단계로 진행할 수 있습니다.'); return }
     if (selected.status === 'completion' && !selected.requesterConfirmed) { window.alert('요청자 확인이 완료되어야 게시할 수 있습니다.'); return }
     // 개발 단계: 미완료 태스크가 있으면 확인
     if (selected.status === 'development' && openTasks.length > 0) {
@@ -1534,7 +1534,7 @@ function App() {
       delete nextReviews[signRole]
     }
     const nextSignoff = { ...current, [signRole]: nextDone, reviews: nextReviews }
-    const label = { qa: 'QC', security: '보안', pm: 'PM' }[signRole]
+    const label = { qa: 'QA', security: '보안', pm: 'PM' }[signRole]
     await patchSelectedProject(
       { qcSignoff: nextSignoff },
       `${label} 검토를 ${nextDone ? '완료' : '취소'} 처리했습니다.${nextDone && trimmedNote ? ` (${trimmedNote})` : ''}`,
@@ -2788,8 +2788,8 @@ function App() {
             {viewedStep === currentStep && ['dept_review', 'qc_security', 'completion', 'rejected'].includes(viewedStatus) && (
             <div className={`actionBanner ${['completion', 'rejected'].includes(viewedStatus) ? 'rowAction' : ''} ${canAct && !selected.onHold ? 'neonHighlight' : ''}`} data-section="현재 단계 액션" data-section-tone="approval">
               <div>
-                <strong>{selected.status === 'dept_review' ? '승인 단계' : selected.status === 'qc_security' ? 'QC·보안·PM 3자 검토' : (canAct ? selected.nextAction : `${roleLabels[role]} 역할은 현재 단계에서 대기 상태입니다.`)}</strong>
-                <span>담당: {selected.status === 'qc_security' ? 'QC · 보안 · PM' : roleLabels[selected.assigneeRole]} · 마감 {formatDate(selected.dueDate)}</span>
+                <strong>{selected.status === 'dept_review' ? '승인 단계' : selected.status === 'qc_security' ? 'QA·보안·PM 3자 검토' : (canAct ? selected.nextAction : `${roleLabels[role]} 역할은 현재 단계에서 대기 상태입니다.`)}</strong>
+                <span>담당: {selected.status === 'qc_security' ? 'QA · 보안 · PM' : roleLabels[selected.assigneeRole]} · 마감 {formatDate(selected.dueDate)}</span>
                 {selected.status === 'dept_review' && (
                   <div className="approvalGrid" style={{ ['--cols' as string]: selectedApprovalState.requiredRoles.length }}>
                     <div className="approvalUnitGrid">
@@ -2920,7 +2920,7 @@ function App() {
                   <div className="qcReviewBlock">
                     <div className="qcReviewGrid">
                       {(['qa', 'security', 'pm'] as const).map((r) => {
-                        const label = { qa: 'QC', security: '보안', pm: 'PM' }[r]
+                        const label = { qa: 'QA', security: '보안', pm: 'PM' }[r]
                         const done = qcSignoff[r]
                         const review = qcSignoff.reviews?.[r]
                         const isMine = (r === myQcSignoffRole) || role === 'admin'
@@ -2965,7 +2965,7 @@ function App() {
                       })}
                     </div>
                     <span className="approvalGuide">
-                      {qcAllSignedOff ? 'QC·보안·PM 검토 완료 · 다음 단계 진행 가능' : `검토 대기: ${qcPendingRoles.map((r) => ({ qa: 'QC', security: '보안', pm: 'PM' }[r])).join(', ')}`}
+                      {qcAllSignedOff ? 'QA·보안·PM 검토 완료 · 다음 단계 진행 가능' : `검토 대기: ${qcPendingRoles.map((r) => ({ qa: 'QA', security: '보안', pm: 'PM' }[r])).join(', ')}`}
                     </span>
                     {(myQcSignoffRole || role === 'admin') && !selected.onHold && (
                       <div className="qcRejectArea">
@@ -4989,6 +4989,21 @@ function SettingsPanel({
   const [draft, setDraft] = useState('')
   const [holdFilter, setHoldFilter] = useState<'all' | 'onHold' | 'active'>('all')
 
+  type ConfirmAction = { type: 'delete'; projectId: string; title: string } | { type: 'hold'; projectId: string; title: string; isHold: boolean } | { type: 'deleteAll' }
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
+  const [confirmKey, setConfirmKey] = useState('')
+
+  const REQUIRED_KEY = '확인'
+
+  function handleConfirmSubmit() {
+    if (confirmKey !== REQUIRED_KEY || !confirmAction) return
+    if (confirmAction.type === 'delete') onDeleteProject(confirmAction.projectId)
+    else if (confirmAction.type === 'hold') onToggleHold(confirmAction.projectId)
+    else if (confirmAction.type === 'deleteAll') onDeleteAllProjects()
+    setConfirmAction(null)
+    setConfirmKey('')
+  }
+
   // 동사무소 게시판 API 등록 설정 (localStorage 영속)
   type OfficeApiConfig = { baseUrl: string; boardName: string; username: string; password: string }
   const officeApiStorageKey = 'pms-office-api'
@@ -5027,6 +5042,7 @@ function SettingsPanel({
   }
 
   return (
+    <>
     <section className="requestPanel settingsPanel">
       <div className="requestIntro">
         <p className="eyebrow">Settings</p>
@@ -5142,11 +5158,7 @@ function SettingsPanel({
               type="button"
               className="dangerChip"
               disabled={projects.length === 0}
-              onClick={() => {
-                if (window.confirm(`전체 프로젝트 ${projects.length}개를 모두 삭제합니다. 되돌릴 수 없습니다. 계속할까요?`)) {
-                  onDeleteAllProjects()
-                }
-              }}
+              onClick={() => { setConfirmAction({ type: 'deleteAll' }); setConfirmKey('') }}
             >
               전체 삭제
             </button>
@@ -5179,18 +5191,14 @@ function SettingsPanel({
                       className="miniButton"
                       type="button"
                       disabled={disabled}
-                      onClick={() => onToggleHold(project.id)}
+                      onClick={() => { setConfirmAction({ type: 'hold', projectId: project.id, title: project.title, isHold: !project.onHold }); setConfirmKey('') }}
                     >
                       {project.onHold ? '보류 해제' : '보류'}
                     </button>
                     <button
                       className="miniButton rejectButton"
                       type="button"
-                      onClick={() => {
-                        if (window.confirm(`"${project.title}" 프로젝트를 삭제합니다. 되돌릴 수 없습니다. 계속할까요?`)) {
-                          onDeleteProject(project.id)
-                        }
-                      }}
+                      onClick={() => { setConfirmAction({ type: 'delete', projectId: project.id, title: project.title }); setConfirmKey('') }}
                     >
                       삭제
                     </button>
@@ -5202,6 +5210,53 @@ function SettingsPanel({
         </div>
       </div>
     </section>
+
+    {confirmAction && (
+      <div className="attachmentModalBackdrop" role="dialog" aria-modal="true" onClick={() => { setConfirmAction(null); setConfirmKey('') }}>
+        <div className="confirmKeyModal" onClick={(e) => e.stopPropagation()}>
+          <div className="confirmKeyModalHeader">
+            <strong>
+              {confirmAction.type === 'deleteAll' ? '전체 삭제 확인' :
+               confirmAction.type === 'delete' ? '프로젝트 삭제 확인' :
+               confirmAction.isHold ? '보류 확인' : '보류 해제 확인'}
+            </strong>
+          </div>
+          <div className="confirmKeyModalBody">
+            <p>
+              {confirmAction.type === 'deleteAll'
+                ? `전체 프로젝트 ${projects.length}개를 모두 삭제합니다. 되돌릴 수 없습니다.`
+                : confirmAction.type === 'delete'
+                ? `"${confirmAction.title}" 프로젝트를 삭제합니다. 되돌릴 수 없습니다.`
+                : confirmAction.isHold
+                ? `"${confirmAction.title}" 프로젝트를 보류 처리합니다.`
+                : `"${confirmAction.title}" 프로젝트의 보류를 해제합니다.`}
+            </p>
+            <p className="confirmKeyInstruction">아래에 <strong>{REQUIRED_KEY}</strong>을 입력하세요.</p>
+            <input
+              className="confirmKeyInput"
+              type="text"
+              value={confirmKey}
+              placeholder={REQUIRED_KEY}
+              autoFocus
+              onChange={(e) => setConfirmKey(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmSubmit() }}
+            />
+          </div>
+          <div className="confirmKeyModalFooter">
+            <button className="miniButton" type="button" onClick={() => { setConfirmAction(null); setConfirmKey('') }}>취소</button>
+            <button
+              className="miniButton rejectButton"
+              type="button"
+              disabled={confirmKey !== REQUIRED_KEY}
+              onClick={handleConfirmSubmit}
+            >
+              {confirmAction.type === 'delete' || confirmAction.type === 'deleteAll' ? '삭제' : confirmAction.isHold ? '보류' : '보류 해제'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
 

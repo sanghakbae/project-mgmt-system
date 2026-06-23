@@ -2,6 +2,11 @@
   line-height: 1.1;
 }
 
+button {
+  min-height: 26px;
+  box-sizing: border-box;
+}
+
 html {
   /* 스크롤바 자리를 항상 확보해 단계 이동 시 본문 폭이 변하지 않도록 */
   scrollbar-gutter: stable;
@@ -2368,9 +2373,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 
 .panelHeader.compact {
   margin-bottom: 12px;
-  /* 세로(제목↔부제) 간격은 4px margin 규칙으로만 통일 — 부모 flex의 14px gap이
-     h3·span이 직접 자식일 때 추가로 끼어드는 것을 차단 (가로 버튼 간격은 유지) */
-  row-gap: 0;
+  gap: 8px;
 }
 
 /* 패널 헤더 제목 통일 — 모두 15px */
@@ -2682,7 +2685,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 }
 
 .requestPanel {
-  padding: 18px;
+  padding: 13px 18px;
   font-size: 12px;
 }
 
@@ -2693,8 +2696,8 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 
 .settingsSection {
   display: grid;
-  gap: 12px;
-  padding: 18px;
+  gap: 6px;
+  padding: 13px 18px;
   border: 1px solid #dfe2e7;
   border-radius: 8px;
   background: #fff;
@@ -2775,6 +2778,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   border: 1px solid #dfe2e7;
   border-radius: 8px;
   background: #fff;
+  line-height: 1.4;
 }
 
 .projectHoldRow.onHold {
@@ -4919,6 +4923,65 @@ strong.required {
   flex-shrink: 0;
 }
 
+.confirmKeyModal {
+  width: min(420px, 100%);
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.4);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.confirmKeyModalHeader {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e3e5e9;
+  background: #fafbfc;
+  font-size: 14px;
+}
+
+.confirmKeyModalBody {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+  color: #374151;
+}
+
+.confirmKeyInstruction {
+  color: #6b7280;
+}
+
+.confirmKeyInput {
+  border: 1.5px solid #d1d5db;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.confirmKeyInput:focus {
+  border-color: #6366f1;
+}
+
+.confirmKeyModalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid #e3e5e9;
+  background: #fafbfc;
+}
+
+.confirmKeyModalFooter .rejectButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .attachmentModalActions .miniButton {
   font-size: 12px;
   padding: 6px 12px;
@@ -6652,7 +6715,7 @@ button.approvalPill:hover {
 }
 
 .miniButton {
-  min-height: 30px;
+  min-height: 26px;
   padding: 0 9px;
   display: inline-flex;
   align-items: center;
@@ -9095,41 +9158,40 @@ button.approvalPill:hover {
 
 /* ─── 감사 로그 패널 ──────────────────────────────────────────────────────── */
 .auditLogPage { display: flex; flex-direction: column; align-items: stretch; gap: 12px; width: 100%; max-width: 100%; box-sizing: border-box; }
-.auditTabBar { display: flex; gap: 4px; border-bottom: 2px solid #e5e7eb; padding-bottom: 0; }
+.auditTabBar { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; }
 .auditTab {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 16px; border-radius: 6px 6px 0 0;
-  border: 1px solid transparent; border-bottom: none;
-  background: transparent; color: #6b7280; font-size: 13px; font-weight: 600; cursor: pointer;
-  transition: background 0.14s, color 0.14s;
+  padding: 6px 14px; border-radius: 20px;
+  border: 1px solid #e5e7eb;
+  background: #f3f4f6; color: #6b7280; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background 0.14s, color 0.14s, border-color 0.14s;
 }
-.auditTab:hover { background: #f3f4f6; color: #20242b; }
-.auditTab.active { background: #fff; color: #20242b; border-color: #e5e7eb; margin-bottom: -2px; }
+.auditTab:hover { background: #e9eaec; color: #20242b; }
+.auditTab.active { background: #20242b; color: #fff; border-color: #20242b; }
 .auditTabCount {
   background: #e5e7eb; color: #4b5563; font-size: 11px; font-weight: 700;
   padding: 1px 6px; border-radius: 10px; min-width: 20px; text-align: center;
 }
 .auditContent { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
-.auditSearch { flex: 1; max-width: 400px; margin-left: auto; align-self: center; margin-bottom: 6px; }
+.auditSearch { flex: 1; max-width: 400px; margin-left: auto; margin-bottom: 0; height: 34px; border-radius: 20px; }
 .auditTableWrap { width: 100%; overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
 .auditTable {
-  width: 100%; border-collapse: collapse; font-size: 10px;
+  width: 100%; border-collapse: collapse; font-size: 12px;
 }
 .auditTable th {
-  background: #fff; color: #4b515c; font-weight: 700; font-size: 10px;
-  padding: 7px 10px; text-align: left; border-bottom: 1px solid #e5e7eb;
+  background: #fff; color: #4b515c; font-weight: 700; font-size: 14px;
+  padding: 7px 12px; text-align: center; border-bottom: 1px solid #e5e7eb;
   white-space: nowrap;
 }
-.auditTable td { padding: 6px 10px; border-bottom: 1px solid #f0f1f4; vertical-align: middle; font-size: 10px; background: #fff; }
+.auditTable td { padding: 6px 12px; border-bottom: 1px solid #f0f1f4; vertical-align: middle; font-size: 12px; background: #fff; text-align: center; }
 .auditTable tbody tr:last-child td { border-bottom: none; }
 .auditTable tbody tr:hover td { background: #f5f6fa; }
-.auditTime { color: #6b7280; font-size: 10px; white-space: nowrap; text-align: center; width: 1%; }
+.auditTime { color: #6b7280; font-size: 12px; white-space: nowrap; text-align: center; width: 1%; }
 .auditProject { font-weight: 600; color: #20242b; white-space: nowrap; text-align: center; width: 1%; }
 .auditActor { text-align: center; white-space: nowrap; width: 1%; }
-.auditTable th { text-align: center; }
 .auditTable td:last-child { text-align: left; }
 .auditActor { color: #374151; white-space: nowrap; }
-.auditMessage { color: #4b5563; line-height: 1.5; }
+.auditMessage { color: #4b5563; line-height: 1.5; text-align: left; }
 .auditActionBadge {
   display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;
 }

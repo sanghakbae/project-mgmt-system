@@ -17,7 +17,7 @@ export const roleLabels: Record<Role, string> = {
   cem: 'CEM',
   developer: '개발자',
   infra: '인프라',
-  qa: 'QC',
+  qa: 'QA',
   security: '보안',
   patent: '특허',
   admin: '관리자',
