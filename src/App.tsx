@@ -116,9 +116,21 @@ const DEV_NO_LOGIN = true
 const DEV_ACCOUNT: Account = { id: 'demo', email: 'demo@local', fullName: '데모', role: 'admin' }
 const accountStorageKey = 'pms-account'
 const sessionStartStorageKey = 'pms-session-start'
-const SESSION_MAX_MS = 60 * 60 * 1000 // 세션 타임아웃 60분 고정
+const sessionTimeoutStorageKey = 'pms-session-timeout'
+const DEFAULT_SESSION_TIMEOUT_MIN = 60
 
-// localStorage에서 계정 복원. 로그인 60분이 지났으면 만료 처리하고 null 반환.
+function getStoredSessionTimeoutMin(): number {
+  try {
+    const stored = window.localStorage.getItem(sessionTimeoutStorageKey)
+    if (stored) {
+      const m = Number(stored)
+      if (Number.isFinite(m) && m >= 5 && m <= 480) return m
+    }
+  } catch {}
+  return DEFAULT_SESSION_TIMEOUT_MIN
+}
+
+// localStorage에서 계정 복원. 세션 타임아웃이 지났으면 만료 처리하고 null 반환.
 function loadStoredAccount(): Account | null {
   if (typeof window === 'undefined') return null
   try {
@@ -126,7 +138,8 @@ function loadStoredAccount(): Account | null {
     if (!raw) return null
     const startRaw = window.localStorage.getItem(sessionStartStorageKey)
     const start = startRaw ? Number(startRaw) : NaN
-    if (!Number.isFinite(start) || Date.now() - start >= SESSION_MAX_MS) {
+    const maxMs = getStoredSessionTimeoutMin() * 60 * 1000
+    if (!Number.isFinite(start) || Date.now() - start >= maxMs) {
       window.localStorage.removeItem(accountStorageKey)
       window.localStorage.removeItem(sessionStartStorageKey)
       return null
@@ -774,6 +787,7 @@ function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   // 인증 상태 — DB 계정 기반 로그인(계정당 고정 역할). localStorage에 60분 세션 보관.
   const [account, setAccount] = useState<Account | null>(() => loadStoredAccount() ?? (DEV_NO_LOGIN ? DEV_ACCOUNT : null))
+  const [sessionTimeoutMin, setSessionTimeoutMin] = useState<number>(() => getStoredSessionTimeoutMin())
   // 작성자 표기 — "이름(역할)" 형식. 이름이 없으면 역할만 표시
   const authorName = account?.fullName?.trim()
   const authorLabel = authorName ? `${authorName}(${roleLabels[role]})` : roleLabels[role]
@@ -798,22 +812,23 @@ function App() {
     setAccount(null)
   }, [])
 
-  // 세션 타임아웃 60분 고정: 로그인 시점 기준 60분이 지나면 강제 로그아웃
+  // 세션 타임아웃: 로그인 시점 기준 설정된 시간이 지나면 강제 로그아웃
   useEffect(() => {
     if (!account) return
+    const maxMs = sessionTimeoutMin * 60 * 1000
     const startRaw = window.localStorage.getItem(sessionStartStorageKey)
     const start = startRaw ? Number(startRaw) : Date.now()
-    const remaining = start + SESSION_MAX_MS - Date.now()
+    const remaining = start + maxMs - Date.now()
     if (remaining <= 0) {
       handleLogout()
       return
     }
     const timer = window.setTimeout(() => {
       handleLogout()
-      window.alert('세션이 만료되었습니다(60분). 다시 로그인해 주세요.')
+      window.alert(`세션이 만료되었습니다(${sessionTimeoutMin}분). 다시 로그인해 주세요.`)
     }, remaining)
     return () => window.clearTimeout(timer)
-  }, [account, handleLogout])
+  }, [account, handleLogout, sessionTimeoutMin])
 
   // 프로젝트 로드(Firestore) — 로그인(계정) 이후에만
   useEffect(() => {
@@ -2067,6 +2082,12 @@ function App() {
               </button>
             </>
           )}
+          {role === 'security' && (
+            <button className={`navItem ${viewMode === 'settings' ? 'active' : ''}`} type="button" title="보안 설정" onClick={() => setViewMode('settings')}>
+              <Shield size={17} />
+              <span>보안 설정</span>
+            </button>
+          )}
         </nav>
       </aside>
 
@@ -2125,14 +2146,20 @@ function App() {
           <SystemGuidePanel />
         ) : viewMode === 'auditLog' && role === 'admin' ? (
           <AuditLogPanel projects={projects} />
-        ) : viewMode === 'settings' && role === 'admin' ? (
+        ) : viewMode === 'settings' && (role === 'admin' || role === 'security') ? (
           <SettingsPanel
+            role={role}
             serviceOptions={serviceOptions}
             setServiceOptions={replaceServiceOptions}
             projects={projects}
             onToggleHold={toggleHoldProject}
             onDeleteProject={deleteProject}
             onDeleteAllProjects={deleteAllProjects}
+            sessionTimeoutMin={sessionTimeoutMin}
+            onSaveSessionTimeout={(min) => {
+              window.localStorage.setItem(sessionTimeoutStorageKey, String(min))
+              setSessionTimeoutMin(min)
+            }}
           />
         ) : viewMode === 'dashboard' ? (
           <DashboardOverview
@@ -4972,22 +4999,30 @@ function RequirementBlock({ label, value }: { label: string; value: string }) {
 }
 
 function SettingsPanel({
+  role,
   serviceOptions,
   setServiceOptions,
   projects,
   onToggleHold,
   onDeleteProject,
   onDeleteAllProjects,
+  sessionTimeoutMin,
+  onSaveSessionTimeout,
 }: {
+  role: Role
   serviceOptions: string[]
   setServiceOptions: (nextOptions: string[]) => void
   projects: Project[]
   onToggleHold: (projectId: string) => void
   onDeleteProject: (projectId: string) => void
   onDeleteAllProjects: () => void
+  sessionTimeoutMin: number
+  onSaveSessionTimeout: (min: number) => void
 }) {
   const [draft, setDraft] = useState('')
   const [holdFilter, setHoldFilter] = useState<'all' | 'onHold' | 'active'>('all')
+  const [timeoutDraft, setTimeoutDraft] = useState(String(sessionTimeoutMin))
+  const [timeoutSaved, setTimeoutSaved] = useState(false)
 
   type ConfirmAction = { type: 'delete'; projectId: string; title: string } | { type: 'hold'; projectId: string; title: string; isHold: boolean } | { type: 'deleteAll' }
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
@@ -5002,6 +5037,15 @@ function SettingsPanel({
     else if (confirmAction.type === 'deleteAll') onDeleteAllProjects()
     setConfirmAction(null)
     setConfirmKey('')
+  }
+
+  function handleSaveTimeout(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const min = Number(timeoutDraft)
+    if (!Number.isFinite(min) || min < 5 || min > 480) return
+    onSaveSessionTimeout(min)
+    setTimeoutSaved(true)
+    setTimeout(() => setTimeoutSaved(false), 1800)
   }
 
   // 동사무소 게시판 API 등록 설정 (localStorage 영속)
@@ -5043,6 +5087,41 @@ function SettingsPanel({
 
   return (
     <>
+    {/* 보안 설정 섹션 — 보안 역할 및 관리자 공통 표시 */}
+    <section className="requestPanel settingsPanel">
+      <div className="requestIntro">
+        <p className="eyebrow">Security</p>
+        <h2>보안 설정</h2>
+        <p>시스템 보안 정책을 설정합니다. 변경 사항은 즉시 적용됩니다.</p>
+      </div>
+      <div className="settingsSection">
+        <div className="panelHeader compact">
+          <div>
+            <h3>세션 타임아웃</h3>
+            <p>로그인 후 자동 로그아웃까지의 시간을 설정합니다. (5분 ~ 480분)</p>
+          </div>
+        </div>
+        <form onSubmit={handleSaveTimeout} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            type="number"
+            min={5}
+            max={480}
+            value={timeoutDraft}
+            onChange={(e) => { setTimeoutDraft(e.target.value); setTimeoutSaved(false) }}
+            placeholder="분 단위 입력"
+            aria-label="세션 타임아웃(분)"
+            style={{ width: 120, height: 34, padding: '0 10px', border: '1px solid #cfd3da', borderRadius: 8, fontSize: 14, color: '#20242b', background: '#fff', boxSizing: 'border-box' }}
+          />
+          <span style={{ fontSize: 13, color: '#606772', whiteSpace: 'nowrap' }}>분</span>
+          <button className="miniButton" type="submit" disabled={timeoutSaved}>
+            {timeoutSaved ? '저장됨 ✓' : '저장'}
+          </button>
+        </form>
+        <p style={{ fontSize: 12, color: '#8a909a', marginTop: 4 }}>현재 설정: <strong>{sessionTimeoutMin}분</strong> — 로그인 후 {sessionTimeoutMin}분이 지나면 자동 로그아웃됩니다.</p>
+      </div>
+    </section>
+
+    {role === 'admin' && (
     <section className="requestPanel settingsPanel">
       <div className="requestIntro">
         <p className="eyebrow">Settings</p>
@@ -5210,6 +5289,7 @@ function SettingsPanel({
         </div>
       </div>
     </section>
+    )}
 
     {confirmAction && (
       <div className="attachmentModalBackdrop" role="dialog" aria-modal="true" onClick={() => { setConfirmAction(null); setConfirmKey('') }}>
