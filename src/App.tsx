@@ -126,7 +126,9 @@ function getStoredSessionTimeoutMin(): number {
       const m = Number(stored)
       if (Number.isFinite(m) && m >= 5 && m <= 480) return m
     }
-  } catch {}
+  } catch (_e) {
+    // ignore
+  }
   return DEFAULT_SESSION_TIMEOUT_MIN
 }
 
