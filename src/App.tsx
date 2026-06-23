@@ -5083,7 +5083,7 @@ function SettingsPanel({
 
   return (
     <>
-    {/* 보안 설정 섹션 — 보안 역할 및 관리자 공통 표시 */}
+    {role === 'security' && (
     <section className="requestPanel settingsPanel">
       <div className="requestIntro">
         <p className="eyebrow">Security</p>
@@ -5116,6 +5116,7 @@ function SettingsPanel({
         <p style={{ fontSize: 12, color: '#8a909a', marginTop: 4 }}>현재 설정: <strong>{sessionTimeoutMin}분</strong> — 로그인 후 {sessionTimeoutMin}분이 지나면 자동 로그아웃됩니다.</p>
       </div>
     </section>
+    )}
 
     {role === 'admin' && (
     <section className="requestPanel settingsPanel">
