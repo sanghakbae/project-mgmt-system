@@ -2072,22 +2072,16 @@ function App() {
             <Workflow size={17} />
             <span>시스템 가이드</span>
           </button>
-          {role === 'admin' && (
-            <>
-              <button className={`navItem ${viewMode === 'auditLog' ? 'active' : ''}`} type="button" title="감사 로그" onClick={() => setViewMode('auditLog')}>
-                <Shield size={17} />
-                <span>감사 로그</span>
-              </button>
-              <button className={`navItem ${viewMode === 'settings' ? 'active' : ''}`} type="button" title="설정" onClick={() => setViewMode('settings')}>
-                <SlidersHorizontal size={17} />
-                <span>설정</span>
-              </button>
-            </>
-          )}
-          {role === 'security' && (
-            <button className={`navItem ${viewMode === 'settings' ? 'active' : ''}`} type="button" title="보안 설정" onClick={() => setViewMode('settings')}>
+          {(role === 'admin' || role === 'security') && (
+            <button className={`navItem ${viewMode === 'auditLog' ? 'active' : ''}`} type="button" title="감사 로그" onClick={() => setViewMode('auditLog')}>
               <Shield size={17} />
-              <span>보안 설정</span>
+              <span>감사 로그</span>
+            </button>
+          )}
+          {(role === 'admin' || role === 'security') && (
+            <button className={`navItem ${viewMode === 'settings' ? 'active' : ''}`} type="button" title={role === 'security' ? '보안 설정' : '설정'} onClick={() => setViewMode('settings')}>
+              <SlidersHorizontal size={17} />
+              <span>{role === 'security' ? '보안 설정' : '설정'}</span>
             </button>
           )}
         </nav>
@@ -2146,7 +2140,7 @@ function App() {
           <RequestFlowPanel form={requestForm} serviceOptions={serviceOptions} setForm={setRequestForm} onSubmit={submitRequest} />
         ) : viewMode === 'flow' ? (
           <SystemGuidePanel />
-        ) : viewMode === 'auditLog' && role === 'admin' ? (
+        ) : viewMode === 'auditLog' && (role === 'admin' || role === 'security') ? (
           <AuditLogPanel projects={projects} />
         ) : viewMode === 'settings' && (role === 'admin' || role === 'security') ? (
           <SettingsPanel
