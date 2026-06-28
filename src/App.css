@@ -1155,7 +1155,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 
 .workflowSummary strong {
   color: #20242b;
-  font-size: 24px;
+  font-size: 20px;
   line-height: 1.3;
 }
 
@@ -7561,6 +7561,159 @@ button.approvalPill:hover {
   }
 }
 
+
+/* Tablet layout (769px-1024px): top horizontal navigation, keep phone/desktop untouched */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .appShell,
+  .appShell.sidebarCollapsed {
+    grid-template-columns: 1fr !important;
+  }
+
+  .sidebar {
+    position: sticky !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 62px !important;
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 14px !important;
+    padding: 10px 16px !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid #dedfe3 !important;
+    background: #fbfbfc !important;
+    overflow: visible !important;
+    z-index: 60 !important;
+  }
+
+  .sidebarToggleEdge,
+  .sidebar .sidebarToggle,
+  .sidebarSection {
+    display: none !important;
+  }
+
+  .sidebar .brand {
+    min-width: 196px !important;
+    padding: 0 !important;
+    border-bottom: 0 !important;
+  }
+
+  .sidebar .brandMark {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 8px !important;
+  }
+
+  .sidebar .brand strong {
+    font-size: 13px !important;
+  }
+
+  .sidebar .brand span {
+    font-size: 11px !important;
+  }
+
+  .sidebar .navGroup,
+  .sidebar nav {
+    display: grid !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: max-content !important;
+    justify-content: end !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 0 !important;
+    min-width: 0 !important;
+  }
+
+  .sidebar .navItem {
+    width: auto !important;
+    min-height: 38px !important;
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    padding: 8px 10px !important;
+    border-radius: 8px !important;
+    white-space: nowrap !important;
+  }
+
+  .sidebar .navItem svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  .sidebar .navItem span {
+    display: inline !important;
+    font-size: 13px !important;
+    line-height: 1.1 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .main {
+    padding: 16px 16px 128px !important;
+  }
+
+  .topbar {
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 0 12px !important;
+    justify-content: flex-end !important;
+  }
+
+  .topbarActions {
+    width: auto !important;
+  }
+
+  .metricGrid {
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)) !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .workflowOverview {
+    overflow: visible !important;
+  }
+
+  .workflowOverview > .panelHeader.compact {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 320px) !important;
+    align-items: center !important;
+    gap: 12px !important;
+  }
+
+  .workflowSummary {
+    min-width: 0 !important;
+  }
+
+  .workflowSummary strong {
+    display: block !important;
+    white-space: nowrap !important;
+    writing-mode: horizontal-tb !important;
+    word-break: keep-all !important;
+  }
+
+  .workflowOverview > .panelHeader.compact .serviceFilterControl {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .workflowOverview > .panelHeader.compact .serviceFilterControl select {
+    min-width: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .dashboardKanban,
+  .dashboardKanban.adminScroll {
+    overflow: visible !important;
+  }
+}
+
 /* ─────────────────────────────────────────────
    Mobile layout (≤768px): sidebar → bottom nav bar
    ───────────────────────────────────────────── */
@@ -9205,4 +9358,622 @@ button.approvalPill:hover {
   .auditTab { padding: 6px 10px; font-size: 12px; }
   .auditTable th, .auditTable td { padding: 5px 6px; font-size: 10px; }
   .auditProject { width: 28%; }
+}
+
+@media (max-width: 520px) {
+  html {
+    scrollbar-gutter: auto !important;
+    overflow-y: auto !important;
+  }
+
+  .appShell .topbar {
+    padding-right: 2px !important;
+  }
+
+  .appShell .sidebar nav {
+    padding: 0 !important;
+  }
+
+  .appShell .sidebar .navItem {
+    min-height: 50px !important;
+    padding: 6px 4px !important;
+    gap: 2px !important;
+    border-radius: 8px !important;
+  }
+
+  .appShell .sidebar .navItem svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .appShell .sidebar .navItem span {
+    font-size: 10px !important;
+    line-height: 1.1 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .appShell .metric {
+    border-radius: 5px !important;
+  }
+
+  .appShell .metric span {
+    font-size: 12px !important;
+  }
+
+  .appShell .metricGrid {
+    margin-bottom: 2.5px !important;
+  }
+
+  .appShell .workflowOverview {
+    margin-top: 2.5px !important;
+  }
+
+  .appShell .requestPanel,
+  .appShell .settingsPanel,
+  .appShell .guidePanel,
+  .appShell .auditLogPage {
+    width: calc(100% - 4px) !important;
+    max-width: calc(100% - 4px) !important;
+    margin-left: 2px !important;
+    margin-right: 2px !important;
+    box-sizing: border-box !important;
+  }
+
+  .appShell .requestPanel {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  .appShell .requestPanel .requestForm,
+  .appShell .requestPanel .flowRequestForm {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .appShell .requestPanel fieldset,
+  .appShell .requestForm fieldset,
+  .appShell .flowRequestForm fieldset {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+    box-sizing: border-box !important;
+  }
+
+  .appShell .workflowSummary strong {
+    font-size: 16px !important;
+  }
+
+  .appShell .serviceFilterControl {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    gap: 8px !important;
+    padding-top: 3px !important;
+    padding-bottom: 3px !important;
+  }
+
+  .appShell .serviceFilterControl span {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+  }
+
+  .appShell .serviceFilterControl select {
+    flex: 1 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+  }
+
+  .appShell .flowRequestHead {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 6px !important;
+    width: 100% !important;
+  }
+
+  .appShell .flowRequestHead > div:first-child {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+  }
+
+  .appShell .flowRequestHead .eyebrow {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+  }
+
+  .appShell .flowRequestHead h2 {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .appShell .flowHeadActions {
+    flex: 0 0 auto !important;
+    max-width: none !important;
+  }
+
+  .appShell .flowCurrentStep {
+    white-space: nowrap !important;
+    max-width: none !important;
+    padding: 3px 6px !important;
+  }
+
+  .appShell .queuePanel .searchFilterRow {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
+    width: 100% !important;
+  }
+
+  .appShell .queuePanel .searchFilterRow > .searchBox {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    width: auto !important;
+  }
+
+  .appShell .queuePanel .searchFilterRow > .filterTriggerBtn,
+  .appShell .queuePanel .searchFilterRow > .csvExportButton {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    height: 28px !important;
+    white-space: nowrap !important;
+  }
+
+  .appShell .queuePanel .searchFilterRow > .filterChips {
+    flex: 1 0 100% !important;
+  }
+
+  .appShell .detailHeaderPanel .flowRequestHead {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 4px !important;
+    width: 100% !important;
+  }
+
+  .appShell .detailHeaderPanel .flowRequestHead > div:first-child {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+  }
+
+  .appShell .detailHeaderPanel .flowRequestHead .eyebrow,
+  .appShell .detailHeaderPanel .flowRequestHead h2,
+  .appShell .detailHeaderPanel .flowCurrentStep,
+  .appShell .detailHeaderPanel .statusPill,
+  .appShell .detailHeaderPanel .miniButton {
+    font-size: 12px !important;
+    line-height: 1 !important;
+  }
+
+  .appShell .detailHeaderPanel .flowRequestHead .eyebrow {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+  }
+
+  .appShell .detailHeaderPanel .mobileOptionalText {
+    display: none !important;
+  }
+
+  .appShell .detailHeaderPanel .flowRequestHead h2 {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .appShell .detailHeaderPanel .flowHeadActions {
+    flex: 0 0 auto !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    gap: 3px !important;
+    max-width: none !important;
+  }
+
+  .appShell .detailHeaderPanel .flowCurrentStep,
+  .appShell .detailHeaderPanel .statusPill,
+  .appShell .detailHeaderPanel .miniButton {
+    white-space: nowrap !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    padding: 2px 4px !important;
+  }
+
+  .appShell .guideTableWrap {
+    overflow-x: hidden !important;
+  }
+
+  .appShell .guideTable {
+    min-width: 0 !important;
+    width: 100% !important;
+    table-layout: fixed !important;
+    font-size: 10px !important;
+  }
+
+  .appShell .guideTable th,
+  .appShell .guideTable td {
+    padding: 4px 3px !important;
+    font-size: 10px !important;
+    line-height: 1.15 !important;
+    word-break: keep-all !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .appShell .guideTable th:first-child,
+  .appShell .guideTable td:first-child {
+    width: 23% !important;
+  }
+
+  .appShell .guideTable th:nth-child(2),
+  .appShell .guideTable td:nth-child(2) {
+    width: 24% !important;
+  }
+
+  .appShell .guideTable th:nth-child(3),
+  .appShell .guideTable td:nth-child(3) {
+    width: 27% !important;
+  }
+
+  .appShell .guideTable th:nth-child(4),
+  .appShell .guideTable td:nth-child(4) {
+    width: 26% !important;
+  }
+
+  .appShell .guideTable td .statusPill {
+    min-height: 17px !important;
+    padding: 1px 4px !important;
+    font-size: 10px !important;
+  }
+
+
+  .appShell .guideTable.kpiGuideTable {
+    table-layout: auto !important;
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .appShell .kpiGuideTable th,
+  .appShell .kpiGuideTable td {
+    padding-left: 2px !important;
+    padding-right: 2px !important;
+    font-size: 10px !important;
+    line-height: 1.12 !important;
+  }
+
+  .appShell .kpiGuideTable th:first-child,
+  .appShell .kpiGuideTable td:first-child {
+    width: 38% !important;
+    white-space: nowrap !important;
+  }
+
+  .appShell .kpiGuideTable th:last-child,
+  .appShell .kpiGuideTable td:last-child {
+    width: 62% !important;
+    white-space: normal !important;
+  }
+
+
+  .appShell .auditLogPage {
+    gap: 4px !important;
+  }
+
+  .appShell .auditLogHead,
+  .appShell .auditLogPage .guideHead {
+    margin-bottom: 9px !important;
+  }
+
+  .appShell .auditTabBar {
+    padding-bottom: 5px !important;
+  }
+
+  .appShell .auditContent {
+    gap: 5px !important;
+    padding-top: 2px !important;
+  }
+
+  .appShell .auditTableWrap {
+    overflow-x: hidden !important;
+  }
+
+  .appShell .auditTable {
+    min-width: 0 !important;
+    width: 100% !important;
+    table-layout: auto !important;
+    font-size: 10px !important;
+  }
+
+  .appShell .auditTable th,
+  .appShell .auditTable td {
+    padding: 4px 2px !important;
+    font-size: 10px !important;
+    line-height: 1.12 !important;
+  }
+
+  .appShell .auditTime,
+  .appShell .auditActor {
+    width: 1% !important;
+    white-space: nowrap !important;
+  }
+
+  .appShell .auditProject {
+    width: auto !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: keep-all !important;
+    font-size: 10px !important;
+    line-height: 1.12 !important;
+  }
+
+  .appShell .auditMessage {
+    width: auto !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: keep-all !important;
+    font-size: 10px !important;
+    line-height: 1.12 !important;
+  }
+
+  .appShell .settingsPanel .settingsSection:has(.projectHoldList) {
+    padding-top: 1.25px !important;
+  }
+
+  .appShell .settingsPanel .settingsSection:has(.projectHoldList) .panelHeader {
+    margin-bottom: 1.25px !important;
+  }
+
+  .appShell .projectHoldList {
+    gap: 2.5px !important;
+    margin-top: 2.5px !important;
+    overflow-x: hidden !important;
+  }
+
+  .appShell .projectHoldRow {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    gap: 3px !important;
+    padding: 5px 4px !important;
+    overflow: hidden !important;
+  }
+
+  .appShell .projectHoldInfo {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    gap: 3px !important;
+    overflow: hidden !important;
+  }
+
+  .appShell .projectHoldInfo strong {
+    flex: 1 1 auto !important;
+    min-width: 34px !important;
+    font-size: clamp(8px, 2.45vw, 10px) !important;
+    line-height: 1.1 !important;
+  }
+
+  .appShell .projectHoldInfo small {
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+    max-width: 92px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: clamp(7px, 2.2vw, 9px) !important;
+    line-height: 1.1 !important;
+  }
+
+  .appShell .projectHoldInfo .statusPill,
+  .appShell .projectHoldInfo .requestTypePill,
+  .appShell .projectHoldInfo .ddayPill,
+  .appShell .projectHoldInfo .holdTag {
+    flex: 0 0 auto !important;
+    min-height: 16px !important;
+    padding: 1px 4px !important;
+    font-size: clamp(7px, 2.2vw, 9px) !important;
+    line-height: 1.05 !important;
+    border-radius: 5px !important;
+  }
+
+  .appShell .projectManageActions {
+    flex: 0 0 auto !important;
+    gap: 2px !important;
+  }
+
+  .appShell .projectManageActions .miniButton {
+    min-height: 18px !important;
+    padding: 2px 4px !important;
+    font-size: clamp(7px, 2.2vw, 9px) !important;
+    line-height: 1 !important;
+    border-radius: 5px !important;
+  }
+}
+
+/* Tablet hard override (521px-1024px): keep top nav compact, phone bottom nav only below 520px */
+@media (min-width: 521px) and (max-width: 1024px) {
+  .appShell,
+  .appShell.sidebarCollapsed {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    min-height: 100dvh !important;
+    overflow-x: hidden !important;
+  }
+
+  .sidebar {
+    position: sticky !important;
+    inset: auto !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 62px !important;
+    min-height: 62px !important;
+    display: grid !important;
+    grid-template-columns: minmax(168px, auto) minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 10px 16px !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid #dedfe3 !important;
+    border-top: 0 !important;
+    background: #fbfbfc !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+    z-index: 60 !important;
+    box-sizing: border-box !important;
+  }
+
+  .sidebarToggleEdge,
+  .sidebar .sidebarToggle,
+  .sidebarSection,
+  .personaCard {
+    display: none !important;
+  }
+
+  .sidebar .brand {
+    min-width: 0 !important;
+    width: auto !important;
+    height: 40px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 0 !important;
+    border-bottom: 0 !important;
+  }
+
+  .sidebar .brandMark {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 8px !important;
+  }
+
+  .sidebar .brand strong {
+    font-size: 13px !important;
+    line-height: 1.1 !important;
+  }
+
+  .sidebar .brand span {
+    font-size: 11px !important;
+    line-height: 1.1 !important;
+  }
+
+  .sidebar .navGroup,
+  .sidebar nav {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 40px !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .sidebar .navItem {
+    width: auto !important;
+    min-width: 0 !important;
+    min-height: 36px !important;
+    height: 36px !important;
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 5px !important;
+    padding: 7px 8px !important;
+    border-radius: 8px !important;
+    white-space: nowrap !important;
+    box-shadow: none !important;
+  }
+
+  .sidebar .navItem svg {
+    width: 15px !important;
+    height: 15px !important;
+    flex: 0 0 auto !important;
+  }
+
+  .sidebar .navItem span {
+    display: inline !important;
+    font-size: 12px !important;
+    line-height: 1.1 !important;
+    letter-spacing: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .main {
+    padding: 16px 16px 128px !important;
+  }
+
+  .topbar {
+    position: static !important;
+    width: 100% !important;
+    height: 42px !important;
+    margin: 0 !important;
+    padding: 0 0 8px !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+  }
+
+  .topbarActions {
+    width: auto !important;
+    justify-content: flex-end !important;
+  }
+
+  .settingsPanel {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+}
+
+/* Tablet security/settings gap fix: prevent the top nav grid row from keeping desktop/sidebar height */
+@media (min-width: 521px) and (max-width: 1024px) {
+  .appShell,
+  .appShell.sidebarCollapsed {
+    grid-template-rows: 62px minmax(0, auto) !important;
+    align-content: start !important;
+  }
+
+  .sidebar {
+    grid-row: 1 !important;
+    min-height: 0 !important;
+    max-height: 62px !important;
+  }
+
+  .main {
+    grid-row: 2 !important;
+  }
+}
+
+/* Tablet: keep service filter label on one line */
+@media (min-width: 521px) and (max-width: 1024px) {
+  .serviceFilterControl span {
+    flex: 0 0 auto !important;
+    min-width: max-content !important;
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+  }
+
+  .serviceFilterControl select {
+    min-width: 0 !important;
+  }
 }

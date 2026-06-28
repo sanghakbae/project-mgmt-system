@@ -2382,12 +2382,18 @@ function App() {
             <div className="detailHeaderPanel">
               <div className="flowRequestHead">
                 <div>
-                  <p className="eyebrow">Project · {selected.code}</p>
+                  <p className="eyebrow">
+                    <span className="mobileOptionalText">Project · </span>
+                    {selected.code}
+                  </p>
                   <h2>{selected.title}</h2>
                 </div>
                 <div className="flowHeadActions">
                   <span className={`statusPill ${selected.status}`}>{statusLabels[selected.status]}</span>
-                  <span className="flowCurrentStep">현재 단계 {currentStep + 1}. {selectedWorkflow[currentStep]?.label}</span>
+                  <span className="flowCurrentStep">
+                    <span className="mobileOptionalText">현재 단계 </span>
+                    {currentStep + 1}. {selectedWorkflow[currentStep]?.label}
+                  </span>
                   {canAct && (
                     <button
                       type="button"
