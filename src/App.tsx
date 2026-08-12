@@ -34,8 +34,10 @@ import {
   buildCompletionTitle,
   buildOfficePostUrl,
   DEFAULT_OFFICE_POST_PATH,
+  getOfficeProxyUrl,
   hasBeenPostedToBoard,
   isOfficeBoardConfigured,
+  isOfficeProxyMode,
   officeApiStorageKey,
   postToOfficeBoard,
   readOfficeApiConfig,
@@ -5323,11 +5325,14 @@ function SettingsPanel({
   }
 
   async function runOfficeTest() {
-    // 저장 버튼(native submit)의 type="url" 검증을 우회하므로 여기서 직접 확인
-    const urlError = validateOfficeBaseUrl(officeApi.baseUrl)
-    if (urlError) {
-      setOfficeTest({ ok: false, message: urlError })
-      return
+    // 저장 버튼(native submit)의 type="url" 검증을 우회하므로 여기서 직접 확인.
+    // 프록시 모드에서는 Base URL을 쓰지 않으므로 검사하지 않는다.
+    if (!isOfficeProxyMode()) {
+      const urlError = validateOfficeBaseUrl(officeApi.baseUrl)
+      if (urlError) {
+        setOfficeTest({ ok: false, message: urlError })
+        return
+      }
     }
     setOfficeTesting(true)
     setOfficeTest(null)
@@ -5338,8 +5343,9 @@ function SettingsPanel({
         ? {
             ok: true,
             message:
-              `주소 도달 확인 (HTTP ${result.status}) · ${buildOfficePostUrl(officeApi)}\n` +
-              '※ 경로·자격증명이 맞는지는 확인되지 않습니다. 완료 보고 1건을 실제 전송해 검증하세요.',
+              `주소 도달 확인 (HTTP ${result.status})` +
+              (isOfficeProxyMode() ? ` · 프록시 ${getOfficeProxyUrl()}` : ` · ${buildOfficePostUrl(officeApi)}`) +
+              '\n※ 경로·자격증명이 맞는지는 확인되지 않습니다. 완료 보고 1건을 실제 전송해 검증하세요.',
           }
         : { ok: false, message: result.error },
     )
@@ -5499,17 +5505,30 @@ function SettingsPanel({
               />
             </label>
           </div>
-          <p className="officeApiHint">
-            {'게시판 스펙에 맞춰 경로를 지정하세요. {board} 는 게시판명으로 치환됩니다. 비우면 '}
-            <code>{DEFAULT_OFFICE_POST_PATH}</code>
-            {' 를 사용합니다.'}
-            {isOfficeBoardConfigured(officeApi) && (
-              <>
-                <br />
-                전송 대상: <code>{buildOfficePostUrl(officeApi)}</code>
-              </>
-            )}
-          </p>
+          {isOfficeProxyMode() ? (
+            <p className="officeApiHint">
+              <strong>프록시 모드</strong> — 주소·계정·비밀번호는 Worker에 보관되며 위 입력값 대신 사용됩니다.
+              브라우저에는 <strong>게시판명만</strong> 필요합니다.
+              <br />
+              프록시: <code>{getOfficeProxyUrl()}</code>
+            </p>
+          ) : (
+            <p className="officeApiHint">
+              {'게시판 스펙에 맞춰 경로를 지정하세요. {board} 는 게시판명으로 치환됩니다. 비우면 '}
+              <code>{DEFAULT_OFFICE_POST_PATH}</code>
+              {' 를 사용합니다.'}
+              {isOfficeBoardConfigured(officeApi) && officeApi.baseUrl.trim() && (
+                <>
+                  <br />
+                  전송 대상: <code>{buildOfficePostUrl(officeApi)}</code>
+                </>
+              )}
+              <br />
+              <strong>직접 호출 모드</strong>입니다. 게시판 서버가 이 도메인의 CORS를 허용하지 않으면
+              브라우저가 요청을 차단합니다(&quot;Failed to fetch&quot;). 그 경우 <code>VITE_OFFICE_PROXY_URL</code> 로
+              프록시 모드를 사용하세요.
+            </p>
+          )}
           {officeTest && (
             <p className={`officeApiTestResult ${officeTest.ok ? 'ok' : 'fail'}`}>{officeTest.message}</p>
           )}

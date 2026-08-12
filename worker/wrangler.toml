@@ -8,9 +8,16 @@ R2_ACCOUNT_ID = "your-cloudflare-account-id"
 R2_BUCKET = "pms-attachments"
 ALLOWED_ORIGIN = "http://localhost:5173"
 
+# 동사무소 게시판 프록시 대상 (시크릿 아님)
+# 클라이언트가 보낸 주소로 요청하지 않고 반드시 이 값을 쓴다 → 오픈 프록시 방지
+OFFICE_BASE_URL = ""
+OFFICE_POST_PATH = "/api/boards/{board}/posts"
+
 # 시크릿은 아래 명령으로 등록(파일에 넣지 말 것):
 #   wrangler secret put R2_ACCESS_KEY_ID
 #   wrangler secret put R2_SECRET_ACCESS_KEY
+#   wrangler secret put OFFICE_USERNAME
+#   wrangler secret put OFFICE_PASSWORD
 #
 # 선택: R2 바인딩(프록시 방식으로 확장할 때만 필요. presigned 방식에는 불필요)
 # [[r2_buckets]]
