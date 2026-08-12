@@ -203,7 +203,15 @@ export function buildCompletionBody(project: Project): string {
 
 /**
  * 게시판에 글 등록.
- * 인증은 Basic(username/password) — 게시판이 다른 방식을 쓰면 이 함수만 교체하면 된다.
+ *
+ * ⚠️ 인증 방식 미확정 — 현재 Basic 인증은 center.muhayu.com 에서 동작하지 않는다.
+ * 2026-08-12 실측 결과:
+ *   - POST /api/boards/{board}/posts → 302 Location: /login  (Basic 헤더 무시)
+ *   - POST /api/login → {"success":false,"message":"username과 password가 필요합니다."}
+ *   - 응답에 JSESSIONID 쿠키 발급 → 세션 기반 인증(Spring 계열)
+ * 즉 올바른 흐름은 ① /api/login 으로 로그인해 쿠키 수령 → ② 쿠키로 게시 이다.
+ * 게시 엔드포인트·body 필드명은 미인증 상태에서 전부 302로 가려져 탐색 불가.
+ * 스펙 확인 후 이 함수(및 worker 의 /board-post)를 세션 방식으로 교체해야 한다.
  */
 export async function postToOfficeBoard(
   payload: { title: string; body: string; author: string },

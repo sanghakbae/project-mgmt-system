@@ -40,6 +40,9 @@ function buildBoardUrl(env, board) {
   return `${base}${rawPath.startsWith('/') ? rawPath : `/${rawPath}`}`
 }
 
+// ⚠️ 이 Basic 인증은 center.muhayu.com 에서 동작하지 않는다 (2026-08-12 실측).
+// 해당 서버는 JSESSIONID 쿠키 기반 세션 인증이라 ① /api/login 로그인 → ② 쿠키로 게시
+// 순서가 필요하다. 게시 엔드포인트·필드명 확인 후 이 함수와 /board-post 를 교체할 것.
 function boardAuthHeaders(env) {
   const username = String(env.OFFICE_USERNAME || '').trim()
   if (!username) return {}

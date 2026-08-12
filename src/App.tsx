@@ -5445,8 +5445,13 @@ function SettingsPanel({
         <form className="officeApiForm" onSubmit={saveOfficeApi}>
           <div className="panelHeader compact officeApiHeader">
             <div>
-              <h3>동사무소 게시판 API</h3>
-              <p>완료된 프로젝트를 동사무소 게시판에 자동 게시하기 위한 API 연결 정보입니다.</p>
+              <h3>동사무소 게시판 API <span className="wipBadge">연동 미완</span></h3>
+              <p>
+                완료된 프로젝트를 동사무소 게시판에 게시하기 위한 연결 정보입니다.
+                <br />
+                <strong>현재는 전송이 실패합니다</strong> — 게시판 서버(center.muhayu.com)가 CORS를 허용하지 않고,
+                인증도 Basic이 아닌 세션(JSESSIONID) 방식입니다. 게시 엔드포인트·인증 흐름 확정 후 동작합니다.
+              </p>
             </div>
             <div className="officeApiActions">
               {officeApiSaved && <span className="officeApiSavedHint">저장되었습니다 ✓</span>}
