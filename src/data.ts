@@ -52,7 +52,7 @@ const stageDefaults: Record<ProjectStatus, { progress: number; assignee: Project
   planning: { progress: 32, assignee: 'pm', approved: [], nextAction: 'PM이 기획 문서(SRS+SDS)를 작성합니다.' },
   dept_review: { progress: 46, assignee: 'pm', approved: ['cem', 'developer'], nextAction: '승인 역할 전원의 확인을 기다리고 있습니다.' },
   development: { progress: 66, assignee: 'developer', approved: fullRoles, nextAction: '일정 조율 후 개발 태스크를 진행합니다.' },
-  qc_security: { progress: 86, assignee: 'qa', approved: fullRoles, nextAction: 'QC·보안·PM 3자 검토를 진행합니다.' },
+  qc_security: { progress: 86, assignee: 'qa', approved: fullRoles, nextAction: 'QA·보안·PM 3자 검토를 진행합니다.' },
   completion: { progress: 100, assignee: 'admin', approved: fullRoles, nextAction: '완료 보고를 작성하고 동사무소 게시판에 게시합니다.' },
   rejected: { progress: 8, assignee: 'requester', approved: [], nextAction: '반려 사유를 반영해 재요청합니다.' },
 }
@@ -129,13 +129,13 @@ function tasksForStage(seed: DemoSeed, t: { created: string; due: string }): Pro
     case 'qc_security':
       return [
         mk(1, 'story', `${seed.serviceArea} 기능 구현`, '개발자', 'done', '기능 개발을 모두 완료했습니다.'),
-        mk(2, 'task', 'QC 시나리오 검증', 'QA', 'doing', '핵심 시나리오 검증 중입니다.'),
+        mk(2, 'task', 'QA 시나리오 검증', 'QA', 'doing', '핵심 시나리오 검증 중입니다.'),
         mk(3, 'task', '보안 점검 (권한·로그)', '보안', 'doing', '접근 권한과 감사 로그를 점검 중입니다.'),
       ]
     case 'completion':
       return [
         mk(1, 'story', `${seed.serviceArea} 기능 구현`, '개발자', 'done', '개발을 완료했습니다.'),
-        mk(2, 'task', 'QC·보안 검토', 'QA', 'done', '3자 검토를 모두 통과했습니다.'),
+        mk(2, 'task', 'QA·보안 검토', 'QA', 'done', '3자 검토를 모두 통과했습니다.'),
         mk(3, 'task', '완료 보고서 작성 및 게시', 'PM', 'done', '완료 보고서를 작성하고 게시했습니다.'),
       ]
     default:

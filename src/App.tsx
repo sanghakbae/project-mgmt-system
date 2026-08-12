@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react'
 import {
   AlertTriangle,
   BarChart3,
@@ -27,6 +27,22 @@ import {
 import './App.css'
 import { RichEditor, RichTextView } from './RichEditor'
 import { notifyGoogleChat } from './notify'
+import {
+  BOARD_POST_FAIL_PREFIX,
+  BOARD_POST_OK_PREFIX,
+  buildCompletionBody,
+  buildCompletionTitle,
+  buildOfficePostUrl,
+  DEFAULT_OFFICE_POST_PATH,
+  hasBeenPostedToBoard,
+  isOfficeBoardConfigured,
+  officeApiStorageKey,
+  postToOfficeBoard,
+  readOfficeApiConfig,
+  testOfficeBoardConnection,
+  validateOfficeBaseUrl,
+  type OfficeApiConfig,
+} from './officeBoard'
 import { roleLabels, workflow } from './data'
 import {
   deleteProject as deleteProjectDoc,
@@ -736,6 +752,10 @@ function serializeSrsSections(map: Record<SrsSectionKey, string>): string {
 function App() {
   const restoredSession = readSessionState()
   const [projects, setProjects] = useState<Project[]>([])
+  // 비동기 작업(게시판 전송 등) 완료 후 최신 프로젝트를 읽기 위한 ref.
+  // await 전에 캡처한 project 객체로 logs를 덮으면 그 사이의 로그가 유실된다.
+  const projectsRef = useRef(projects)
+  useEffect(() => { projectsRef.current = projects }, [projects])
   const [selectedId, setSelectedId] = useState(restoredSession.selectedId ?? '')
   const [role, setRole] = useState<Role>(restoredSession.role ?? (DEV_NO_LOGIN ? 'admin' : 'requester'))
   const [serviceOptions, setServiceOptions] = useState<string[]>(() => {
@@ -790,6 +810,9 @@ function App() {
   // 인증 상태 — DB 계정 기반 로그인(계정당 고정 역할). localStorage에 60분 세션 보관.
   const [account, setAccount] = useState<Account | null>(() => loadStoredAccount() ?? (DEV_NO_LOGIN ? DEV_ACCOUNT : null))
   const [sessionTimeoutMin, setSessionTimeoutMin] = useState<number>(() => getStoredSessionTimeoutMin())
+  // 게시판 전송 상태 (프로젝트 id 기준)
+  const [boardSendingId, setBoardSendingId] = useState<string | null>(null)
+  const [boardResults, setBoardResults] = useState<Record<string, { ok: boolean; message: string }>>({})
   // 작성자 표기 — "이름(역할)" 형식. 이름이 없으면 역할만 표시
   const authorName = account?.fullName?.trim()
   const authorLabel = authorName ? `${authorName}(${roleLabels[role]})` : roleLabels[role]
@@ -1527,6 +1550,63 @@ function App() {
     }
   }
 
+  // 완료 보고 → 동사무소 게시판(그룹웨어) 글 등록
+  // 작업 목록의 '완료 보고' 행에서 [전송] 버튼으로 실행한다.
+  async function sendProjectToBoard(project: Project) {
+    if (boardSendingId) return
+    if (!isOfficeBoardConfigured()) {
+      window.alert('게시판 연동 정보가 없습니다.\n설정 > 동사무소 게시판 API 에서 Base URL과 게시판명을 먼저 저장해 주세요.')
+      return
+    }
+    // finalizeProject()와 동일한 게이트 — 요청자 확인 전에 외부 게시판으로 나가면 안 된다
+    if (!project.requesterConfirmed) {
+      window.alert('요청자 확인이 완료되어야 게시판에 등록할 수 있습니다.')
+      return
+    }
+
+    // 새로고침해도 유지되는 활동 로그로 중복 게시 여부를 판정
+    const already = hasBeenPostedToBoard(project) || boardResults[project.id]?.ok
+    const confirmText = already
+      ? `"${project.title}" 완료 보고는 이미 게시판에 등록된 기록이 있습니다.\n다시 등록하면 중복 게시됩니다. 계속할까요?`
+      : `"${project.title}" 완료 보고를 동사무소 게시판에 등록합니다.\n\n제목: ${buildCompletionTitle(project)}`
+    if (!window.confirm(confirmText)) return
+
+    setBoardSendingId(project.id)
+    const result = await postToOfficeBoard({
+      title: buildCompletionTitle(project),
+      body: buildCompletionBody(project),
+      author: authorLabel,
+    })
+    setBoardSendingId(null)
+
+    const message = result.ok
+      ? `${BOARD_POST_OK_PREFIX} 동사무소 게시판에 완료 보고를 등록했습니다.${result.postId ? ` (글 ID: ${result.postId})` : ''}`
+      : `${BOARD_POST_FAIL_PREFIX} ${result.error}`
+    setBoardResults((current) => ({ ...current, [project.id]: { ok: result.ok, message } }))
+
+    // 성공·실패 모두 활동 로그로 남긴다 (감사 추적).
+    // await 동안 다른 로그가 추가됐을 수 있으므로 캡처된 project가 아닌 최신 상태에서 읽는다.
+    const fresh = projectsRef.current.find((p) => p.id === project.id) ?? project
+    const nextLogs = [
+      { id: crypto.randomUUID(), at: logStamp(), actor: authorLabel, message },
+      ...fresh.logs,
+    ]
+    setProjects((current) => current.map((p) => (p.id === project.id ? { ...p, logs: nextLogs } : p)))
+    if (hasFirebaseConfig) {
+      try {
+        await updateProjectDoc(project.id, { logs: nextLogs })
+      } catch {
+        setLoadState('error')
+      }
+    }
+
+    void notifyGoogleChat(result.ok ? 'project.advance' : 'project.reject', message, {
+      프로젝트: project.title,
+      코드: project.code,
+    })
+    if (!result.ok) window.alert(message)
+  }
+
   // #4 QC/보안/PM 3자 사인오프 토글
   async function toggleQcSignoff(signRoleArg?: 'qa' | 'security' | 'pm', note?: string) {
     if (!selected || selected.status !== 'qc_security') return
@@ -1556,7 +1636,7 @@ function App() {
       { qcSignoff: nextSignoff },
       `${label} 검토를 ${nextDone ? '완료' : '취소'} 처리했습니다.${nextDone && trimmedNote ? ` (${trimmedNote})` : ''}`,
     )
-    void notifyGoogleChat('task.status', `QC/보안/PM 검토 ${nextDone ? '완료' : '취소'}: ${label}`, { 프로젝트: selected.title })
+    void notifyGoogleChat('task.status', `QA/보안/PM 검토 ${nextDone ? '완료' : '취소'}: ${label}`, { 프로젝트: selected.title })
   }
 
   // 반려 처리: 현재 단계에서 프로젝트를 반려하고 사유를 기록
@@ -2353,27 +2433,49 @@ function App() {
             {filterSheetOpen && <div className="filterSheetBackdrop" onClick={() => setFilterSheetOpen(false)} aria-hidden="true" />}
 
             <div className="projectList">
-              {filteredProjects.map((project) => (
-                <button
-                  key={project.id}
-                  className={`projectCard ${selected?.id === project.id ? 'selected' : ''} ${project.onHold ? 'onHold' : ''}`}
-                  type="button"
-                  onClick={() => setSelectedId(project.id)}
-                >
-                  <span className={`statusPill ${project.status}`}>
-                    <span className="stageFull">{statusLabels[project.status]}</span>
-                    <span className="stageShort">{shortStatusLabels[project.status]}</span>
-                  </span>
-                  <strong>{project.title}</strong>
-                  <span className="cardMeta">
-                    <span className="serviceBadge">{inferServiceOption(project, serviceOptions)}</span>
-                    <span className="requestTypePill">{requestTypeLabels[project.requestType]}</span>
-                    <span className={`priority ${project.priority}`}>{priorityLabels[project.priority]}</span>
-                    <span>{project.ownerTeam}</span>
-                    {(() => { const dd = dDayInfo(project.dueDate, demoToday); return <span className={`ddayPill ${dd.tone}`}>{dd.label}</span> })()}
-                  </span>
-                </button>
-              ))}
+              {filteredProjects.map((project) => {
+                const sendResult = boardResults[project.id]
+                const sending = boardSendingId === project.id
+                // 새로고침 후에도 유지되도록 활동 로그 기준으로 게시 여부 판정
+                const posted = sendResult?.ok ?? hasBeenPostedToBoard(project)
+                // '완료 보고' 단계에서만 게시판 전송 노출 (PM·관리자)
+                const canSendToBoard = project.status === 'completion' && (role === 'pm' || role === 'admin')
+                const sendBlockedReason = !project.requesterConfirmed ? '요청자 확인이 완료되어야 등록할 수 있습니다' : null
+                return (
+                  <div key={project.id} className="projectCardRow">
+                    <button
+                      className={`projectCard ${selected?.id === project.id ? 'selected' : ''} ${project.onHold ? 'onHold' : ''}`}
+                      type="button"
+                      onClick={() => setSelectedId(project.id)}
+                    >
+                      <span className={`statusPill ${project.status}`}>
+                        <span className="stageFull">{statusLabels[project.status]}</span>
+                        <span className="stageShort">{shortStatusLabels[project.status]}</span>
+                      </span>
+                      <strong>{project.title}</strong>
+                      <span className="cardMeta">
+                        <span className="serviceBadge">{inferServiceOption(project, serviceOptions)}</span>
+                        <span className="requestTypePill">{requestTypeLabels[project.requestType]}</span>
+                        <span className={`priority ${project.priority}`}>{priorityLabels[project.priority]}</span>
+                        <span>{project.ownerTeam}</span>
+                        {(() => { const dd = dDayInfo(project.dueDate, demoToday); return <span className={`ddayPill ${dd.tone}`}>{dd.label}</span> })()}
+                      </span>
+                    </button>
+                    {canSendToBoard && (
+                      <button
+                        type="button"
+                        className={`miniButton boardSendButton ${posted ? 'sent' : ''}`}
+                        disabled={sending || Boolean(boardSendingId) || Boolean(sendBlockedReason)}
+                        onClick={() => void sendProjectToBoard(project)}
+                        title={sendBlockedReason ?? sendResult?.message ?? '완료 보고를 동사무소 게시판에 등록합니다'}
+                      >
+                        <Send size={13} />
+                        {sending ? '전송 중…' : posted ? '게시됨' : '전송'}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
             </div>
 
           </div>
@@ -2499,7 +2601,6 @@ function App() {
                     <section className={`requirementsPanel docCard srsCard ${srsCollapsed ? 'collapsed' : ''}`}>
                       <div className="panelHeader compact docCardHeader" role="button" onClick={() => { const next = !srsCollapsed; setSrsCollapsed(next); if (next) setSdsCollapsed(false) }} title={srsCollapsed ? '펼치기' : '접기'}>
                         <h3><span className="docTag srsTag">SRS</span> <span className="docTitle">요구사항 정의서</span></h3>
-                        <span className="docSubtitle">항목별 입력 · 첨부 가능</span>
                       </div>
                       <div className="requestForm securityReviewEditor">
                         <div className="srsSectionGroup">
@@ -2669,7 +2770,7 @@ function App() {
                     <span>주요 마일스톤</span>
                     <RichEditor
                       value={currentScheduleDraft.milestones}
-                      placeholder="예) 설계 완료 6/5 · 개발 완료 6/20 · QC 6/25"
+                      placeholder="예) 설계 완료 6/5 · 개발 완료 6/20 · QA 6/25"
                       minHeight={40}
                       onChange={(html) => setScheduleDrafts((c) => ({ ...c, [selected.id]: { ...currentScheduleDraft, milestones: html } }))}
                     />
@@ -4212,6 +4313,9 @@ function AuditLogPanel({ projects }: { projects: Project[] }) {
   )
 }
 
+// 역할×단계 매트릭스의 열 라벨. 모바일에서는 각 셀의 data-stage로도 노출된다.
+const laneStages = ['① 요청', '② 기획', '③ 승인', '④ 개발', '⑤ 검토', '⑥ 완료']
+
 // 프로젝트 관리 시스템 가이드 — 워크플로·역할·산출물·화면·KPI 전반 설명
 function SystemGuidePanel() {
   return (
@@ -4236,10 +4340,99 @@ function SystemGuidePanel() {
               <tr><td><span className="statusPill planning">기획</span></td><td>PM / 기획자</td><td><strong>요구사항 정의서(SRS)</strong></td><td>요구사항 12개 항목 작성, 승인 필요 역할 지정</td></tr>
               <tr><td><span className="statusPill dept_review">승인</span></td><td>지정 승인자(CEM·개발·정보보호·인프라·QA·특허)</td><td>승인 내역</td><td>역할별 검토·승인, 전원 승인 시 자동 진행</td></tr>
               <tr><td><span className="statusPill development">개발</span></td><td>개발자(리더)</td><td><strong>설계 명세서(SDS)</strong> · 일감(Task)</td><td>설계 작성, 일정 조율, 개발 태스크 수행</td></tr>
-              <tr><td><span className="statusPill qc_security">검토</span></td><td>QC · 보안 · PM</td><td>Bug · 취약점 · Change</td><td>SRS·SDS 대조 검증, 3자(QC·보안·PM) 합의</td></tr>
+              <tr><td><span className="statusPill qc_security">검토</span></td><td>QA · 보안 · PM</td><td>Bug · 취약점 · Change</td><td>SRS·SDS 대조 검증, 3자(QA·보안·PM) 합의</td></tr>
               <tr><td><span className="statusPill completion">완료</span></td><td>PM / 관리자</td><td>완료 보고</td><td>요청자 확인 후 게시·완료 처리</td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="guideSection">
+        <h3>2-1. 한눈에 보는 6단계</h3>
+        <p className="guideDiagramLead">pms.sanghak.kr · 시스템 가이드 기준</p>
+        <div className="stageFlow">
+          {[
+            { no: '①', name: '요청', owner: '요청자 · 영업 · 마케팅 · 운영', tone: 'req', acts: ['요청 분류 선택', '요청 내용 작성', '배경 / 현재 상황 작성'], out: ['요청서 (니즈)'] },
+            { no: '②', name: '기획', owner: 'PM / 기획자', tone: 'plan', acts: ['요구사항 12개 항목 작성', '승인 필요 역할 지정'], out: ['요구사항 정의서 (SRS)'] },
+            { no: '③', name: '승인', owner: '지정 승인자', tone: 'appr', acts: ['역할별 개별 검토·승인', 'CEM · 개발 · 정보보호', '인프라 · QA · 특허'], out: ['승인 내역'] },
+            { no: '④', name: '개발', owner: '개발자 (리더)', tone: 'dev', acts: ['설계 작성', '일정 조율', '개발 태스크 수행'], out: ['설계 명세서 (SDS)', '일감 : Task · Bug · Change'] },
+            { no: '⑤', name: '검토', owner: 'QA · 보안 · PM', tone: 'rev', acts: ['SRS · SDS 대조 검증', '3자 합의'], out: ['Bug (QA)', '취약점 (보안)', 'Change (PM)'] },
+            { no: '⑥', name: '완료', owner: 'PM / 관리자', tone: 'done', acts: ['완료 보고 작성', '요청자 확인', '게시 · 완료 처리'], out: ['완료 보고서'] },
+          ].map((s, i) => (
+            <div key={s.no} className="stageFlowItem">
+              <div className={`stageCard tone-${s.tone}`}>
+                <div className="stageCardTop">
+                  <strong>{s.no} {s.name}</strong>
+                  <span className="stageCardOwner">{s.owner}</span>
+                </div>
+                <div className="stageCardBlock">
+                  <b>핵심 활동</b>
+                  <ul>{s.acts.map((a) => <li key={a}>{a}</li>)}</ul>
+                </div>
+                <div className="stageCardBlock">
+                  <b>산출물</b>
+                  <ul>{s.out.map((o) => <li key={o}>{o}</li>)}</ul>
+                </div>
+              </div>
+              {i < 5 && <span className="stageFlowArrow" aria-hidden="true">G{i + 1}</span>}
+            </div>
+          ))}
+        </div>
+
+        <div className="guideSplit">
+          <div className="guideSubBox">
+            <h4>단계 전이 조건</h4>
+            <ul className="gateList">
+              <li><b>G1</b> 요청 제출 → 시스템이 프로젝트 생성, PM에게 신규 요청 알림</li>
+              <li><b>G2</b> 기획 → 승인 : SRS 작성 완료 필요</li>
+              <li><b>G3</b> 승인 → 개발 : 지정 승인자 <strong>전원 승인</strong> → 개발 단계 자동 진행</li>
+              <li><b>G4</b> 개발 → 검토 : SDS 작성 완료 필요</li>
+              <li><b>G5</b> 검토 → 완료 : QA · 보안 · PM <strong>3자 합의</strong></li>
+              <li><b>G6</b> 완료(게시) : 요청자 확인 후 처리</li>
+            </ul>
+          </div>
+          <div className="guideSubBox">
+            <h4>전 단계 공통</h4>
+            <ul className="gateList">
+              <li><b>보류(HOLD)</b> 각 단계 담당자가 사유와 함께 보류 → 보류 중 단계 진행 잠김</li>
+              <li><b>알림(벨)</b> 내 승인 / 검토 차례 · 새 요청 접수(PM) · 마감 임박 / 지연</li>
+              <li><b>활동 로그</b> 모든 상태 변경 자동 기록</li>
+              <li><b>열람 권한</b> 요청자는 본인 요청의 전 단계 열람 · 관리자는 전체 열람</li>
+              <li><b>일감 상태</b> 대기 → 진행 → 완료 (보류 가능, 댓글·첨부 지원)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="guideSection">
+        <h3>2-2. 역할별 처리 흐름</h3>
+        <p className="guideDiagramLead">행 = 역할 · 열 = 단계 · 회색 점선 = 시스템 자동 처리</p>
+        <div className="laneMatrix">
+          <div className="laneMatrixHead">
+            <span className="laneRoleHead">역할</span>
+            {laneStages.map((st) => (
+              <span key={st} className="laneStageHead">{st}</span>
+            ))}
+          </div>
+          {[
+            { role: '요청자', tone: 'req', cells: [['새 요청 작성'], [], [], [], [], ['요청자 확인']] },
+            { role: 'PM / 기획자', tone: 'plan', cells: [[], ['SRS 작성', '승인 역할 지정'], [], [], ['PM 검토 (Change)'], ['완료 보고 작성']] },
+            { role: '승인자', tone: 'appr', cells: [[], [], ['역할별 검토 · 승인', 'CEM · 개발 · 정보보호', '인프라 · QA · 특허'], [], [], []] },
+            { role: '개발자', tone: 'dev', cells: [[], [], [], ['SDS 작성', '개발 태스크 수행'], [], []] },
+            { role: 'QA · 보안', tone: 'rev', cells: [[], [], [], [], ['QA 검토 (Bug)', '보안 검토 (취약점)', '3자 합의'], []] },
+            { role: '시스템', tone: 'sys', cells: [['요청 접수 · 프로젝트 생성', 'PM 알림'], ['승인 요청 알림'], ['전원 승인 시 개발 단계 자동 진행'], [], [], ['게시 · 완료 처리']] },
+          ].map((row) => (
+            <div key={row.role} className={`laneRow lane-${row.tone}`}>
+              <span className="laneRole">{row.role}</span>
+              {row.cells.map((items, ci) => (
+                <div key={ci} className="laneCell" data-stage={laneStages[ci]}>
+                  {items.map((it) => (
+                    <span key={it} className={`laneChip ${row.tone === 'sys' ? 'laneChipAuto' : ''}`}>{it}</span>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
       </div>
 
@@ -4253,7 +4446,7 @@ function SystemGuidePanel() {
               <tr><td>PM</td><td>기획(SRS)·일정·검토</td><td>기획, 검토</td></tr>
               <tr><td>CEM · 인프라 · 특허</td><td>승인</td><td>승인</td></tr>
               <tr><td>개발자</td><td>설계(SDS)·개발</td><td>승인, 개발</td></tr>
-              <tr><td>QC</td><td>품질 검토(Bug)</td><td>승인, 검토</td></tr>
+              <tr><td>QA</td><td>품질 검토(Bug)</td><td>승인, 검토</td></tr>
               <tr><td>보안</td><td>보안 검토(취약점)</td><td>승인, 검토</td></tr>
               <tr><td>관리자</td><td>전체 열람·운영</td><td>모든 프로젝트 열람(직접 처리 없음)</td></tr>
             </tbody>
@@ -4302,7 +4495,7 @@ function SystemGuidePanel() {
         <h3>7. 일감 유형 (단계별)</h3>
         <ul>
           <li><strong>개발 단계</strong> — Task(작업) · Bug(버그) · Change(변경)</li>
-          <li><strong>검토 단계</strong> — Bug(QC) · 취약점(보안) · Change(PM) — 역할별 기본 유형 자동 지정</li>
+          <li><strong>검토 단계</strong> — Bug(QA) · 취약점(보안) · Change(PM) — 역할별 기본 유형 자동 지정</li>
         </ul>
       </div>
 
@@ -4321,9 +4514,75 @@ function SystemGuidePanel() {
           <li>기획 → 승인: <strong>SRS 작성 완료</strong> 필요</li>
           <li>승인 → 개발: <strong>지정 승인자 전원 승인</strong></li>
           <li>개발 → 검토: <strong>SDS 작성 완료</strong> 필요</li>
-          <li>검토 → 완료: <strong>QC·보안·PM 3자 합의</strong></li>
+          <li>검토 → 완료: <strong>QA·보안·PM 3자 합의</strong></li>
           <li>완료(게시): <strong>요청자 확인</strong> 후 처리</li>
         </ul>
+      </div>
+
+      <div className="guideSection">
+        <h3>9-1. 승인 단계 상세 (병렬 승인)</h3>
+        <p className="guideDiagramLead">지정된 역할만 활성화 · 미지정 역할은 스킵</p>
+        <div className="forkFlow">
+          <div className="forkStep">
+            <div className="forkBox tone-plan">SRS 작성 완료</div>
+            <span className="forkArrow" aria-hidden="true" />
+            <div className="forkBox tone-plan">PM : 승인 필요 역할 지정<em>(N개 선택)</em></div>
+          </div>
+          <span className="forkBarLabel">병렬 승인 요청</span>
+          <div className="forkBar" aria-hidden="true" />
+          <div className="forkBranches">
+            {['CEM', '개발', '정보보호', '인프라', 'QA', '특허'].map((r) => (
+              <div key={r} className="forkBox tone-appr forkBranch">{r}</div>
+            ))}
+          </div>
+          <div className="forkBar" aria-hidden="true" />
+          <span className="forkBarLabel">전원 승인 대기</span>
+          <div className="forkStep">
+            <span className="forkArrow" aria-hidden="true" />
+            <div className="forkBox tone-dev forkResult">개발 단계<br />자동 진행</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="guideSection">
+        <h3>9-2. 보류(HOLD) 흐름</h3>
+        <div className="holdFlow">
+          <div className="forkBox tone-req">단계 진행 중</div>
+          <span className="forkArrow" aria-hidden="true" />
+          <div className="forkBox tone-rev">담당자 보류<em>(사유 입력)</em></div>
+          <span className="forkArrow" aria-hidden="true" />
+          <div className="forkBox tone-rev holdLocked">보류 상태<em>단계 진행 잠김</em></div>
+          <span className="forkArrow" aria-hidden="true" />
+          <div className="holdBranch">
+            <div className="forkBox tone-plan">보류 해제 → 원 단계 복귀</div>
+            <div className="forkBox tone-sys">관리자 삭제 / 종료</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="guideSection gapSection">
+        <h3>10. 가이드에 정의되지 않은 구간 (검토 필요)</h3>
+        <p className="guideDiagramLead">아래 항목은 시스템 가이드에 규칙이 없어 흐름도에 그리지 않았습니다. 확정 후 반영이 필요합니다.</p>
+        <div className="gapGrid">
+          {[
+            { tone: 'warn', title: '1. 승인 반려 시 처리', body: '"전원 승인 시 자동 진행"만 정의됨. 승인자가 반려했을 때 기획 단계로 회귀하는지, 보류로 전환되는지 규칙 없음.' },
+            { tone: 'warn', title: '2. 검토 3자 합의 실패 시 처리', body: 'Bug · 취약점이 남았을 때 개발 단계로 되돌아가는지, 검토 단계에서 반복하는지 규칙 없음.' },
+            { tone: 'warn', title: '3. 요청자 무응답 시 완료 처리', body: '완료(게시)가 요청자 확인에 종속. 요청자가 확인하지 않으면 프로젝트가 완료 단계에 무기한 대기. 타임아웃 · 자동 확인 규칙 없음.' },
+            { tone: 'crit', title: '4. SDS 승인 게이트 부재', body: 'SRS는 승인 단계를 거치지만 SDS는 "작성 완료" 여부만 확인하고 검토 단계로 진행. 설계에 대한 승인 주체가 없음.' },
+            { tone: 'crit', title: '5. 역할 중복 (승인 ↔ 검토)', body: '개발 · QA · 보안이 승인 단계와 개발/검토 단계에 모두 참여. 특히 개발자는 승인 후 본인이 SDS를 작성. 이중 확인 의도인지 확인 필요.' },
+            { tone: 'info', title: '6. 마감일 확정 시점', body: 'KPI에 "마감 임박 D-5"가 있으나 마감일을 어느 단계에서 누가 확정하는지가 워크플로에 없음. (개발 단계 "일정 조율"로 추정)' },
+          ].map((g) => (
+            <div key={g.title} className={`gapCard gap-${g.tone}`}>
+              <strong>{g.title}</strong>
+              <p>{g.body}</p>
+            </div>
+          ))}
+        </div>
+        <div className="gapLegend">
+          <span><i className="gapDot gap-warn" /> 예외 경로 미정의</span>
+          <span><i className="gapDot gap-crit" /> 구조적 검토 필요</span>
+          <span><i className="gapDot gap-info" /> 정보 부족</span>
+        </div>
       </div>
     </section>
   )
@@ -5045,23 +5304,39 @@ function SettingsPanel({
   }
 
   // 동사무소 게시판 API 등록 설정 (localStorage 영속)
-  type OfficeApiConfig = { baseUrl: string; boardName: string; username: string; password: string }
-  const officeApiStorageKey = 'pms-office-api'
-  const [officeApi, setOfficeApi] = useState<OfficeApiConfig>(() => {
-    if (typeof window === 'undefined') return { baseUrl: '', boardName: '', username: '', password: '' }
-    try {
-      const saved = window.localStorage.getItem(officeApiStorageKey)
-      return saved ? JSON.parse(saved) : { baseUrl: '', boardName: '', username: '', password: '' }
-    } catch {
-      return { baseUrl: '', boardName: '', username: '', password: '' }
-    }
-  })
+  const [officeApi, setOfficeApi] = useState<OfficeApiConfig>(() => readOfficeApiConfig())
   const [officeApiSaved, setOfficeApiSaved] = useState(false)
+  const [officeTest, setOfficeTest] = useState<{ ok: boolean; message: string } | null>(null)
+  const [officeTesting, setOfficeTesting] = useState(false)
+
   function saveOfficeApi(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     window.localStorage.setItem(officeApiStorageKey, JSON.stringify(officeApi))
     setOfficeApiSaved(true)
     setTimeout(() => setOfficeApiSaved(false), 1800)
+  }
+
+  async function runOfficeTest() {
+    // 저장 버튼(native submit)의 type="url" 검증을 우회하므로 여기서 직접 확인
+    const urlError = validateOfficeBaseUrl(officeApi.baseUrl)
+    if (urlError) {
+      setOfficeTest({ ok: false, message: urlError })
+      return
+    }
+    setOfficeTesting(true)
+    setOfficeTest(null)
+    const result = await testOfficeBoardConnection(officeApi)
+    setOfficeTesting(false)
+    setOfficeTest(
+      result.ok
+        ? {
+            ok: true,
+            message:
+              `주소 도달 확인 (HTTP ${result.status}) · ${buildOfficePostUrl(officeApi)}\n` +
+              '※ 경로·자격증명이 맞는지는 확인되지 않습니다. 완료 보고 1건을 실제 전송해 검증하세요.',
+          }
+        : { ok: false, message: result.error },
+    )
   }
 
   function addService(event: FormEvent<HTMLFormElement>) {
@@ -5163,6 +5438,9 @@ function SettingsPanel({
             </div>
             <div className="officeApiActions">
               {officeApiSaved && <span className="officeApiSavedHint">저장되었습니다 ✓</span>}
+              <button className="miniButton" type="button" onClick={() => void runOfficeTest()} disabled={officeTesting}>
+                {officeTesting ? '테스트 중…' : '연결 테스트'}
+              </button>
               <button className="primaryButton" type="submit">저장</button>
             </div>
           </div>
@@ -5205,7 +5483,30 @@ function SettingsPanel({
                 autoComplete="new-password"
               />
             </label>
+            <label>
+              <span>게시 경로 (Post path)</span>
+              <input
+                type="text"
+                value={officeApi.postPath ?? ''}
+                onChange={(e) => setOfficeApi((c) => ({ ...c, postPath: e.target.value }))}
+                placeholder={DEFAULT_OFFICE_POST_PATH}
+              />
+            </label>
           </div>
+          <p className="officeApiHint">
+            {'게시판 스펙에 맞춰 경로를 지정하세요. {board} 는 게시판명으로 치환됩니다. 비우면 '}
+            <code>{DEFAULT_OFFICE_POST_PATH}</code>
+            {' 를 사용합니다.'}
+            {isOfficeBoardConfigured(officeApi) && (
+              <>
+                <br />
+                전송 대상: <code>{buildOfficePostUrl(officeApi)}</code>
+              </>
+            )}
+          </p>
+          {officeTest && (
+            <p className={`officeApiTestResult ${officeTest.ok ? 'ok' : 'fail'}`}>{officeTest.message}</p>
+          )}
         </form>
       </div>
 
