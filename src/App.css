@@ -7841,6 +7841,17 @@ button.approvalPill:hover {
    ───────────────────────────────────────────── */
 @media (max-width: 768px) {
   :root {
+  /* ── 모바일 단일 스케일 (768px 이하) ─────────────────────────────
+     화면마다 오버라이드가 달라 폰트·패딩이 제각기였던 것을 한 곳에서 관리한다.
+     위계: 제목 > 본문 > 라벨/보조. 밀도는 폰트가 아니라 여백으로 조절. */
+  --m-fs-kpi: 20px;    /* KPI 수치 */
+  --m-fs-h: 14px;      /* 섹션 제목 */
+  --m-fs-body: 13px;   /* 본문·입력값 */
+  --m-fs-label: 12px;  /* 라벨·배지·캡션 (하한) */
+  --m-pad-sec: 10px;   /* 섹션 컨테이너 좌우/상하 */
+  --m-pad-row: 6px;    /* 행·필드 세로 */
+  --m-gap: 5px;        /* 항목 간격 */
+
     font-size: 14px;
   }
 
@@ -8199,18 +8210,18 @@ button.approvalPill:hover {
   .appShell li, .appShell td, .appShell th, .appShell label,
   .appShell button, .appShell input, .appShell select, .appShell textarea,
   .appShell strong, .appShell b, .appShell em {
-    font-size: 14px !important;
+    font-size: var(--m-fs-body) !important;
     line-height: 1.45 !important;
   }
   /* 섹션 제목 = 16px */
   .appShell h1, .appShell h2, .appShell h3, .appShell h4,
   .appShell .detailTitle {
-    font-size: 16px !important;
+    font-size: var(--m-fs-h) !important;
   }
   /* KPI 수치·화면 제목은 키운다 */
-  .appShell .metric strong { font-size: 26px !important; }
-  .appShell .statCardValue { font-size: 20px !important; }
-  .appShell .workflowSummary strong { font-size: 20px !important; }
+  .appShell .metric strong { font-size: var(--m-fs-kpi) !important; }
+  .appShell .statCardValue { font-size: var(--m-fs-kpi) !important; }
+  .appShell .workflowSummary strong { font-size: var(--m-fs-kpi) !important; }
   /* 보조 라벨(배지·메타·캡션) = 12px — 그 이하 금지 */
   .appShell small, .appShell .cardMeta, .appShell .cardMeta *,
   .appShell .statCardSub, .appShell .statCardLabel, .appShell .statBarName, .appShell .statBarNum,
@@ -8219,7 +8230,7 @@ button.approvalPill:hover {
   .appShell .flowConnectorLabel, .appShell .flowStepRole, .appShell .flowStepRole span,
   .appShell .eyebrow, .appShell .flowCurrentStep,
   .appShell .flowStepText strong, .appShell .flowStepText em {
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
   }
   /* 하단 탭바 라벨: 아이콘과 함께 6칸을 나눠 쓰므로 11px 유지 (축약 라벨과 병행) */
   .sidebar .navItem span { font-size: 11px !important; letter-spacing: -0.3px; }
@@ -8268,7 +8279,7 @@ button.approvalPill:hover {
     border-radius: 8px;
     background: #fff;
     color: #2b323d;
-    font-size: 14px !important;
+    font-size: var(--m-fs-body) !important;
     font-weight: 700;
     cursor: pointer;
   }
@@ -8282,7 +8293,7 @@ button.approvalPill:hover {
     border-radius: 999px;
     background: #2b6cf0;
     color: #fff;
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
     font-weight: 800;
   }
 
@@ -8302,7 +8313,7 @@ button.approvalPill:hover {
     border: 1px solid #cdd6e4;
     background: #eef2ff;
     color: #2b4a8f;
-    font-size: 13px !important;
+    font-size: var(--m-fs-body) !important;
     font-weight: 700;
     cursor: pointer;
   }
@@ -8310,7 +8321,7 @@ button.approvalPill:hover {
     background: #fff;
     color: #6b7280;
   }
-  .searchFilterRow .filterChip span { font-size: 12px !important; opacity: 0.7; }
+  .searchFilterRow .filterChip span { font-size: var(--m-fs-label) !important; opacity: 0.7; }
 
   /* 기본 상태에서 select 묶음은 숨기고(시트로 이동), 검색은 항상 노출 */
   .filterControls {
@@ -8340,7 +8351,7 @@ button.approvalPill:hover {
   }
   .filterControls.sheetOpen .listFilterBox select {
     width: 100%;
-    font-size: 16px !important; /* 14px 이상 + iOS 포커스 확대 방지 */
+    font-size: var(--m-fs-h) !important; /* 14px 이상 + iOS 포커스 확대 방지 */
     font-weight: 600;
   }
   .filterSheetHeader {
@@ -8349,11 +8360,11 @@ button.approvalPill:hover {
     justify-content: space-between;
     padding-bottom: 4px;
   }
-  .filterControls .filterSheetHeader strong { font-size: 16px !important; font-weight: 800; }
+  .filterControls .filterSheetHeader strong { font-size: var(--m-fs-h) !important; font-weight: 800; }
   .filterControls .filterSheetClose {
     width: 32px; height: 32px;
     border: 0; background: #f1f3f6; border-radius: 8px;
-    font-size: 15px !important; color: #5f6670; cursor: pointer;
+    font-size: var(--m-fs-h) !important; color: #5f6670; cursor: pointer;
   }
   .filterSheetFooter {
     display: flex;
@@ -8365,7 +8376,7 @@ button.approvalPill:hover {
     flex: 1 1 0;
     height: 46px;
     border-radius: 10px;
-    font-size: 15px !important;
+    font-size: var(--m-fs-h) !important;
     font-weight: 800;
     cursor: pointer;
   }
@@ -8429,12 +8440,12 @@ button.approvalPill:hover {
   /* ② 헤더 eyebrow / 현재 단계 배지: 줄바꿈 금지 + 폰트 축소 */
   .requestPanel .eyebrow,
   .detailHeaderPanel .eyebrow {
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
     white-space: nowrap;
     letter-spacing: -0.2px;
   }
   .flowHeadActions .flowCurrentStep {
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
     white-space: nowrap;
     padding: 4px 9px;
   }
@@ -8449,7 +8460,7 @@ button.approvalPill:hover {
   }
   .flowStepper.projectFlowStepper .flowStepText { align-items: center; }
   .flowStepper.projectFlowStepper .flowStepText strong {
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
     line-height: 1.2 !important;
     white-space: nowrap;
   }
@@ -8791,10 +8802,10 @@ button.approvalPill:hover {
   }
   /* 필터/CSV 버튼 = 중간 10px, 칩·카운트 = 최소 8px */
   .searchFilterRow .filterTriggerBtn,
-  .csvExportButton { font-size: 12px !important; }
+  .csvExportButton { font-size: var(--m-fs-label) !important; }
   .searchFilterRow .filterChip,
   .searchFilterRow .filterChipClear,
-  .searchFilterRow .filterTriggerCount { font-size: 12px !important; }
+  .searchFilterRow .filterTriggerCount { font-size: var(--m-fs-label) !important; }
   /* 상단바 ↔ 본문 간격 축소 */
   .appShell .topbar { padding-bottom: 5px !important; }
   .appShell .topStickyArea { margin-top: 5px !important; }
@@ -9075,12 +9086,12 @@ button.approvalPill:hover {
   .appShell .requestPanel .flowStepText strong,
   .appShell .requestPanel .approvalGuide,
   .appShell .requestPanel .flowSectionLead {
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
   }
   .appShell .requestPanel h2,
   .appShell .requestPanel h3,
   .appShell .requestPanel legend {
-    font-size: 16px !important;
+    font-size: var(--m-fs-h) !important;
   }
 }
 
@@ -9112,10 +9123,10 @@ button.approvalPill:hover {
   }
   .appShell .approvalUnitHead {
     padding: 4px 2px !important;
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
     line-height: 1.2 !important;
   }
-  .appShell .approvalCellPill { height: 26px !important; font-size: 12px !important; }
+  .appShell .approvalCellPill { height: 26px !important; font-size: var(--m-fs-label) !important; }
   .appShell .approvalGridFoot { padding: 5px 6px !important; }
 }
 
@@ -9209,7 +9220,7 @@ button.approvalPill:hover {
   .appShell .allProjectsPage .projectCard .cardMeta,
   .appShell .allProjectsPage .projectCard .cardMeta *,
   .appShell .allProjectsPage .projectCard .statusPill {
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
   }
 }
 
@@ -9766,7 +9777,7 @@ button.approvalPill:hover {
   }
 
   .appShell .metric span {
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
   }
 
   .appShell .metricGrid {
@@ -9808,7 +9819,7 @@ button.approvalPill:hover {
   }
 
   .appShell .workflowSummary strong {
-    font-size: 16px !important;
+    font-size: var(--m-fs-h) !important;
   }
 
   .appShell .serviceFilterControl {
@@ -9926,7 +9937,7 @@ button.approvalPill:hover {
   .appShell .detailHeaderPanel .flowCurrentStep,
   .appShell .detailHeaderPanel .statusPill,
   .appShell .detailHeaderPanel .miniButton {
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
     line-height: 1 !important;
   }
 
@@ -9976,13 +9987,13 @@ button.approvalPill:hover {
     min-width: 0 !important;
     width: 100% !important;
     table-layout: fixed !important;
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
   }
 
   .appShell .guideTable th,
   .appShell .guideTable td {
     padding: 4px 3px !important;
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
     line-height: 1.15 !important;
     word-break: keep-all !important;
     overflow-wrap: anywhere !important;
@@ -10011,7 +10022,7 @@ button.approvalPill:hover {
   .appShell .guideTable td .statusPill {
     min-height: 17px !important;
     padding: 1px 4px !important;
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
   }
 
 
@@ -10025,7 +10036,7 @@ button.approvalPill:hover {
   .appShell .kpiGuideTable td {
     padding-left: 2px !important;
     padding-right: 2px !important;
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
     line-height: 1.12 !important;
   }
 
@@ -10068,13 +10079,13 @@ button.approvalPill:hover {
     min-width: 0 !important;
     width: 100% !important;
     table-layout: auto !important;
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
   }
 
   .appShell .auditTable th,
   .appShell .auditTable td {
     padding: 4px 2px !important;
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
     line-height: 1.12 !important;
   }
 
@@ -10089,7 +10100,7 @@ button.approvalPill:hover {
     white-space: normal !important;
     overflow-wrap: anywhere !important;
     word-break: keep-all !important;
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
     line-height: 1.12 !important;
   }
 
@@ -10098,7 +10109,7 @@ button.approvalPill:hover {
     white-space: normal !important;
     overflow-wrap: anywhere !important;
     word-break: keep-all !important;
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
     line-height: 1.12 !important;
   }
 
@@ -10136,7 +10147,7 @@ button.approvalPill:hover {
   .appShell .projectHoldInfo strong {
     flex: 1 1 100% !important;
     min-width: 0 !important;
-    font-size: 14px !important;
+    font-size: var(--m-fs-body) !important;
     line-height: 1.35 !important;
   }
 
@@ -10146,7 +10157,7 @@ button.approvalPill:hover {
     max-width: none !important;
     overflow: visible !important;
     white-space: normal !important;
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
     line-height: 1.35 !important;
   }
 
@@ -10157,7 +10168,7 @@ button.approvalPill:hover {
     flex: 0 0 auto !important;
     min-height: 20px !important;
     padding: 1px 6px !important;
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
     line-height: 1.3 !important;
     border-radius: 5px !important;
   }
@@ -10171,7 +10182,7 @@ button.approvalPill:hover {
   .appShell .projectManageActions .miniButton {
     min-height: 30px !important;
     padding: 4px 8px !important;
-    font-size: 12px !important;
+    font-size: var(--m-fs-label) !important;
     line-height: 1.2 !important;
     border-radius: 5px !important;
   }
@@ -10347,4 +10358,45 @@ button.approvalPill:hover {
   .serviceFilterControl select {
     min-width: 0 !important;
   }
+}
+
+/* =========================================================================
+   모바일 최종 통합 (768px 이하) — 화면마다 달랐던 여백을 단일 스케일로 맞춘다.
+   폰트는 :root 의 --m-fs-* 변수로 이미 통일됨. 여기서는 여백만 정리한다.
+   레거시 블록보다 뒤에 있고 특이도를 맞춰 마지막에 적용된다.
+   ========================================================================= */
+@media (max-width: 768px) {
+  /* 섹션 컨테이너: 상하/좌우 동일 스케일 */
+  .appShell .requestPanel,
+  .appShell .settingsSection,
+  .appShell .guideSection,
+  .appShell .dashboardPanel,
+  .appShell .queuePanel,
+  .appShell .detailHeaderPanel {
+    padding: var(--m-pad-sec) !important;
+  }
+
+  /* 필드·행: 세로 여백 통일 + 터치 높이는 min-height로 보장 */
+  .appShell .requestPanel fieldset { padding: var(--m-pad-row) var(--m-pad-sec) !important; }
+  .appShell .requestPanel input,
+  .appShell .requestPanel select,
+  .appShell .requestPanel textarea,
+  .appShell .requestTypeButton {
+    padding: var(--m-pad-row) 9px !important;
+    min-height: 32px !important;
+  }
+  .appShell .requestPanel label { gap: 4px !important; }
+
+  /* 리스트 행 */
+  .appShell .projectCard,
+  .appShell .serviceListItem,
+  .appShell .projectHoldRow {
+    padding: var(--m-pad-row) 10px !important;
+    gap: var(--m-gap) !important;
+  }
+
+  /* 항목 간 간격 통일 */
+  .appShell .requestPanel > * + *,
+  .appShell .guideSection + .guideSection { margin-top: var(--m-gap) !important; }
+  .appShell .metricGrid { gap: var(--m-gap) !important; }
 }
