@@ -45,7 +45,7 @@ import {
   validateOfficeBaseUrl,
   type OfficeApiConfig,
 } from './officeBoard'
-import { roleLabels, workflow } from './data'
+import { roleLabels, stageBaselineProgress, workflow } from './data'
 import {
   deleteProject as deleteProjectDoc,
   deleteProjects as deleteProjectsDoc,
@@ -608,7 +608,8 @@ function isProjectAssignedToRole(project: Project, role: Role) {
     project.assigneeRole === role ||
     // 요청자에게 배정된 단계는 영업·마케팅도 본인 할 일로 봄
     (project.assigneeRole === 'requester' && isRequesterRole(role)) ||
-    (project.status === 'qc_security' && (role === 'qa' || role === 'security' || role === 'pm'))
+    // 검토 단계는 개발(단위테스트)·QA(통합테스트)·보안·PM 4자가 모두 담당
+    (project.status === 'qc_security' && qcSignoffRoles.includes(role as QcSignoffRole))
   )
 }
 
@@ -625,7 +626,8 @@ function roleActsOnStatus(role: Role, status: ProjectStatus): boolean {
     case 'development':
       return role === 'pm' || role === 'developer'
     case 'qc_security':
-      return role === 'qa' || role === 'security' || role === 'pm'
+      // 개발(단위테스트) 포함 4자
+      return qcSignoffRoles.includes(role as QcSignoffRole)
     case 'completion':
       return role === 'pm'
     default:
@@ -1516,7 +1518,7 @@ function App() {
     if (selected.status === 'dept_review' && pendingApprovalRoles.length > 0) return
     if (selected.status === 'planning' && planningRequiredByType[selected.requestType] && !hasSrsDraft) { window.alert('요구사항 정의서(SRS)를 작성해야 다음 단계로 진행할 수 있습니다.'); return }
     if (selected.status === 'development' && planningRequiredByType[selected.requestType] && !hasSdsDraft) { window.alert('설계 명세서(SDS)를 작성해야 검토 단계로 진행할 수 있습니다.'); return }
-    if (selected.status === 'qc_security' && !qcAllSignedOff) { window.alert('QA·보안·PM 3자 검토가 모두 완료되어야 다음 단계로 진행할 수 있습니다.'); return }
+    if (selected.status === 'qc_security' && !qcAllSignedOff) { window.alert(`검토가 모두 완료되어야 다음 단계로 진행할 수 있습니다.\n대기: ${qcPendingRoles.map((r) => qcSignoffTitles[r]).join(', ')}`); return }
     if (selected.status === 'completion' && !selected.requesterConfirmed) { window.alert('요청자 확인이 완료되어야 게시할 수 있습니다.'); return }
     // 개발 단계: 미완료 태스크가 있으면 확인
     if (selected.status === 'development' && openTasks.length > 0) {
@@ -1613,6 +1615,12 @@ function App() {
     if (patch.approvalState) dbPatch.approval_state = merged.approvalState
     if (patch.workflowConfig) dbPatch.workflow_config = merged.workflowConfig
     if (patch.published !== undefined) dbPatch.published = merged.published
+    // 보류 상태(반려 → 보류 전환 포함)도 전용 컬럼에 영속화.
+    // 누락되면 새로고침 시 보류가 풀린 것처럼 보인다.
+    if (patch.onHold !== undefined) dbPatch.on_hold = merged.onHold
+    if (patch.holdReason !== undefined) dbPatch.hold_reason = merged.holdReason ?? ''
+    // 마감일 확정(개발 단계 일정 조율 결과)
+    if (patch.dueDate) dbPatch.due_date = patch.dueDate
     try {
       await updateProjectDoc(selected.id, dbPatch)
     } catch {
@@ -1739,6 +1747,9 @@ function App() {
       {
         status: 'development',
         assigneeRole: 'developer',
+        // 진행률도 개발 단계 기준으로 되돌린다 (진행률은 단계 진행 시 +12 누적이라
+        // 되돌리면서 놔두면 검토 단계 수준(86%)이 남아 실제보다 부풀려진다)
+        progress: Math.min(selected.progress, stageBaselineProgress.development),
         // 재검토가 필요하므로 사인오프 전체 초기화
         qcSignoff: emptyQcSignoff,
         // 개발 단계에서 다시 문서를 수정할 수 있도록 잠금 해제

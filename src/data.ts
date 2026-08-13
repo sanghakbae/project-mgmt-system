@@ -47,6 +47,7 @@ type DemoSeed = {
 }
 
 // 단계별 진행률·담당·승인 상태를 일관되게 생성하기 위한 헬퍼
+// (단계를 되돌릴 때 진행률을 그 단계 기준으로 되돌리는 데도 사용 — stageBaselineProgress)
 const stageDefaults: Record<ProjectStatus, { progress: number; assignee: Project['assigneeRole']; approved: Role[]; nextAction: string }> = {
   request: { progress: 10, assignee: 'requester', approved: [], nextAction: 'PM이 요청 내용을 검토하고 기획 단계로 진행합니다.' },
   planning: { progress: 32, assignee: 'pm', approved: [], nextAction: 'PM이 기획 문서(SRS+SDS)를 작성합니다.' },
@@ -56,6 +57,11 @@ const stageDefaults: Record<ProjectStatus, { progress: number; assignee: Project
   completion: { progress: 100, assignee: 'admin', approved: fullRoles, nextAction: '완료 보고를 작성하고 동사무소 게시판에 게시합니다.' },
   rejected: { progress: 8, assignee: 'requester', approved: [], nextAction: '반려 사유를 반영해 재요청합니다.' },
 }
+
+/** 단계별 기준 진행률. 단계를 되돌릴 때 진행률이 앞선 단계 값으로 남지 않도록 사용한다. */
+export const stageBaselineProgress: Record<ProjectStatus, number> = Object.fromEntries(
+  Object.entries(stageDefaults).map(([status, meta]) => [status, meta.progress]),
+) as Record<ProjectStatus, number>
 
 const stageStamp: Record<ProjectStatus, { created: string; updated: string; due: string }> = {
   request: { created: '2026-05-16', updated: '2026-05-17T09:10:00+09:00', due: '2026-06-20' },
