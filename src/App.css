@@ -9514,28 +9514,9 @@ button.approvalPill:hover {
 .lane-sys  .laneRole { background: #f0f0f0; border-color: #999; }
 .laneChipAuto { background: #f7f7f7; border-color: #999; border-style: dashed; color: #4b515c; }
 
-/* 병렬 승인 fork/join — 좌→우 한 줄 흐름 */
-.forkFlowRow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 4px 0;
-}
-/* 수직 fork/join 바 + 세로 라벨 */
-.forkBarV { display: flex; align-items: center; gap: 4px; align-self: stretch; }
-.forkBarV > i { display: block; width: 9px; border-radius: 3px; background: #333; align-self: stretch; }
-.forkBarVLabel {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-size: 11px;
-  color: #5f6670;
-  white-space: nowrap;
-}
-/* 6개 병렬 승인 역할을 세로로 쌓는다 */
-.forkBranchCol { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-
-.forkStep { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+/* 병렬 승인 fork/join — 가로폭 100%, 6개 역할은 한 줄 */
+.forkFlow { display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 100%; }
+.forkStep { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; width: 100%; }
 .forkBox {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 2px; min-height: 44px; padding: 8px 14px;
@@ -9549,13 +9530,13 @@ button.approvalPill:hover {
 .forkBox.tone-dev  { background: #f0e9f5; border-color: #9673a6; }
 .forkBox.tone-rev  { background: #fbeaea; border-color: #b85450; }
 .forkBox.tone-sys  { background: #f0f0f0; border-color: #999; }
-.forkResult { border-width: 2px; font-weight: 800; }
+.forkResult { border-width: 2px; font-weight: 800; align-self: center; }
 .holdLocked { border-width: 2px; }
-.forkBar { width: 100%; max-width: 720px; height: 9px; background: #333; border-radius: 3px; }
+.forkBar { width: 100%; height: 9px; background: #333; border-radius: 3px; }
 .forkBarLabel { font-size: 12px; color: #5f6670; }
 .forkBranches {
   display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 8px; width: 100%; max-width: 720px;
+  gap: 8px; width: 100%;
 }
 .forkBranch { padding: 6px 18px; min-height: 34px; }
 /* 가로 화살표(스텝 사이) / 세로 화살표(bar 위아래) */
@@ -9567,7 +9548,18 @@ button.approvalPill:hover {
   border-top: 5px solid transparent; border-bottom: 5px solid transparent;
 }
 
-/* 보류 흐름 */
+/* 보류 흐름 — 가로폭 100%, 단계별 컬럼 */
+.holdFlowRow {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+}
+.holdCol { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.holdColLabel { font-size: 11px; font-weight: 800; color: #8a919b; text-align: center; }
+.holdFlowRow .forkBox { flex: 1 1 auto; }
+.holdFlowRow .forkArrow { flex: 0 0 22px; align-self: center; }
+/* 이전 세로형 보류 흐름 (미사용 대비 유지) */
 .holdFlow { display: flex; align-items: center; justify-content: flex-start; gap: 8px; flex-wrap: wrap; }
 .holdBranch { display: flex; flex-direction: column; gap: 8px; }
 
@@ -9622,12 +9614,9 @@ button.approvalPill:hover {
   .appShell .laneCell .laneChip { grid-column: 2; }
   /* 병렬 승인: 모바일은 한 줄 유지가 불가하므로 세로 흐름 + 분기 2열 */
   .appShell .forkBranches { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .appShell .forkFlowRow { flex-direction: column; align-items: stretch; }
-  .appShell .forkFlowRow .forkArrow { align-self: center; transform: rotate(90deg); }
-  .appShell .forkBarV { align-self: stretch; flex-direction: column; }
-  .appShell .forkBarV > i { width: auto; height: 9px; align-self: stretch; }
-  .appShell .forkBarVLabel { writing-mode: horizontal-tb; text-align: center; }
-  .appShell .forkBranchCol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  /* 보류 흐름: 모바일은 세로 스택 */
+  .appShell .holdFlowRow { flex-direction: column; align-items: stretch; }
+  .appShell .holdFlowRow .forkArrow { align-self: center; transform: rotate(90deg); }
   .appShell .holdFlow { flex-direction: column; align-items: stretch; }
   .appShell .holdFlow .forkArrow { align-self: center; transform: rotate(90deg); }
 }

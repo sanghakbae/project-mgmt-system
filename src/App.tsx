@@ -4554,7 +4554,7 @@ function SystemGuidePanel() {
           <div className="guideSubBox">
             <h4>전 단계 공통</h4>
             <ul className="gateList">
-              <li><b>보류(HOLD)</b> 각 단계 담당자가 사유와 함께 보류 → 보류 중 단계 진행 잠김</li>
+              <li><b>보류(HOLD)</b> PM · 관리자가 사유와 함께 보류 → 단계는 유지되고 진행만 잠김</li>
               <li><b>알림(벨)</b> 내 승인 / 검토 차례 · 새 요청 접수(PM) · 마감 임박 / 지연</li>
               <li><b>활동 로그</b> 모든 상태 변경 자동 기록</li>
               <li><b>열람 권한</b> 요청자는 본인 요청의 전 단계 열람 · 관리자는 전체 열람</li>
@@ -4663,7 +4663,7 @@ function SystemGuidePanel() {
         <h3>8. 승인 · 보류 · 알림</h3>
         <ul>
           <li><strong>승인</strong> — 기획 단계에서 지정한 역할만 승인 단계에서 검토·승인. 전원 승인 시 개발 단계로 자동 진행.</li>
-          <li><strong>보류</strong> — 각 단계 담당자가 사유와 함께 프로젝트를 보류. 보류 중에는 단계 진행이 잠김.</li>
+          <li><strong>보류</strong> — PM · 관리자가 사유와 함께 프로젝트를 보류. 단계는 그대로 유지되고 진행만 잠기며, 해제하면 같은 단계에서 재개됩니다. 승인 단계에서 <strong>반려</strong>하면 보류로 전환됩니다.</li>
           <li><strong>알림</strong> — 내 승인/검토 차례, 새 요청 접수(PM), 마감 임박/지연을 벨에 모아 표시.</li>
         </ul>
       </div>
@@ -4674,7 +4674,10 @@ function SystemGuidePanel() {
           <li>기획 → 승인: <strong>SRS 작성 완료</strong> 필요</li>
           <li>승인 → 개발: <strong>지정 승인자 전원 승인</strong></li>
           <li>개발 → 검토: <strong>SDS 작성 완료</strong> 필요</li>
-          <li>검토 → 완료: <strong>QA·보안·PM 3자 합의</strong></li>
+          <li>검토 → 완료: <strong>개발·QA·보안·PM 4자 합의</strong> (단위테스트 → 통합테스트 순서, 보안테스트 병행)</li>
+          <li>검토 → 개발(회귀): <strong>Bug·취약점이 남으면</strong> 개발 단계로 되돌리고 검토 상태 초기화</li>
+          <li>승인 반려: 단계를 유지한 채 <strong>보류로 전환</strong> (해제 시 같은 단계에서 재개)</li>
+          <li>마감일 확정: <strong>개발 단계 일정 조율</strong>의 완료 예정일로 확정 (KPI 마감 임박 D-5 기준)</li>
           <li>완료(게시): <strong>요청자 확인</strong> 후 처리</li>
         </ul>
       </div>
@@ -4682,40 +4685,49 @@ function SystemGuidePanel() {
       <div className="guideSection">
         <h3>9-1. 승인 단계 상세 (병렬 승인)</h3>
         <p className="guideDiagramLead">지정된 역할만 활성화 · 미지정 역할은 스킵</p>
-        {/* 좌→우 한 줄 흐름: 준비 → fork(수직 바) → 6개 병렬 승인 → join → 결과 */}
-        <div className="forkFlowRow">
-          <div className="forkBox tone-plan">SRS 작성 완료</div>
-          <span className="forkArrow" aria-hidden="true" />
-          <div className="forkBox tone-plan">PM : 승인 필요 역할 지정<em>(N개 선택)</em></div>
-          <div className="forkBarV">
-            <span className="forkBarVLabel">병렬 승인 요청</span>
-            <i aria-hidden="true" />
+        <div className="forkFlow">
+          <div className="forkStep">
+            <div className="forkBox tone-plan">SRS 작성 완료</div>
+            <span className="forkArrow" aria-hidden="true" />
+            <div className="forkBox tone-plan">PM : 승인 필요 역할 지정<em>(N개 선택)</em></div>
           </div>
-          <div className="forkBranchCol">
+          <span className="forkBarLabel">병렬 승인 요청 ▼</span>
+          <div className="forkBar" aria-hidden="true" />
+          {/* 6개 승인 역할을 한 줄에 균등 배치 (가로폭 100%) */}
+          <div className="forkBranches">
             {['CEM', '개발', '정보보호', '인프라', 'QA', '특허'].map((r) => (
               <div key={r} className="forkBox tone-appr forkBranch">{r}</div>
             ))}
           </div>
-          <div className="forkBarV">
-            <span className="forkBarVLabel">전원 승인 대기</span>
-            <i aria-hidden="true" />
-          </div>
-          <span className="forkArrow" aria-hidden="true" />
-          <div className="forkBox tone-dev forkResult">개발 단계<br />자동 진행</div>
+          <div className="forkBar" aria-hidden="true" />
+          <span className="forkBarLabel">전원 승인 대기 ▼</span>
+          <div className="forkBox tone-dev forkResult">개발 단계 자동 진행</div>
         </div>
       </div>
 
       <div className="guideSection">
         <h3>9-2. 보류(HOLD) 흐름</h3>
-        <div className="holdFlow">
-          <div className="forkBox tone-req">단계 진행 중</div>
+        <p className="guideDiagramLead">보류·해제 권한은 PM · 관리자 · 보류 중에는 단계가 바뀌지 않고 진행만 잠긴다</p>
+        <div className="holdFlowRow">
+          <div className="holdCol">
+            <span className="holdColLabel">진입</span>
+            <div className="forkBox tone-req">단계 진행 중</div>
+          </div>
           <span className="forkArrow" aria-hidden="true" />
-          <div className="forkBox tone-rev">담당자 보류<em>(사유 입력)</em></div>
+          <div className="holdCol">
+            <span className="holdColLabel">보류 전환 (2가지)</span>
+            <div className="forkBox tone-rev">PM · 관리자 보류<em>사유 입력 (선택)</em></div>
+            <div className="forkBox tone-rev">승인 반려<em>사유 입력 (필수)</em></div>
+          </div>
           <span className="forkArrow" aria-hidden="true" />
-          <div className="forkBox tone-rev holdLocked">보류 상태<em>단계 진행 잠김</em></div>
+          <div className="holdCol">
+            <span className="holdColLabel">보류 상태</span>
+            <div className="forkBox tone-rev holdLocked">단계 진행 잠김<em>단계는 그대로 유지</em></div>
+          </div>
           <span className="forkArrow" aria-hidden="true" />
-          <div className="holdBranch">
-            <div className="forkBox tone-plan">보류 해제 → 원 단계 복귀</div>
+          <div className="holdCol">
+            <span className="holdColLabel">해소</span>
+            <div className="forkBox tone-plan">보류 해제 (PM · 관리자)<em>같은 단계에서 재개</em></div>
             <div className="forkBox tone-sys">관리자 삭제 / 종료</div>
           </div>
         </div>
@@ -4723,15 +4735,14 @@ function SystemGuidePanel() {
 
       <div className="guideSection gapSection">
         <h3>10. 가이드에 정의되지 않은 구간 (검토 필요)</h3>
-        <p className="guideDiagramLead">아래 항목은 시스템 가이드에 규칙이 없어 흐름도에 그리지 않았습니다. 확정 후 반영이 필요합니다.</p>
+        <p className="guideDiagramLead">
+          아래 항목은 아직 규칙이 없어 흐름도에 그리지 않았습니다. 확정 후 반영이 필요합니다.
+          (승인 반려 · 검토 합의 실패 · 역할 중복 · 마감일 확정 시점은 확정되어 위 9-1 / 9-2 및 2-2에 반영됨)
+        </p>
         <div className="gapGrid">
           {[
-            { tone: 'warn', title: '1. 승인 반려 시 처리', body: '"전원 승인 시 자동 진행"만 정의됨. 승인자가 반려했을 때 기획 단계로 회귀하는지, 보류로 전환되는지 규칙 없음.' },
-            { tone: 'warn', title: '2. 검토 3자 합의 실패 시 처리', body: 'Bug · 취약점이 남았을 때 개발 단계로 되돌아가는지, 검토 단계에서 반복하는지 규칙 없음.' },
-            { tone: 'warn', title: '3. 요청자 무응답 시 완료 처리', body: '완료(게시)가 요청자 확인에 종속. 요청자가 확인하지 않으면 프로젝트가 완료 단계에 무기한 대기. 타임아웃 · 자동 확인 규칙 없음.' },
-            { tone: 'crit', title: '4. SDS 승인 게이트 부재', body: 'SRS는 승인 단계를 거치지만 SDS는 "작성 완료" 여부만 확인하고 검토 단계로 진행. 설계에 대한 승인 주체가 없음.' },
-            { tone: 'crit', title: '5. 역할 중복 (승인 ↔ 검토)', body: '개발 · QA · 보안이 승인 단계와 개발/검토 단계에 모두 참여. 특히 개발자는 승인 후 본인이 SDS를 작성. 이중 확인 의도인지 확인 필요.' },
-            { tone: 'info', title: '6. 마감일 확정 시점', body: 'KPI에 "마감 임박 D-5"가 있으나 마감일을 어느 단계에서 누가 확정하는지가 워크플로에 없음. (개발 단계 "일정 조율"로 추정)' },
+            { tone: 'warn', title: '요청자 무응답 시 완료 처리', body: '완료(게시)가 요청자 확인에 종속. 요청자가 확인하지 않으면 프로젝트가 완료 단계에 무기한 대기. 타임아웃 · 자동 확인 규칙 없음.' },
+            { tone: 'crit', title: 'SDS 승인 게이트 부재', body: 'SRS는 승인 단계를 거치지만 SDS는 "작성 완료" 여부만 확인하고 검토 단계로 진행. 설계에 대한 승인 주체가 없음.' },
           ].map((g) => (
             <div key={g.title} className={`gapCard gap-${g.tone}`}>
               <strong>{g.title}</strong>
@@ -4742,7 +4753,6 @@ function SystemGuidePanel() {
         <div className="gapLegend">
           <span><i className="gapDot gap-warn" /> 예외 경로 미정의</span>
           <span><i className="gapDot gap-crit" /> 구조적 검토 필요</span>
-          <span><i className="gapDot gap-info" /> 정보 부족</span>
         </div>
       </div>
     </section>
