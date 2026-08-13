@@ -10381,6 +10381,55 @@ button.approvalPill:hover {
     line-height: 1.35 !important;
   }
 
+  /* ── 시스템 가이드 다이어그램 요소 (역할 토큰에 매핑) ─────────── */
+  /* 카드/박스 타이틀 */
+  .appShell .main .stageCardTop strong,
+  .appShell .main .guideSubBox h4,
+  .appShell .main .gapCard strong {
+    font-size: var(--m-fs-h) !important;
+    line-height: 1.3 !important;
+  }
+  /* 본문 성격 (목록·설명·박스 내용) */
+  .appShell .main .stageCardBlock li,
+  .appShell .main .gateList li,
+  .appShell .main .gapCard p,
+  .appShell .main .forkBox {
+    font-size: var(--m-fs-body) !important;
+    line-height: 1.45 !important;
+  }
+  /* 라벨·캡션 성격 (담당자·구분 라벨·칩·범례) */
+  .appShell .main .stageCardOwner,
+  .appShell .main .stageCardBlock b,
+  .appShell .main .stageFlowArrow,
+  .appShell .main .laneRoleHead,
+  .appShell .main .laneStageHead,
+  .appShell .main .laneRole,
+  .appShell .main .laneChip,
+  .appShell .main .holdColLabel,
+  .appShell .main .forkBox em,
+  .appShell .main .gapLegend span {
+    font-size: var(--m-fs-label) !important;
+    line-height: 1.35 !important;
+  }
+
+  /* 상단 역할 전환 컨트롤 — 메뉴명과 동일 스케일 */
+  .appShell .topbar .roleSwitchLabel,
+  .appShell .topbar .roleSwitchCurrent,
+  .appShell .topbar .roleSwitchChevron {
+    font-size: var(--m-fs-nav) !important;
+    line-height: 1.2 !important;
+  }
+
+  /* 정책 외로 남아있던 요소들 매핑 */
+  /* KPI 카드 라벨 = 라벨 스케일 */
+  .appShell .main .metric > span { font-size: var(--m-fs-label) !important; }
+  /* 그룹 헤드·스텝 제목·액션 문구 = 타이틀 스케일 */
+  .appShell .main .serviceFlowHead strong,
+  .appShell .main .simpleActionRow strong { font-size: var(--m-fs-h) !important; }
+  /* 스텝퍼·요약 행 텍스트 = 본문 스케일 */
+  .appShell .main .flowStepText strong,
+  .appShell .main .flowReviewRow strong { font-size: var(--m-fs-body) !important; }
+
   /* 패널 디스크립션 — 타이틀 아래 설명문 */
   .appShell .main .panelHeader p,
   .appShell .main .requestIntro p,
@@ -10464,4 +10513,25 @@ button.approvalPill:hover {
   }
   /* 2열 폼은 좁은 화면에서 1열로 — 폭이 좁아 생기는 개행을 줄인다 */
   .appShell .requestPanel .formGrid.two { grid-template-columns: 1fr !important; }
+}
+/* =========================================================================
+   모바일: 라운드 처리 통일 — 모든 곡률을 3px로
+   ========================================================================= */
+@media (max-width: 768px) {
+  .appShell .main *,
+  .appShell .main *::before,
+  .appShell .main *::after,
+  .appShell .sidebar .navItem,
+  .appShell .topbar .roleSwitchBtn,
+  .appShell .topbar .notifBellBtn {
+    border-radius: 3px !important;
+  }
+  /* 원형 유지가 필요한 요소는 예외 */
+  .appShell .main .metric > div,
+  .appShell .notifBadge,
+  .appShell .main .stepIndex,
+  .appShell .main input[type="checkbox"],
+  .appShell .main input[type="radio"] {
+    border-radius: 50% !important;
+  }
 }
