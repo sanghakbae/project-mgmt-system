@@ -2709,7 +2709,15 @@ function App() {
             <section className={`requirementsPanel numberedSection sectionSrsSds ${['pm', 'requester'].includes(role) && !selected.docsLocked && selected.status === 'planning' ? 'neonHighlight' : ''}`} data-section="기획 (SRS+SDS)" data-section-tone="planning">
               <div className="panelHeader compact">
                 <h3>기획 문서 (요구사항 정의서 · SRS)</h3>
-                <span>{selected.docsLocked ? '승인 완료 · 잠김 (수정하려면 이전 단계로 회송)' : ['pm', 'requester'].includes(role) ? 'PM이 요구사항 정의서 작성 (설계 명세서는 개발 단계)' : '읽기 전용'}</span>
+                <span>
+                  {selected.docsLocked
+                    ? '승인 완료 · 잠김 (수정하려면 이전 단계로 회송)'
+                    : ['pm', 'requester'].includes(role)
+                    ? (isPlanningRequired(selected)
+                        ? 'PM이 요구사항 정의서 작성 (설계 명세서는 개발 단계)'
+                        : 'PM 기획 생략 — 요청자가 직접 요구사항 정의서 작성 (설계 명세서는 개발 단계)')
+                    : '읽기 전용'}
+                </span>
               </div>
               {(['pm', 'requester', 'admin'].includes(role)) && !selected.docsLocked && (
                 <div className="approvalPreset planningApproval">
@@ -3031,20 +3039,20 @@ function App() {
                     <button
                       type="button"
                       className={`planningSkipSlider ${skipEnabled ? 'active' : ''}`}
-                      title="PM 기획 단계를 거치지 않고 요청자가 직접 기획·SRS/SDS를 작성"
+                      title="PM 기획 단계를 거치지 않고 요청자가 직접 SRS를 작성합니다. 요구사항 정의서 자체가 생략되는 것은 아닙니다."
                       onClick={() => void togglePlanningRequired()}
                     >
                       <span className="sliderTrack">
                         <span className="sliderThumb" />
                       </span>
-                      <span>기획 생략</span>
+                      <span>PM 기획 생략</span>
                     </button>
                   )}
                   <button
                     className="primaryButton"
                     type="button"
                     disabled={isDisabled}
-                    title={skipReasonMissing ? '기획 생략 사유를 입력해야 진행할 수 있습니다.' : undefined}
+                    title={skipReasonMissing ? 'PM 기획 생략 사유를 입력해야 진행할 수 있습니다.' : undefined}
                     onClick={() => void advanceSelectedProject()}
                   >
                     <Send size={16} />
@@ -3054,7 +3062,7 @@ function App() {
               </div>
               {skipEnabled && canEditSkip && (
                 <label className="skipReasonField">
-                  <span>기획 단계 생략 사유 <em>(필수)</em></span>
+                  <span>PM 기획 생략 사유 <em>(필수)</em></span>
                   <input
                     type="text"
                     value={skipReasonValue}

@@ -2820,7 +2820,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   border-radius: 4px;
   background: #f0f2f6;
   color: #3a414b;
-  font-size: 11.5px;
+  font-size: 12px;
 }
 .officeApiTestResult {
   margin: 8px 0 0;
@@ -3753,7 +3753,7 @@ strong.required {
   gap: 6px;
   font-size: 11px;
 }
-.qcReviewBlock .qcReviewHead strong { font-size: 11px !important; }
+.qcReviewBlock .qcReviewHead strong { font-size: 12px !important; }
 
 .qcReviewBadge {
   align-self: flex-start;
@@ -7732,7 +7732,7 @@ button.approvalPill:hover {
   }
 
   .sidebar .brand span {
-    font-size: 11px !important;
+    font-size: 12px !important;
   }
 
   .sidebar .navGroup,
@@ -8190,25 +8190,28 @@ button.approvalPill:hover {
     text-overflow: ellipsis;
   }
 
-  /* ③ 폰트 3단계 — 최대 12px / 중간 10px / 최소 8px */
-  /* 중간(본문·입력·버튼·리스트 텍스트) = 10px */
+  /* ③ 폰트 3단계 — CLAUDE.md 기준: 본문 14px / 보조 12px / 제목·KPI는 오히려 확대.
+     이전에는 본문 10px · 보조 8px · KPI 12px로 눌러 두었는데,
+     이는 "9~12px 금지 / 보조 12px 이하 금지 / KPI·제목은 키운다" 기준 위반이었다.
+     공간은 폰트가 아니라 패딩·간격 압축으로 확보한다(아래 ④). */
+  /* 본문·입력·버튼·리스트 텍스트 = 14px */
   .appShell p, .appShell span, .appShell div, .appShell a,
   .appShell li, .appShell td, .appShell th, .appShell label,
   .appShell button, .appShell input, .appShell select, .appShell textarea,
   .appShell strong, .appShell b, .appShell em {
-    font-size: 10px !important;
-    line-height: 1.4 !important;
+    font-size: 14px !important;
+    line-height: 1.45 !important;
   }
-  /* 최대(화면 제목·KPI 수치·섹션 제목) = 12px */
+  /* 섹션 제목 = 16px */
   .appShell h1, .appShell h2, .appShell h3, .appShell h4,
-  .appShell .detailTitle,
-  .appShell .metric strong, .appShell .statCardValue {
-    font-size: 12px !important;
-  }
-  .appShell .workflowSummary strong {
+  .appShell .detailTitle {
     font-size: 16px !important;
   }
-  /* 최소(배지·메타·보조 라벨·캡션) = 8px (중간보다 높은 specificity로 고정) */
+  /* KPI 수치·화면 제목은 키운다 */
+  .appShell .metric strong { font-size: 26px !important; }
+  .appShell .statCardValue { font-size: 20px !important; }
+  .appShell .workflowSummary strong { font-size: 20px !important; }
+  /* 보조 라벨(배지·메타·캡션) = 12px — 그 이하 금지 */
   .appShell small, .appShell .cardMeta, .appShell .cardMeta *,
   .appShell .statCardSub, .appShell .statCardLabel, .appShell .statBarName, .appShell .statBarNum,
   .appShell .ddayPill, .appShell .priority, .appShell .requestTypePill, .appShell .statusPill,
@@ -8216,10 +8219,21 @@ button.approvalPill:hover {
   .appShell .flowConnectorLabel, .appShell .flowStepRole, .appShell .flowStepRole span,
   .appShell .eyebrow, .appShell .flowCurrentStep,
   .appShell .flowStepText strong, .appShell .flowStepText em {
-    font-size: 8px !important;
+    font-size: 12px !important;
   }
-  /* 하단 탭바 라벨: 최소 8px */
+  /* 하단 탭바 라벨: 아이콘과 함께 6칸을 나눠 쓰므로 11px 유지 (축약 라벨과 병행) */
   .sidebar .navItem span { font-size: 11px !important; letter-spacing: -0.3px; }
+
+  /* ④ 폰트를 키운 만큼 밀도는 패딩·간격으로 되찾는다 (CLAUDE.md: 행 높이 = 폰트의 2~2.5배) */
+  .appShell .projectCard { padding: 7px 10px !important; gap: 6px !important; }
+  .appShell .guideSection { padding: 11px 12px !important; margin-bottom: 8px !important; }
+  .appShell .guideSection p { margin-bottom: 4px !important; }
+  .appShell .metric { min-height: 78px !important; padding: 10px 12px !important; row-gap: 6px !important; }
+  .appShell .serviceListItem { padding: 6px 10px !important; }
+  .appShell .projectHoldRow { padding: 6px 10px !important; }
+  .appShell .settingsSection { padding: 11px 12px !important; }
+  .appShell .auditTable thead th { padding: 6px 8px !important; }
+  .appShell .auditTable td { padding: 5px 8px !important; }
 }
 
 /* =========================================================================
@@ -8268,7 +8282,7 @@ button.approvalPill:hover {
     border-radius: 999px;
     background: #2b6cf0;
     color: #fff;
-    font-size: 11px !important;
+    font-size: 12px !important;
     font-weight: 800;
   }
 
@@ -8296,7 +8310,7 @@ button.approvalPill:hover {
     background: #fff;
     color: #6b7280;
   }
-  .searchFilterRow .filterChip span { font-size: 11px !important; opacity: 0.7; }
+  .searchFilterRow .filterChip span { font-size: 12px !important; opacity: 0.7; }
 
   /* 기본 상태에서 select 묶음은 숨기고(시트로 이동), 검색은 항상 노출 */
   .filterControls {
@@ -8415,12 +8429,12 @@ button.approvalPill:hover {
   /* ② 헤더 eyebrow / 현재 단계 배지: 줄바꿈 금지 + 폰트 축소 */
   .requestPanel .eyebrow,
   .detailHeaderPanel .eyebrow {
-    font-size: 11px !important;
+    font-size: 12px !important;
     white-space: nowrap;
     letter-spacing: -0.2px;
   }
   .flowHeadActions .flowCurrentStep {
-    font-size: 11px !important;
+    font-size: 12px !important;
     white-space: nowrap;
     padding: 4px 9px;
   }
@@ -8435,7 +8449,7 @@ button.approvalPill:hover {
   }
   .flowStepper.projectFlowStepper .flowStepText { align-items: center; }
   .flowStepper.projectFlowStepper .flowStepText strong {
-    font-size: 9.5px !important;
+    font-size: 12px !important;
     line-height: 1.2 !important;
     white-space: nowrap;
   }
@@ -8777,10 +8791,10 @@ button.approvalPill:hover {
   }
   /* 필터/CSV 버튼 = 중간 10px, 칩·카운트 = 최소 8px */
   .searchFilterRow .filterTriggerBtn,
-  .csvExportButton { font-size: 10px !important; }
+  .csvExportButton { font-size: 12px !important; }
   .searchFilterRow .filterChip,
   .searchFilterRow .filterChipClear,
-  .searchFilterRow .filterTriggerCount { font-size: 8px !important; }
+  .searchFilterRow .filterTriggerCount { font-size: 12px !important; }
   /* 상단바 ↔ 본문 간격 축소 */
   .appShell .topbar { padding-bottom: 5px !important; }
   .appShell .topStickyArea { margin-top: 5px !important; }
@@ -9061,12 +9075,12 @@ button.approvalPill:hover {
   .appShell .requestPanel .flowStepText strong,
   .appShell .requestPanel .approvalGuide,
   .appShell .requestPanel .flowSectionLead {
-    font-size: 10px !important;
+    font-size: 12px !important;
   }
   .appShell .requestPanel h2,
   .appShell .requestPanel h3,
   .appShell .requestPanel legend {
-    font-size: 12px !important;
+    font-size: 16px !important;
   }
 }
 
@@ -9098,10 +9112,10 @@ button.approvalPill:hover {
   }
   .appShell .approvalUnitHead {
     padding: 4px 2px !important;
-    font-size: 10px !important;
+    font-size: 12px !important;
     line-height: 1.2 !important;
   }
-  .appShell .approvalCellPill { height: 26px !important; font-size: 10px !important; }
+  .appShell .approvalCellPill { height: 26px !important; font-size: 12px !important; }
   .appShell .approvalGridFoot { padding: 5px 6px !important; }
 }
 
@@ -9962,13 +9976,13 @@ button.approvalPill:hover {
     min-width: 0 !important;
     width: 100% !important;
     table-layout: fixed !important;
-    font-size: 10px !important;
+    font-size: 12px !important;
   }
 
   .appShell .guideTable th,
   .appShell .guideTable td {
     padding: 4px 3px !important;
-    font-size: 10px !important;
+    font-size: 12px !important;
     line-height: 1.15 !important;
     word-break: keep-all !important;
     overflow-wrap: anywhere !important;
@@ -9997,7 +10011,7 @@ button.approvalPill:hover {
   .appShell .guideTable td .statusPill {
     min-height: 17px !important;
     padding: 1px 4px !important;
-    font-size: 10px !important;
+    font-size: 12px !important;
   }
 
 
@@ -10011,7 +10025,7 @@ button.approvalPill:hover {
   .appShell .kpiGuideTable td {
     padding-left: 2px !important;
     padding-right: 2px !important;
-    font-size: 10px !important;
+    font-size: 12px !important;
     line-height: 1.12 !important;
   }
 
@@ -10054,13 +10068,13 @@ button.approvalPill:hover {
     min-width: 0 !important;
     width: 100% !important;
     table-layout: auto !important;
-    font-size: 10px !important;
+    font-size: 12px !important;
   }
 
   .appShell .auditTable th,
   .appShell .auditTable td {
     padding: 4px 2px !important;
-    font-size: 10px !important;
+    font-size: 12px !important;
     line-height: 1.12 !important;
   }
 
@@ -10075,7 +10089,7 @@ button.approvalPill:hover {
     white-space: normal !important;
     overflow-wrap: anywhere !important;
     word-break: keep-all !important;
-    font-size: 10px !important;
+    font-size: 12px !important;
     line-height: 1.12 !important;
   }
 
@@ -10084,7 +10098,7 @@ button.approvalPill:hover {
     white-space: normal !important;
     overflow-wrap: anywhere !important;
     word-break: keep-all !important;
-    font-size: 10px !important;
+    font-size: 12px !important;
     line-height: 1.12 !important;
   }
 
@@ -10117,22 +10131,23 @@ button.approvalPill:hover {
     overflow: hidden !important;
   }
 
+  /* 한 줄에 억지로 맞추려 7~10px까지 줄였던 것을 기준선(본문 14 / 보조 12)으로 복원.
+     대신 줄바꿈을 허용해 밀도를 확보한다 — 폰트로 공간을 만들지 않는다. */
   .appShell .projectHoldInfo strong {
-    flex: 1 1 auto !important;
-    min-width: 34px !important;
-    font-size: clamp(8px, 2.45vw, 10px) !important;
-    line-height: 1.1 !important;
+    flex: 1 1 100% !important;
+    min-width: 0 !important;
+    font-size: 14px !important;
+    line-height: 1.35 !important;
   }
 
   .appShell .projectHoldInfo small {
-    flex: 0 1 auto !important;
+    flex: 1 1 100% !important;
     min-width: 0 !important;
-    max-width: 92px !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-    font-size: clamp(7px, 2.2vw, 9px) !important;
-    line-height: 1.1 !important;
+    max-width: none !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
   }
 
   .appShell .projectHoldInfo .statusPill,
@@ -10140,23 +10155,24 @@ button.approvalPill:hover {
   .appShell .projectHoldInfo .ddayPill,
   .appShell .projectHoldInfo .holdTag {
     flex: 0 0 auto !important;
-    min-height: 16px !important;
-    padding: 1px 4px !important;
-    font-size: clamp(7px, 2.2vw, 9px) !important;
-    line-height: 1.05 !important;
+    min-height: 20px !important;
+    padding: 1px 6px !important;
+    font-size: 12px !important;
+    line-height: 1.3 !important;
     border-radius: 5px !important;
   }
 
   .appShell .projectManageActions {
     flex: 0 0 auto !important;
-    gap: 2px !important;
+    gap: 4px !important;
   }
 
+  /* 터치 타겟은 폰트가 아니라 최소 높이로 보장 */
   .appShell .projectManageActions .miniButton {
-    min-height: 18px !important;
-    padding: 2px 4px !important;
-    font-size: clamp(7px, 2.2vw, 9px) !important;
-    line-height: 1 !important;
+    min-height: 30px !important;
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
     border-radius: 5px !important;
   }
 }
@@ -10224,7 +10240,7 @@ button.approvalPill:hover {
   }
 
   .sidebar .brand span {
-    font-size: 11px !important;
+    font-size: 12px !important;
     line-height: 1.1 !important;
   }
 
