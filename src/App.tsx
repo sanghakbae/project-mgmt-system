@@ -60,7 +60,7 @@ import {
 } from './projectsRepo'
 import { registerWithEmail, signInWithEmail } from './authRepo'
 import { resolveAttachmentUrl, uploadAttachment } from './storage'
-import type { ApprovalState, IssueType, Priority, Project, ProjectRequestType, ProjectStatus, ProjectTask, ReviewDocs, Role, ScheduleInfo, SecurityReview, TaskAttachment, TaskStatus, WorkflowConfig } from './types'
+import type { ApprovalState, IssueType, Priority, Project, ProjectRequestType, ProjectStatus, ProjectTask, QcSignoffRole, QcSignoffState, ReviewDocs, Role, ScheduleInfo, SecurityReview, TaskAttachment, TaskStatus, WorkflowConfig } from './types'
 
 const statusLabels: Record<ProjectStatus, string> = {
   request: '요청 단계',
@@ -484,6 +484,32 @@ const defaultWorkflowConfig: WorkflowConfig = {
 }
 
 const fullApprovalRoles: Role[] = ['cem', 'developer', 'security', 'infra', 'qa', 'patent']
+
+// ── 검토 단계 사인오프 ────────────────────────────────────────────────────
+// 순서: 개발자 단위테스트 → QA 통합테스트. 보안 테스트는 테스트 결과에 종속되지
+// 않으므로(코드·설정·의존성 점검) 병행 가능. PM은 SRS 대조 검토로 언제든 가능.
+const qcSignoffRoles: QcSignoffRole[] = ['developer', 'qa', 'security', 'pm']
+const emptyQcSignoff: QcSignoffState = { developer: false, qa: false, security: false, pm: false }
+const qcSignoffLabels: Record<QcSignoffRole, string> = {
+  developer: '개발',
+  qa: 'QA',
+  security: '보안',
+  pm: 'PM',
+}
+// 각 역할이 검토 단계에서 수행하는 작업 (버튼·입력 안내용)
+const qcSignoffWork: Record<QcSignoffRole, string> = {
+  developer: '단위테스트',
+  qa: '통합테스트',
+  security: '보안테스트',
+  pm: 'SRS 대조 검토',
+}
+// 카드 제목·대기 목록 표시명 (역할명과 작업명이 중복되지 않게 별도 관리)
+const qcSignoffTitles: Record<QcSignoffRole, string> = {
+  developer: '개발 단위테스트',
+  qa: 'QA 통합테스트',
+  security: '보안테스트',
+  pm: 'PM 검토 (SRS 대조)',
+}
 
 const requestFieldRules: Record<
   ProjectRequestType,
@@ -1057,10 +1083,22 @@ function App() {
       if (p.status === 'dept_review' && p.approvalState.requiredRoles.includes(role) && !p.approvalState.approvedRoles.includes(role)) {
         items.push({ id: `appr-${p.id}`, kind: 'approval', tone: 'action', projectId: p.id, projectTitle: p.title, text: '내 승인 차례입니다.' })
       }
-      // 내 검토 차례 (QC·보안·PM 검토 단계)
-      if (p.status === 'qc_security' && (role === 'qa' || role === 'security' || role === 'pm')) {
-        if (!p.qcSignoff?.[role]) {
-          items.push({ id: `qc-${p.id}`, kind: 'qc', tone: 'action', projectId: p.id, projectTitle: p.title, text: `${role === 'qa' ? 'QA' : role === 'security' ? '보안' : 'PM'} 검토가 필요합니다.` })
+      // 내 검토 차례 (개발·QA·보안·PM 검토 단계)
+      if (p.status === 'qc_security' && qcSignoffRoles.includes(role as QcSignoffRole)) {
+        const r = role as QcSignoffRole
+        if (!p.qcSignoff?.[r]) {
+          // QA 통합테스트는 개발자 단위테스트 완료 전에는 알림하지 않는다(아직 내 차례가 아님)
+          const waitingForUnitTest = r === 'qa' && !p.qcSignoff?.developer
+          if (!waitingForUnitTest) {
+            items.push({
+              id: `qc-${p.id}`,
+              kind: 'qc',
+              tone: 'action',
+              projectId: p.id,
+              projectTitle: p.title,
+              text: `${qcSignoffTitles[r]}가 필요합니다.`,
+            })
+          }
         }
       }
       // 마감 임박 / 지연 (내 할 일 프로젝트만)
@@ -1131,7 +1169,7 @@ function App() {
       if (project.status === 'dept_review') {
         project.approvalState.requiredRoles.filter((r) => !project.approvalState.approvedRoles.includes(r)).forEach(bump)
       } else if (project.status === 'qc_security') {
-        (['qa', 'security', 'pm'] as const).forEach((r) => { if (!project.qcSignoff?.[r]) bump(r) })
+        qcSignoffRoles.forEach((r) => { if (!project.qcSignoff?.[r]) bump(r) })
       } else {
         bump(project.assigneeRole)
       }
@@ -1171,10 +1209,12 @@ function App() {
   const hasSrsDraft = currentReviewDocsDraft.srs.trim().length > 0
   const hasSdsDraft = currentReviewDocsDraft.sds.trim().length > 0
   const pendingApprovalRoles = selectedApprovalState.requiredRoles.filter((item) => !selectedApprovalState.approvedRoles.includes(item))
-  // QC/보안/PM 3자 합의 게이트
-  const qcSignoff = selected?.qcSignoff ?? { qa: false, security: false, pm: false }
-  const qcAllSignedOff = qcSignoff.qa && qcSignoff.security && qcSignoff.pm
-  const qcPendingRoles = (['qa', 'security', 'pm'] as const).filter((r) => !qcSignoff[r])
+  // 검토 단계 합의 게이트 (개발자 단위테스트 → QA 통합테스트 순서, 보안·PM 병행)
+  const qcSignoff = selected?.qcSignoff ?? emptyQcSignoff
+  const qcAllSignedOff = qcSignoffRoles.every((r) => qcSignoff[r])
+  const qcPendingRoles = qcSignoffRoles.filter((r) => !qcSignoff[r])
+  // QA 통합테스트는 개발자 단위테스트가 끝나야 시작할 수 있다
+  const qaBlockedByUnitTest = !qcSignoff.developer
   const isStepAdvanceBlocked = Boolean(
     selected?.onHold ||
     (selected?.status === 'dept_review' && pendingApprovalRoles.length > 0) ||
@@ -1190,9 +1230,9 @@ function App() {
     selectedApprovalState.requiredRoles.includes(role) &&
     !selectedApprovalState.approvedRoles.includes(role),
   )
-  // QC 사인오프 가능한 역할인지 (admin은 모든 역할 대행 가능)
-  const myQcSignoffRole: ('qa' | 'security' | 'pm') | null =
-    role === 'qa' ? 'qa' : role === 'security' ? 'security' : role === 'pm' ? 'pm' : null
+  // 검토 사인오프 가능한 역할인지 (admin은 모든 역할 대행 가능)
+  const myQcSignoffRole: QcSignoffRole | null =
+    role === 'developer' ? 'developer' : role === 'qa' ? 'qa' : role === 'security' ? 'security' : role === 'pm' ? 'pm' : null
 
   async function updateApprovalState(approvalState: ApprovalState, message: string) {
     if (!selected) return
@@ -1312,16 +1352,36 @@ function App() {
     }
   }
 
-  async function updateSelectedSchedule() {
+  /**
+   * 일정 조율 저장.
+   *
+   * confirm=true 로 호출하면 개발 단계 일정 조율 결과를 확정하고,
+   * 그 시점의 완료 예정일(plannedEnd)을 프로젝트 마감일(dueDate)로 반영한다.
+   * → 마감일 확정 주체·시점 = 개발 단계 일정 조율 (KPI 'D-5 마감 임박'의 기준)
+   */
+  async function updateSelectedSchedule(confirm = false) {
     if (!selected) return
+
+    const plannedEnd = currentScheduleDraft.plannedEnd?.trim() ?? ''
+    if (confirm && !plannedEnd) {
+      window.alert('완료 예정일을 입력해야 마감일을 확정할 수 있습니다.')
+      return
+    }
+    if (confirm && !window.confirm(`완료 예정일 ${plannedEnd} 을 프로젝트 마감일로 확정합니다.\n\n확정 후에도 일정을 다시 조율해 재확정할 수 있습니다.`)) return
+
+    const nextSchedule: ScheduleInfo = confirm
+      ? { ...currentScheduleDraft, confirmed: true, confirmedAt: logStamp(), confirmedBy: authorLabel }
+      : currentScheduleDraft
 
     const nextLogs = [
       {
         id: crypto.randomUUID(),
         at: logStamp(),
         actor: authorLabel,
-        message: `${roleLabels[role]}이(가) 일정 조율 정보를 업데이트했습니다.`,
-        meta: { schedule: currentScheduleDraft },
+        message: confirm
+          ? `${roleLabels[role]}이(가) 일정 조율 결과로 마감일을 ${plannedEnd} 로 확정했습니다.`
+          : `${roleLabels[role]}이(가) 일정 조율 정보를 업데이트했습니다.`,
+        meta: { schedule: nextSchedule },
       },
       ...selected.logs,
     ]
@@ -1331,7 +1391,9 @@ function App() {
         project.id === selected.id
           ? {
               ...project,
-              schedule: currentScheduleDraft,
+              schedule: nextSchedule,
+              // 확정 시에만 마감일을 덮어쓴다 (단순 저장은 마감일에 영향 없음)
+              ...(confirm ? { dueDate: plannedEnd } : {}),
               logs: nextLogs,
               updatedAt: new Date().toISOString(),
             }
@@ -1343,18 +1405,24 @@ function App() {
       void _removed
       return rest
     })
-    window.alert('일정 조율 정보를 저장했습니다.')
+    window.alert(confirm ? `마감일을 ${plannedEnd} 로 확정했습니다.` : '일정 조율 정보를 저장했습니다.')
 
-    void notifyGoogleChat('schedule.update', `${roleLabels[role]}이(가) 일정을 업데이트했습니다.`, {
+    void notifyGoogleChat('schedule.update', confirm
+      ? `${roleLabels[role]}이(가) 마감일을 ${plannedEnd} 로 확정했습니다.`
+      : `${roleLabels[role]}이(가) 일정을 업데이트했습니다.`, {
       프로젝트: selected.title,
       코드: selected.code,
-      착수예정: currentScheduleDraft.plannedStart || '미정',
-      완료예정: currentScheduleDraft.plannedEnd || '미정',
+      착수예정: nextSchedule.plannedStart || '미정',
+      완료예정: nextSchedule.plannedEnd || '미정',
     })
 
     if (!hasFirebaseConfig) return
     try {
-      await updateProjectDoc(selected.id, { schedule: currentScheduleDraft, logs: nextLogs })
+      await updateProjectDoc(selected.id, {
+        schedule: nextSchedule,
+        logs: nextLogs,
+        ...(confirm ? { due_date: plannedEnd } : {}),
+      })
     } catch {
       setLoadState('error')
     }
@@ -1609,21 +1677,34 @@ function App() {
     if (!result.ok) window.alert(message)
   }
 
-  // #4 QC/보안/PM 3자 사인오프 토글
-  async function toggleQcSignoff(signRoleArg?: 'qa' | 'security' | 'pm', note?: string) {
+  // #4 검토 단계 사인오프 토글 (개발 단위테스트 → QA 통합테스트 순서 강제)
+  async function toggleQcSignoff(signRoleArg?: QcSignoffRole, note?: string) {
     if (!selected || selected.status !== 'qc_security') return
     if (selected.onHold) { window.alert('보류 중에는 검토할 수 없습니다.'); return }
     const targetRole = signRoleArg ?? myQcSignoffRole
     // admin이면 어떤 역할을 대행할지 선택
     let signRole = targetRole
     if (!signRole && role === 'admin') {
-      const pick = (window.prompt('대행 사인오프할 역할 입력 (qa / security / pm)') ?? '').trim().toLowerCase()
-      if (!['qa', 'security', 'pm'].includes(pick)) return
-      signRole = pick as 'qa' | 'security' | 'pm'
+      const pick = (window.prompt('대행 사인오프할 역할 입력 (developer / qa / security / pm)') ?? '').trim().toLowerCase()
+      if (!qcSignoffRoles.includes(pick as QcSignoffRole)) return
+      signRole = pick as QcSignoffRole
     }
     if (!signRole) return
-    const current = selected.qcSignoff ?? { qa: false, security: false, pm: false }
+    const current = selected.qcSignoff ?? emptyQcSignoff
     const nextDone = !current[signRole]
+
+    // 순서 게이트: 단위테스트(개발) 완료 전에는 통합테스트(QA) 불가
+    if (signRole === 'qa' && nextDone && !current.developer) {
+      window.alert('개발자 단위테스트가 완료되어야 QA 통합테스트를 시작할 수 있습니다.')
+      return
+    }
+    // 통합테스트가 끝난 뒤 단위테스트를 취소하면 순서가 깨진다 → QA도 함께 취소
+    let cascadeQa = false
+    if (signRole === 'developer' && !nextDone && current.qa) {
+      if (!window.confirm('단위테스트를 취소하면 이미 완료된 QA 통합테스트도 함께 취소됩니다. 계속할까요?')) return
+      cascadeQa = true
+    }
+
     const trimmedNote = (note ?? '').trim()
     const nextReviews = { ...(current.reviews ?? {}) }
     if (nextDone) {
@@ -1632,31 +1713,74 @@ function App() {
       // 취소 시 검토 내용도 함께 비움
       delete nextReviews[signRole]
     }
-    const nextSignoff = { ...current, [signRole]: nextDone, reviews: nextReviews }
-    const label = { qa: 'QA', security: '보안', pm: 'PM' }[signRole]
+    if (cascadeQa) delete nextReviews.qa
+
+    const nextSignoff: QcSignoffState = {
+      ...current,
+      [signRole]: nextDone,
+      ...(cascadeQa ? { qa: false } : {}),
+      reviews: nextReviews,
+    }
+    const label = qcSignoffTitles[signRole]
     await patchSelectedProject(
       { qcSignoff: nextSignoff },
-      `${label} 검토를 ${nextDone ? '완료' : '취소'} 처리했습니다.${nextDone && trimmedNote ? ` (${trimmedNote})` : ''}`,
+      `${label}를 ${nextDone ? '완료' : '취소'} 처리했습니다.${cascadeQa ? ' (QA 통합테스트도 함께 취소)' : ''}${nextDone && trimmedNote ? ` (${trimmedNote})` : ''}`,
     )
-    void notifyGoogleChat('task.status', `QA/보안/PM 검토 ${nextDone ? '완료' : '취소'}: ${label}`, { 프로젝트: selected.title })
+    void notifyGoogleChat('task.status', `검토 ${nextDone ? '완료' : '취소'}: ${label}`, { 프로젝트: selected.title })
   }
 
-  // 반려 처리: 현재 단계에서 프로젝트를 반려하고 사유를 기록
-  async function rejectSelectedProject(reason: string) {
-    if (!selected) return
+  // #3 검토 합의 실패 → 개발 단계로 되돌린다 (Bug·취약점이 남은 경우)
+  async function returnToDevelopment(reason: string) {
+    if (!selected || selected.status !== 'qc_security') return
     const trimmed = reason.trim()
-    if (!trimmed) { window.alert('반려 사유를 입력하거나 선택해 주세요.'); return }
-    if (!window.confirm(`"${selected.title}" 프로젝트를 반려합니다.\n사유: ${trimmed}`)) return
+    if (!trimmed) { window.alert('되돌리는 사유(남은 Bug·취약점)를 입력해 주세요.'); return }
+    if (!window.confirm(`검토에서 발견된 문제로 "${selected.title}"을(를) 개발 단계로 되돌립니다.\n\n사유: ${trimmed}\n\n검토 완료 상태는 모두 초기화됩니다.`)) return
     await patchSelectedProject(
       {
-        status: 'rejected',
+        status: 'development',
+        assigneeRole: 'developer',
+        // 재검토가 필요하므로 사인오프 전체 초기화
+        qcSignoff: emptyQcSignoff,
+        // 개발 단계에서 다시 문서를 수정할 수 있도록 잠금 해제
+        docsLocked: false,
+        nextAction: '검토 반려 조치 후 재검토 요청',
+      },
+      `검토 결과 개발 단계로 되돌렸습니다. (사유: ${trimmed})`,
+    )
+    void notifyGoogleChat('project.reject', `검토 반려 → 개발 단계 회귀: ${selected.title}`, { 사유: trimmed })
+  }
+
+  // 반려 처리: 단계를 유지한 채 보류로 전환한다.
+  //
+  // 이전에는 status를 'rejected'로 바꿔 더 진행할 수 없는 종료 상태가 됐다.
+  // 반려는 "이 단계에서 진행을 멈춰야 한다"는 뜻이므로 보류(HOLD)로 전환하고,
+  // PM·관리자가 보류를 해제하면 같은 단계에서 그대로 재개한다.
+  async function rejectSelectedProject(reason: string) {
+    if (!selected) return
+    // 검토 단계의 반려는 성격이 다르다 — Bug·취약점이 남았다는 뜻이므로 개발 단계로 되돌린다
+    if (selected.status === 'qc_security') {
+      await returnToDevelopment(reason)
+      return
+    }
+    const trimmed = reason.trim()
+    if (!trimmed) { window.alert('반려 사유를 입력하거나 선택해 주세요.'); return }
+    if (selected.onHold) { window.alert('이미 보류 중인 프로젝트입니다.'); return }
+    if (!window.confirm(`"${selected.title}" 프로젝트를 반려합니다.\n사유: ${trimmed}\n\n${statusLabels[selected.status]} 단계에서 보류 처리되며, 보류를 해제하면 이 단계에서 재개됩니다.`)) return
+    await patchSelectedProject(
+      {
+        onHold: true,
+        holdReason: `[반려] ${trimmed}`,
+        // 어느 단계에서 반려됐는지는 남겨두어 상세·이력에서 확인할 수 있게 한다
         rejectedReason: trimmed,
         rejectedFromStatus: selected.status,
-        nextAction: '반려됨 · 요청자 재검토 필요',
+        nextAction: `반려 보류 중 · ${statusLabels[selected.status]} 단계 (보류 해제 시 재개)`,
       },
-      `프로젝트를 반려했습니다. (사유: ${trimmed})`,
+      `프로젝트를 반려하여 보류 처리했습니다. (사유: ${trimmed})`,
     )
-    void notifyGoogleChat('project.reject', `프로젝트 반려: ${selected.title}`, { 사유: trimmed })
+    void notifyGoogleChat('project.reject', `프로젝트 반려(보류 전환): ${selected.title}`, {
+      단계: statusLabels[selected.status],
+      사유: trimmed,
+    })
   }
 
   // #8 요청자 확인 (완료보고 단계)
@@ -2792,9 +2916,23 @@ function App() {
                       onChange={(html) => setScheduleDrafts((c) => ({ ...c, [selected.id]: { ...currentScheduleDraft, note: html } }))}
                     />
                   </div>
-                  <div className="docSaveBar">
-                    <button className="primaryButton" type="button" onClick={() => void updateSelectedSchedule()}>
+                  <div className="docSaveBar scheduleSaveBar">
+                    <span className="dueDateConfirmHint">
+                      {selected.schedule?.confirmed
+                        ? `마감일 확정됨 · ${formatDate(selected.dueDate)}${selected.schedule.confirmedBy ? ` (${selected.schedule.confirmedBy})` : ''}`
+                        : '마감일은 이 단계의 일정 조율 결과로 확정됩니다.'}
+                    </span>
+                    <button className="miniButton" type="button" onClick={() => void updateSelectedSchedule()}>
                       일정 저장
+                    </button>
+                    <button
+                      className="primaryButton"
+                      type="button"
+                      disabled={!currentScheduleDraft.plannedEnd}
+                      title={currentScheduleDraft.plannedEnd ? '완료 예정일을 프로젝트 마감일로 확정합니다' : '완료 예정일을 먼저 입력하세요'}
+                      onClick={() => void updateSelectedSchedule(true)}
+                    >
+                      {selected.schedule?.confirmed ? '마감일 재확정' : '마감일 확정'}
                     </button>
                   </div>
                 </div>
@@ -3051,16 +3189,21 @@ function App() {
                 {selected.status === 'qc_security' && (
                   <div className="qcReviewBlock">
                     <div className="qcReviewGrid">
-                      {(['qa', 'security', 'pm'] as const).map((r) => {
-                        const label = { qa: 'QA', security: '보안', pm: 'PM' }[r]
+                      {qcSignoffRoles.map((r) => {
+                        const label = qcSignoffLabels[r]
+                        const work = qcSignoffWork[r]
                         const done = qcSignoff[r]
                         const review = qcSignoff.reviews?.[r]
                         const isMine = (r === myQcSignoffRole) || role === 'admin'
+                        // QA 통합테스트는 개발자 단위테스트가 끝나야 시작 가능
+                        const blocked = r === 'qa' && qaBlockedByUnitTest
                         return (
-                          <div key={r} className={`qcReviewCard ${done ? 'done' : 'pending'}`}>
+                          <div key={r} className={`qcReviewCard ${done ? 'done' : blocked ? 'blocked' : 'pending'}`}>
                             <div className="qcReviewHead">
-                              <strong>{label} 검토</strong>
-                              <span className={`qcReviewBadge ${done ? 'done' : 'pending'}`}>{done ? '완료' : '대기'}</span>
+                              <strong>{qcSignoffTitles[r]}</strong>
+                              <span className={`qcReviewBadge ${done ? 'done' : blocked ? 'blocked' : 'pending'}`}>
+                                {done ? '완료' : blocked ? '선행 대기' : '대기'}
+                              </span>
                             </div>
                             {done ? (
                               <div className="qcReviewBody">
@@ -3072,12 +3215,14 @@ function App() {
                                   </button>
                                 )}
                               </div>
+                            ) : blocked ? (
+                              <p className="qcReviewWait">개발 단위테스트 완료 후 진행</p>
                             ) : isMine && !selected.onHold ? (
                               <div className="qcReviewBody">
                                 <textarea
                                   rows={2}
                                   className="qcReviewInput"
-                                  placeholder={`${label} 검토 내용 (예: ${label} 검토 완료, 이슈 없음)`}
+                                  placeholder={`${work} 결과 (예: ${work} 완료, 이슈 없음)`}
                                   value={qcReviewDraft}
                                   onChange={(e) => setQcReviewDraft(e.target.value)}
                                 />
@@ -3086,7 +3231,7 @@ function App() {
                                   type="button"
                                   onClick={() => { void toggleQcSignoff(r, qcReviewDraft); setQcReviewDraft('') }}
                                 >
-                                  {label} 검토 완료
+                                  {work} 완료
                                 </button>
                               </div>
                             ) : (
@@ -3097,14 +3242,21 @@ function App() {
                       })}
                     </div>
                     <span className="approvalGuide">
-                      {qcAllSignedOff ? 'QA·보안·PM 검토 완료 · 다음 단계 진행 가능' : `검토 대기: ${qcPendingRoles.map((r) => ({ qa: 'QA', security: '보안', pm: 'PM' }[r])).join(', ')}`}
+                      {qcAllSignedOff
+                        ? '개발·QA·보안·PM 검토 완료 · 다음 단계 진행 가능'
+                        : `검토 대기: ${qcPendingRoles.map((r) => qcSignoffTitles[r]).join(', ')}`}
+                      {' · 순서: 단위테스트 → 통합테스트 (보안테스트는 병행)'}
                     </span>
                     {(myQcSignoffRole || role === 'admin') && !selected.onHold && (
                       <div className="qcRejectArea">
-                        <button type="button" className="rejectBtn" onClick={() => setRejectOpen((v) => !v)}>반려</button>
+                        <button type="button" className="rejectBtn" onClick={() => setRejectOpen((v) => !v)}>
+                          개발 단계로 되돌리기
+                        </button>
                         {rejectOpen && (
                           <div className="rejectComposer">
-                            <span className="rejectComposerLabel">반려 사유 — 프리셋 선택 또는 직접 입력</span>
+                            <span className="rejectComposerLabel">
+                              남은 Bug·취약점 — 프리셋 선택 또는 직접 입력 (검토 완료 상태는 모두 초기화됩니다)
+                            </span>
                             <div className="rejectPresetList">
                               {rejectReasonPresets.map((preset) => (
                                 <button
@@ -3129,7 +3281,7 @@ function App() {
                                 className="rejectConfirmBtn"
                                 onClick={() => { void rejectSelectedProject(rejectReasonDraft); setRejectReasonDraft(''); setRejectOpen(false) }}
                               >
-                                반려 확정
+                                개발 단계로 되돌리기
                               </button>
                               <button type="button" className="closeBtn" onClick={() => setRejectOpen(false)}>취소</button>
                             </div>
@@ -4530,25 +4682,26 @@ function SystemGuidePanel() {
       <div className="guideSection">
         <h3>9-1. 승인 단계 상세 (병렬 승인)</h3>
         <p className="guideDiagramLead">지정된 역할만 활성화 · 미지정 역할은 스킵</p>
-        <div className="forkFlow">
-          <div className="forkStep">
-            <div className="forkBox tone-plan">SRS 작성 완료</div>
-            <span className="forkArrow" aria-hidden="true" />
-            <div className="forkBox tone-plan">PM : 승인 필요 역할 지정<em>(N개 선택)</em></div>
+        {/* 좌→우 한 줄 흐름: 준비 → fork(수직 바) → 6개 병렬 승인 → join → 결과 */}
+        <div className="forkFlowRow">
+          <div className="forkBox tone-plan">SRS 작성 완료</div>
+          <span className="forkArrow" aria-hidden="true" />
+          <div className="forkBox tone-plan">PM : 승인 필요 역할 지정<em>(N개 선택)</em></div>
+          <div className="forkBarV">
+            <span className="forkBarVLabel">병렬 승인 요청</span>
+            <i aria-hidden="true" />
           </div>
-          <span className="forkBarLabel">병렬 승인 요청</span>
-          <div className="forkBar" aria-hidden="true" />
-          <div className="forkBranches">
+          <div className="forkBranchCol">
             {['CEM', '개발', '정보보호', '인프라', 'QA', '특허'].map((r) => (
               <div key={r} className="forkBox tone-appr forkBranch">{r}</div>
             ))}
           </div>
-          <div className="forkBar" aria-hidden="true" />
-          <span className="forkBarLabel">전원 승인 대기</span>
-          <div className="forkStep">
-            <span className="forkArrow" aria-hidden="true" />
-            <div className="forkBox tone-dev forkResult">개발 단계<br />자동 진행</div>
+          <div className="forkBarV">
+            <span className="forkBarVLabel">전원 승인 대기</span>
+            <i aria-hidden="true" />
           </div>
+          <span className="forkArrow" aria-hidden="true" />
+          <div className="forkBox tone-dev forkResult">개발 단계<br />자동 진행</div>
         </div>
       </div>
 

@@ -15,7 +15,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db, hasFirebaseConfig } from './firebase'
-import type { Project, ReviewDocs, ScheduleInfo } from './types'
+import type { Project, QcSignoffState, ReviewDocs, ScheduleInfo } from './types'
 
 const COLLECTION = 'pms_projects'
 
@@ -143,7 +143,15 @@ export function mapProjectRow(row: ProjectRow): Project {
   const schedule =
     scheduleFromField ?? row.logs?.find((log) => log.meta?.schedule)?.meta?.schedule ?? defaultSchedule
   const comments = row.logs?.find((log) => log.meta?.comments)?.meta?.comments ?? []
-  const qcSignoff = row.logs?.find((log) => log.meta?.qcSignoff)?.meta?.qcSignoff ?? { qa: false, security: false, pm: false }
+  // 기존 데이터에는 developer(단위테스트) 필드가 없으므로 기본값과 병합해 보정한다
+  const storedQcSignoff = row.logs?.find((log) => log.meta?.qcSignoff)?.meta?.qcSignoff
+  const qcSignoff: QcSignoffState = {
+    developer: false,
+    qa: false,
+    security: false,
+    pm: false,
+    ...(storedQcSignoff ?? {}),
+  }
   const requesterConfirmed = row.logs?.find((log) => log.meta?.requesterConfirmed !== undefined)?.meta?.requesterConfirmed ?? false
   const docsLocked = row.logs?.find((log) => log.meta?.docsLocked !== undefined)?.meta?.docsLocked ?? false
   const rejectedMeta = row.logs?.find((log) => log.meta?.rejectedReason)?.meta

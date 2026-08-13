@@ -57,18 +57,29 @@ export type QcReviewEntry = {
   at?: string
 }
 
-// QC/보안/PM 단계의 역할별 검토 완료 상태 (3자 합의 게이트)
+// 검토 단계의 역할별 완료 상태 (합의 게이트)
+//
+// 테스트 순서: 개발자 단위테스트 → QA 통합테스트 (단위테스트 완료 전 통합테스트 불가).
+// 보안 테스트는 코드·설정·의존성을 보는 것이라 테스트 결과에 종속되지 않으므로 병행 가능.
+// PM은 SRS 대조 검토로 언제든 가능.
 export type QcSignoffState = {
+  /** 개발자 단위테스트 — QA 통합테스트의 선행 조건 */
+  developer: boolean
+  /** QA 통합테스트 — developer 완료 후에만 가능 */
   qa: boolean
   security: boolean
   pm: boolean
   // 역할별 검토 내용(분리 기록)
   reviews?: {
+    developer?: QcReviewEntry
     qa?: QcReviewEntry
     security?: QcReviewEntry
     pm?: QcReviewEntry
   }
 }
+
+/** 검토 단계 사인오프 역할 (순서·라벨을 한 곳에서 관리) */
+export type QcSignoffRole = 'developer' | 'qa' | 'security' | 'pm'
 
 // 단계별 문의/논의 댓글
 export type ProjectComment = {
@@ -113,6 +124,16 @@ export type ScheduleInfo = {
   plannedEnd: string
   milestones: string
   note: string
+  /**
+   * 일정 확정 여부. 개발 단계에서 일정 조율을 확정하면 true가 되고,
+   * 그 시점의 plannedEnd가 프로젝트 마감일(dueDate)로 반영된다.
+   * (마감일 확정 주체·시점 = 개발 단계 일정 조율)
+   */
+  confirmed?: boolean
+  /** 일정 확정 시각 */
+  confirmedAt?: string
+  /** 일정을 확정한 담당자 */
+  confirmedBy?: string
 }
 
 export type TaskComment = {
