@@ -192,6 +192,9 @@ button {
   font-size: 14px;
 }
 
+/* 탭 라벨 축약: 기본은 전체 라벨만 표시하고, 좁은 화면에서만 축약형으로 교체한다 */
+.navLabelShort { display: none; }
+
 .navItem svg,
 .pipelineItem strong {
   flex: 0 0 auto;
@@ -7903,6 +7906,10 @@ button.approvalPill:hover {
     text-overflow: ellipsis;
     max-width: 100%;
   }
+
+  /* 탭 6개(관리자·보안)일 때 탭 폭이 ~56px로 좁아 긴 라벨이 잘린다 → 축약 라벨로 교체 */
+  .navItem .navLabelFull { display: none; }
+  .navItem .navLabelShort { display: inline; }
 
   .navItem.active {
     color: #d9271e;

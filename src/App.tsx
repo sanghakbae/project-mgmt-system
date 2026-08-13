@@ -2287,7 +2287,9 @@ function App() {
             title="시스템 가이드"
           >
             <Workflow size={17} />
-            <span>시스템 가이드</span>
+            {/* 좁은 화면(≤400px)에서는 6개 탭 폭에 '시스템 가이드'가 들어가지 않아 잘린다 → 축약 라벨 사용 */}
+            <span className="navLabelFull">시스템 가이드</span>
+            <span className="navLabelShort">가이드</span>
           </button>
           {(role === 'admin' || role === 'security') && (
             <button className={`navItem ${viewMode === 'auditLog' ? 'active' : ''}`} type="button" title="감사 로그" onClick={() => setViewMode('auditLog')}>
@@ -5456,7 +5458,9 @@ function SettingsPanel({
   function handleSaveTimeout(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const min = Number(timeoutDraft)
-    if (!Number.isFinite(min) || min < 5 || min > 480) return
+    // 범위·정수 검증은 input의 min/max/step으로 브라우저가 먼저 막아 안내까지 해준다.
+    // 아래는 프로그램적 호출 등 우회 경로에 대한 방어용 가드.
+    if (!Number.isFinite(min) || !Number.isInteger(min) || min < 5 || min > 480) return
     onSaveSessionTimeout(min)
     setTimeoutSaved(true)
     setTimeout(() => setTimeoutSaved(false), 1800)
