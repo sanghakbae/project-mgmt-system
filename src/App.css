@@ -9401,11 +9401,14 @@ button.approvalPill:hover {
   padding-bottom: 6px;
   margin-bottom: 16px;
 }
-.stageFlowItem { display: flex; align-items: center; min-width: 0; }
+/* stretch: 카드가 행 높이(=가장 긴 카드의 내용 높이)까지 늘어나 바닥이 맞는다.
+   화살표는 align-self: center 로 세로 중앙 유지. */
+.stageFlowItem { display: flex; align-items: stretch; min-width: 0; }
+/* 높이는 내용에 맞춘다. 카드 간 높이는 grid의 stretch로 자동 정렬되므로
+   min-height를 주면 가장 긴 카드보다 커져 아래쪽에 빈 여백이 생긴다. */
 .stageCard {
   flex: 1 1 auto;
   min-width: 0;
-  min-height: 236px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -9514,9 +9517,6 @@ button.approvalPill:hover {
 .lane-sys  .laneRole { background: #f0f0f0; border-color: #999; }
 .laneChipAuto { background: #f7f7f7; border-color: #999; border-style: dashed; color: #4b515c; }
 
-/* 병렬 승인 fork/join — 가로폭 100%, 6개 역할은 한 줄 */
-.forkFlow { display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 100%; }
-.forkStep { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; width: 100%; }
 .forkBox {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 2px; min-height: 44px; padding: 8px 14px;
@@ -9530,15 +9530,7 @@ button.approvalPill:hover {
 .forkBox.tone-dev  { background: #f0e9f5; border-color: #9673a6; }
 .forkBox.tone-rev  { background: #fbeaea; border-color: #b85450; }
 .forkBox.tone-sys  { background: #f0f0f0; border-color: #999; }
-.forkResult { border-width: 2px; font-weight: 800; align-self: center; }
 .holdLocked { border-width: 2px; }
-.forkBar { width: 100%; height: 9px; background: #333; border-radius: 3px; }
-.forkBarLabel { font-size: 12px; color: #5f6670; }
-.forkBranches {
-  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 8px; width: 100%;
-}
-.forkBranch { padding: 6px 18px; min-height: 34px; }
 /* 가로 화살표(스텝 사이) / 세로 화살표(bar 위아래) */
 .forkArrow { position: relative; flex: 0 0 30px; height: 12px; }
 .forkArrow::before { content: ''; position: absolute; left: 0; right: 7px; top: 50%; height: 2px; background: #6b7280; }
@@ -9559,9 +9551,6 @@ button.approvalPill:hover {
 .holdColLabel { font-size: 11px; font-weight: 800; color: #8a919b; text-align: center; }
 .holdFlowRow .forkBox { flex: 1 1 auto; }
 .holdFlowRow .forkArrow { flex: 0 0 22px; align-self: center; }
-/* 이전 세로형 보류 흐름 (미사용 대비 유지) */
-.holdFlow { display: flex; align-items: center; justify-content: flex-start; gap: 8px; flex-wrap: wrap; }
-.holdBranch { display: flex; flex-direction: column; gap: 8px; }
 
 /* 미정의 구간 섹션 — 확정 필요 항목이라 좌측에 경고 띠를 둔다 */
 .gapSection { border-left: 3px solid #d6b656; }
@@ -9612,13 +9601,9 @@ button.approvalPill:hover {
   }
   /* 칩이 여러 개면 오른쪽 열에 세로로 쌓는다 */
   .appShell .laneCell .laneChip { grid-column: 2; }
-  /* 병렬 승인: 모바일은 한 줄 유지가 불가하므로 세로 흐름 + 분기 2열 */
-  .appShell .forkBranches { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* 보류 흐름: 모바일은 세로 스택 */
   .appShell .holdFlowRow { flex-direction: column; align-items: stretch; }
   .appShell .holdFlowRow .forkArrow { align-self: center; transform: rotate(90deg); }
-  .appShell .holdFlow { flex-direction: column; align-items: stretch; }
-  .appShell .holdFlow .forkArrow { align-self: center; transform: rotate(90deg); }
 }
 
 /* =========================================================================

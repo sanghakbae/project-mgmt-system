@@ -4683,30 +4683,7 @@ function SystemGuidePanel() {
       </div>
 
       <div className="guideSection">
-        <h3>9-1. 승인 단계 상세 (병렬 승인)</h3>
-        <p className="guideDiagramLead">지정된 역할만 활성화 · 미지정 역할은 스킵</p>
-        <div className="forkFlow">
-          <div className="forkStep">
-            <div className="forkBox tone-plan">SRS 작성 완료</div>
-            <span className="forkArrow" aria-hidden="true" />
-            <div className="forkBox tone-plan">PM : 승인 필요 역할 지정<em>(N개 선택)</em></div>
-          </div>
-          <span className="forkBarLabel">병렬 승인 요청 ▼</span>
-          <div className="forkBar" aria-hidden="true" />
-          {/* 6개 승인 역할을 한 줄에 균등 배치 (가로폭 100%) */}
-          <div className="forkBranches">
-            {['CEM', '개발', '정보보호', '인프라', 'QA', '특허'].map((r) => (
-              <div key={r} className="forkBox tone-appr forkBranch">{r}</div>
-            ))}
-          </div>
-          <div className="forkBar" aria-hidden="true" />
-          <span className="forkBarLabel">전원 승인 대기 ▼</span>
-          <div className="forkBox tone-dev forkResult">개발 단계 자동 진행</div>
-        </div>
-      </div>
-
-      <div className="guideSection">
-        <h3>9-2. 보류(HOLD) 흐름</h3>
+        <h3>9-1. 보류(HOLD) 흐름</h3>
         <p className="guideDiagramLead">보류·해제 권한은 PM · 관리자 · 보류 중에는 단계가 바뀌지 않고 진행만 잠긴다</p>
         <div className="holdFlowRow">
           <div className="holdCol">
@@ -4737,7 +4714,7 @@ function SystemGuidePanel() {
         <h3>10. 가이드에 정의되지 않은 구간 (검토 필요)</h3>
         <p className="guideDiagramLead">
           아래 항목은 아직 규칙이 없어 흐름도에 그리지 않았습니다. 확정 후 반영이 필요합니다.
-          (승인 반려 · 검토 합의 실패 · 역할 중복 · 마감일 확정 시점은 확정되어 위 9-1 / 9-2 및 2-2에 반영됨)
+          (승인 반려 · 검토 합의 실패 · 역할 중복 · 마감일 확정 시점은 확정되어 위 9 / 9-1 및 2-2에 반영됨)
         </p>
         <div className="gapGrid">
           {[
