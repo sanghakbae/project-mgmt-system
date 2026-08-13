@@ -7844,12 +7844,12 @@ button.approvalPill:hover {
   /* ── 모바일 단일 스케일 (768px 이하) ─────────────────────────────
      화면마다 오버라이드가 달라 폰트·패딩이 제각기였던 것을 한 곳에서 관리한다.
      위계: 제목 > 본문 > 라벨/보조. 밀도는 폰트가 아니라 여백으로 조절. */
-  --m-fs-kpi: 20px;    /* KPI 수치 */
-  --m-fs-h: 14px;      /* 패널·섹션 타이틀 */
-  --m-fs-body: 13px;   /* 본문·입력값·버튼 */
-  --m-fs-desc: 12px;   /* 패널 디스크립션(타이틀 아래 설명) */
-  --m-fs-label: 12px;  /* 필드 라벨·배지·캡션 (하한) */
-  --m-fs-nav: 11px;    /* 하단 탭바 메뉴명 */
+  --m-fs-kpi: 18px;    /* KPI 수치 (가운데 정렬) */
+  --m-fs-h: 12px;      /* 패널·섹션 타이틀 */
+  --m-fs-body: 11px;   /* 본문·입력값·버튼 */
+  --m-fs-desc: 10px;   /* 패널 디스크립션(타이틀 아래 설명) */
+  --m-fs-label: 10px;  /* 필드 라벨·배지·캡션 */
+  --m-fs-nav: 12px;    /* 하단 탭바 메뉴명 */
   --m-pad-sec: 10px;   /* 섹션 컨테이너 좌우/상하 */
   --m-pad-row: 6px;    /* 행·필드 세로 */
   --m-gap: 5px;        /* 항목 간격 */
@@ -10392,11 +10392,16 @@ button.approvalPill:hover {
     line-height: 1.45 !important;
   }
 
-  /* KPI 수치는 키운다 */
+  /* KPI 수치 — 가운데 정렬 (모바일만, 데스크톱은 좌측 정렬 유지) */
   .appShell .main .metric strong,
   .appShell .main .statCardValue {
     font-size: var(--m-fs-kpi) !important;
     line-height: 1.1 !important;
+  }
+  .appShell .main .metric > strong {
+    justify-self: center !important;
+    text-align: center !important;
+    width: 100% !important;
   }
   .appShell .main .workflowSummary strong { font-size: var(--m-fs-h) !important; }
 
