@@ -6206,9 +6206,10 @@ strong.required {
 .cardMeta {
   /* 고정폭 그리드로 행마다 열(서비스·분류·우선순위·담당팀·D-day) 정렬 — 내용에 맞춰 타이트하게 */
   display: grid;
-  grid-template-columns: 54px 92px 28px 76px 44px;
+  grid-template-columns: 64px 100px 40px 88px 52px;
   align-items: center;
-  justify-items: start;
+  /* 모든 열을 가운데 정렬해 세로 축을 맞춘다 */
+  justify-items: center;
   flex-shrink: 0;
   gap: 6px;
   margin-top: 0;
@@ -6223,9 +6224,12 @@ strong.required {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* D-day는 우측 정렬 */
-.cardMeta > .ddayPill {
-  justify-self: end;
+/* 모든 셀이 열 폭을 꽉 채우게 해 행 간 시작점·폭을 동일하게 맞춘다
+   (내용 폭에 맞으면 가운데 정렬 때문에 행마다 x좌표가 달라진다) */
+.cardMeta > * {
+  width: 100%;
+  justify-content: center;
+  text-align: center;
 }
 
 .projectCard .statusPill {
@@ -10825,3 +10829,8 @@ button.approvalPill:hover {
 }
 .stageReqChip.done { background: #eaf7ef; border-color: #9dd3b2; color: #1c7a45; }
 .stageReqChip.todo { background: #fff8e0; border-color: #d6b656; color: #8a6a10; }
+
+/* 카드 메타 내부 배지는 열 폭에 맞춘다 (min-width: max-content 예외 해제) */
+.cardMeta > .requestTypePill {
+  min-width: 0 !important;
+}
