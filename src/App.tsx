@@ -4676,13 +4676,13 @@ function SystemGuidePanel() {
         <p className="guideDiagramLead">pms.sanghak.kr · 시스템 가이드 기준</p>
         <div className="stageFlow">
           {[
-            { no: '①', name: '요청', owner: '요청자 · 영업 · 마케팅 · 운영', tone: 'req', acts: ['요청 분류 선택', '요청 내용 작성', '배경 / 현재 상황 작성'], out: ['요청서 (니즈)'] },
-            { no: '②', name: '기획', owner: 'PM / 기획자', tone: 'plan', acts: ['요구사항 12개 항목 작성', '승인 필요 역할 지정'], out: ['요구사항 정의서 (SRS)'] },
-            { no: '③', name: '승인', owner: '지정 승인자', tone: 'appr', acts: ['역할별 개별 검토·승인', 'CEM · 개발 · 정보보호', '인프라 · QA · 특허'], out: ['승인 내역'] },
-            { no: '④', name: '개발', owner: '개발자 (리더)', tone: 'dev', acts: ['설계 작성', '일정 조율', '개발 태스크 수행'], out: ['설계 명세서 (SDS)', '일감 : Task · Bug · Change'] },
-            { no: '⑤', name: '검토', owner: 'QA · 보안 · PM', tone: 'rev', acts: ['SRS · SDS 대조 검증', '3자 합의'], out: ['Bug (QA)', '취약점 (보안)', 'Change (PM)'] },
-            { no: '⑥', name: '배포', owner: '인프라', tone: 'appr', acts: ['운영 환경 반영', '배포 방식·버전 기록', '실패 시 개발 롤백'], out: ['운영 반영 내역'] },
-            { no: '⑦', name: '완료', owner: 'PM / 관리자', tone: 'done', acts: ['완료 보고 작성', '요청자 확인', '게시 · 완료 처리'], out: ['완료 보고서'] },
+            { no: '①', name: '요청', owner: '요청자 · 영업 · 마케팅 · 운영', tone: 'req', acts: ['요청 분류 선택', '요청 내용 작성', '배경 / 현재 상황 작성'], out: ['요청서 (니즈)'], req: ['요청 분류', '제목·서비스·담당팀·요청자', '요청 내용', '배경/현재 상황'] },
+            { no: '②', name: '기획', owner: 'PM / 기획자', tone: 'plan', acts: ['요구사항 12개 항목 작성', '승인 필요 역할 지정'], out: ['요구사항 정의서 (SRS)'], req: ['SRS 작성 완료', '승인 필요 역할 지정'] },
+            { no: '③', name: '승인', owner: '지정 승인자', tone: 'appr', acts: ['역할별 개별 검토·승인', 'CEM · 개발 · 정보보호', '인프라 · QA · 특허'], out: ['승인 내역'], req: ['지정 승인자 전원 승인'] },
+            { no: '④', name: '개발', owner: '개발자 (리더)', tone: 'dev', acts: ['설계 작성', '일정 조율', '개발 태스크 수행'], out: ['설계 명세서 (SDS)', '일감 : Task · Bug · Change'], req: ['SDS 작성 완료', '마감일 확정(일정 조율)'] },
+            { no: '⑤', name: '검토', owner: '개발 · QA · 보안 · PM', tone: 'rev', acts: ['단위테스트 → 통합테스트', '보안테스트 (병행)', 'SRS · SDS 대조 검증'], out: ['Bug (QA)', '취약점 (보안)', 'Change (PM)'], req: ['개발 단위테스트', 'QA 통합테스트', '보안테스트', 'PM 검토'] },
+            { no: '⑥', name: '배포', owner: '인프라', tone: 'appr', acts: ['운영 환경 반영', '배포 방식·버전 기록', '실패 시 개발 롤백'], out: ['운영 반영 내역'], req: ['운영 반영 완료'] },
+            { no: '⑦', name: '완료', owner: 'PM / 관리자', tone: 'done', acts: ['완료 보고 작성', '요청자 확인', '게시 · 완료 처리'], out: ['완료 보고서'], req: ['요청자 확인'] },
           ].map((s, i) => (
             <div key={s.no} className="stageFlowItem">
               <div className={`stageCard tone-${s.tone}`}>
@@ -4698,8 +4698,14 @@ function SystemGuidePanel() {
                   <b>산출물</b>
                   <ul>{s.out.map((o) => <li key={o}>{o}</li>)}</ul>
                 </div>
+                <div className="stageCardBlock">
+                  <b>필수 입력 (진행 조건)</b>
+                  <div className="stageReqBadges">
+                    {s.req.map((r) => <span key={r} className="stageReqBadge">{r}</span>)}
+                  </div>
+                </div>
               </div>
-              {i < 5 && <span className="stageFlowArrow" aria-hidden="true">G{i + 1}</span>}
+              {i < 6 && <span className="stageFlowArrow" aria-hidden="true">G{i + 1}</span>}
             </div>
           ))}
         </div>

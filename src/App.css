@@ -537,7 +537,8 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px 6px 12px;
+  /* 우측 8px 여백이 select 뒤에 빈칸으로 보여 좌우를 맞춘다 */
+  padding: 6px 10px;
   border: 1px solid #d9dce2;
   border-radius: 8px;
   background: #fff;
@@ -883,7 +884,8 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px 6px 12px;
+  /* 우측 8px 여백이 select 뒤에 빈칸으로 보여 좌우를 맞춘다 */
+  padding: 6px 10px;
   border: 1px solid #d9dce2;
   border-radius: 8px;
   background: #fff;
@@ -3505,8 +3507,8 @@ strong.required {
 
 .richEditorContent {
   padding: 10px 12px;
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 15px;
+  line-height: 1.7;
   color: #20242b;
   outline: none;
   white-space: pre-wrap;
@@ -6090,6 +6092,10 @@ strong.required {
 .requestTypePill {
   display: inline-flex;
   align-items: center;
+  /* 좁은 열에서 눌려 글자가 잘리던 문제 방지 */
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-width: max-content;
   min-height: 22px;
   padding: 0 8px;
   border-radius: 8px;
@@ -9326,6 +9332,15 @@ button.approvalPill:hover {
   border-radius: 3px !important;
   font-size: 12px;
 }
+/* 열 내용을 모두 가운데 정렬하고 세로 축을 맞춘다 */
+.allProjectsRow > * {
+  justify-self: center;
+  align-self: center;
+  text-align: center;
+}
+.allProjectsRow {
+  align-items: center;
+}
 .allProjectsRow .requestTypePill::before { content: none !important; }
 .allProjectsRow .allProjectsTeam { color: #4b515c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -9481,33 +9496,54 @@ button.approvalPill:hover {
 .stageCardOwner { font-size: 12px; line-height: 1.35; }
 .stageCardBlock b { display: block; font-size: 12px; font-weight: 800; color: #20242b; margin-bottom: 2px; }
 .stageCardBlock ul { margin: 0; padding-left: 11px; }
+/* 단계별 필수 입력(진행 게이트) 배지 */
+.stageReqBadges { display: flex; flex-wrap: wrap; gap: 3px; }
+.stageReqBadge {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  font-size: 11px;
+  font-weight: 700;
+  color: #20242b;
+  line-height: 1.4;
+}
 .stageCardBlock li { font-size: 12px; line-height: 1.55; color: #3a414b; }
 .stageFlowArrow {
   position: relative;
-  flex: 0 0 20px;
+  flex: 0 0 26px;
   align-self: center;
-  text-align: center;
-  font-size: 11px;
+  /* G 라벨을 선 위로 확실히 띄운다 (기존엔 선과 겹쳤음) */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 30px;
+  font-size: 10px;
   font-weight: 800;
   color: #4b515c;
-  padding-bottom: 12px;
+  line-height: 1;
 }
+/* 라벨 아래에 선 + 삼각형을 별도 트랙으로 배치 */
 .stageFlowArrow::before {
   content: '';
-  position: absolute;
-  left: 4px; right: 12px; top: 50%;
+  display: block;
+  width: 100%;
   height: 2px;
   background: #6b7280;
 }
 .stageFlowArrow::after {
   content: '';
   position: absolute;
-  right: 4px; top: 50%;
-  width: 0; height: 0;
-  transform: translateY(-50%);
-  border-left: 8px solid #6b7280;
-  border-top: 5px solid transparent;
-  border-bottom: 5px solid transparent;
+  right: -1px;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  border-left: 6px solid #6b7280;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
 }
 
 .stageCard.tone-req  { background: #eaf2fd; border-color: #6c8ebf; }
@@ -10691,4 +10727,36 @@ button.approvalPill:hover {
   .appShell .main input[type="radio"] {
     border-radius: 50% !important;
   }
+}
+
+/* =========================================================================
+   단계 패널 제목·설명 규격 통일
+   기존: h3는 15px/어두움, .approvalHistoryInline h4 등은 13px/파랑으로 섞여 있었다.
+   → 제목 15px·800·#20242b / 설명 12px·#6b7280·상단 4px 로 일치시킨다.
+   ========================================================================= */
+.numberedSection > .panelHeader h3,
+.numberedSection > .panelHeader.compact h3,
+.requirementsPanel > .panelHeader h3,
+.requirementsPanel > .panelHeader.compact h3,
+.approvalHistoryInline h4,
+.qcReviewBlock > h4,
+.scheduleBlock > h4,
+.taskBoard > h4 {
+  margin: 0;
+  font-size: 15px !important;
+  font-weight: 800;
+  color: #20242b !important;
+  line-height: 1.35;
+}
+
+.approvalHistoryInline > p,
+.approvalHistoryInline > span,
+.qcReviewBlock > p,
+.scheduleBlock > p,
+.taskBoard > p {
+  display: block;
+  margin: 4px 0 0 !important;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6b7280;
 }
