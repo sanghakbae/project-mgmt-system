@@ -6,6 +6,7 @@ export const workflow: Array<{ status: ProjectStatus; label: string; owner: stri
   { status: 'dept_review', label: '승인 단계', owner: '승인자' },
   { status: 'development', label: '개발 단계', owner: '기획·개발' },
   { status: 'qc_security', label: '검토 단계', owner: '품질·보안·PM' },
+  { status: 'deployment', label: '배포 단계', owner: '인프라' },
   { status: 'completion', label: '완료 보고', owner: 'PM·관리자' },
 ]
 
@@ -53,7 +54,8 @@ const stageDefaults: Record<ProjectStatus, { progress: number; assignee: Project
   planning: { progress: 32, assignee: 'pm', approved: [], nextAction: 'PM이 기획 문서(SRS+SDS)를 작성합니다.' },
   dept_review: { progress: 46, assignee: 'pm', approved: ['cem', 'developer'], nextAction: '승인 역할 전원의 확인을 기다리고 있습니다.' },
   development: { progress: 66, assignee: 'developer', approved: fullRoles, nextAction: '일정 조율 후 개발 태스크를 진행합니다.' },
-  qc_security: { progress: 86, assignee: 'qa', approved: fullRoles, nextAction: 'QA·보안·PM 3자 검토를 진행합니다.' },
+  qc_security: { progress: 78, assignee: 'qa', approved: fullRoles, nextAction: '개발·QA·보안·PM 4자 검토를 진행합니다.' },
+  deployment: { progress: 90, assignee: 'infra', approved: fullRoles, nextAction: '인프라가 운영에 반영하고 smoke test를 확인합니다.' },
   completion: { progress: 100, assignee: 'admin', approved: fullRoles, nextAction: '완료 보고를 작성하고 동사무소 게시판에 게시합니다.' },
   rejected: { progress: 8, assignee: 'requester', approved: [], nextAction: '반려 사유를 반영해 재요청합니다.' },
 }
@@ -69,13 +71,14 @@ const stageStamp: Record<ProjectStatus, { created: string; updated: string; due:
   dept_review: { created: '2026-05-10', updated: '2026-05-17T10:05:00+09:00', due: '2026-06-05' },
   development: { created: '2026-05-06', updated: '2026-05-17T11:20:00+09:00', due: '2026-05-30' },
   qc_security: { created: '2026-05-02', updated: '2026-05-17T11:50:00+09:00', due: '2026-05-26' },
+  deployment: { created: '2026-04-28', updated: '2026-05-17T12:10:00+09:00', due: '2026-05-22' },
   completion: { created: '2026-04-24', updated: '2026-05-16T17:30:00+09:00', due: '2026-05-20' },
   rejected: { created: '2026-05-12', updated: '2026-05-16T16:00:00+09:00', due: '2026-06-15' },
 }
 
 // 기획 단계 이후로는 SRS+SDS 문서가 있어야 단계가 유지됨 (mapProjectRow 정규화 규칙)
 function reviewDocsForStage(seed: DemoSeed): Project['reviewDocs'] {
-  const docsReady: ProjectStatus[] = ['dept_review', 'development', 'qc_security', 'completion']
+  const docsReady: ProjectStatus[] = ['dept_review', 'development', 'qc_security', 'deployment', 'completion']
   if (docsReady.includes(seed.status)) {
     return {
       srs: `# ${seed.title} — 요구사항 정의서(SRS)\n\n## 1. 배경\n${seed.currentProblem}\n\n## 2. 목표\n${seed.desiredOutcome}\n\n## 3. 성공 지표\n${seed.successMetric}\n\n## 4. 대상 사용자\n${seed.affectedUsers}`,
@@ -315,6 +318,17 @@ const demoSeeds: DemoSeed[] = [
     risk: '큐 적체 시 모니터링 필요', securityNotes: '큐에 적재되는 문서 데이터 암호화·보존 기간 관리',
   },
   {
+    id: 'ck-7', code: 'PRJ-2505-019', requestType: 'integration_api', status: 'deployment',
+    title: '표절률 리포트 PDF 서명 검증', serviceName: '카피킬러', serviceArea: '리포트',
+    requester: '한품질', ownerTeam: '개발', priority: 'high',
+    summary: '발급된 리포트 PDF의 위조 여부를 전자서명으로 검증합니다.',
+    currentProblem: '리포트 PDF를 수정해 제출하는 사례를 걸러낼 수 없습니다.',
+    desiredOutcome: '발급 시 서명을 넣고 검증 페이지에서 원본 여부를 확인합니다.',
+    successMetric: '위조 리포트 적발률 100%',
+    affectedUsers: '기관 검사 담당자, 학생', dueDate: '2026-05-24',
+    risk: '서명 키 유출 시 전량 재발급 필요', securityNotes: '서명 키를 KMS에 보관하고 접근 감사 로그 필수',
+  },
+  {
     id: 'ck-6', code: 'PRJ-2505-006', requestType: 'data_report', status: 'completion',
     title: '검사 이력 통계 대시보드', serviceName: '카피킬러', serviceArea: '운영 통계',
     requester: '최운영', ownerTeam: '운영', priority: 'normal',
@@ -383,6 +397,17 @@ const demoSeeds: DemoSeed[] = [
     risk: '마스킹 누락 화면 점검 필요', securityNotes: '마스킹 해제 이력 감사 로그 필수',
   },
   {
+    id: 'ms-7', code: 'PRJ-2505-021', requestType: 'security_permission', status: 'deployment',
+    title: '지원자 개인정보 접근 권한 세분화', serviceName: '몬스터', serviceArea: '권한 관리',
+    requester: '이보안', ownerTeam: '정보보호', priority: 'high',
+    summary: '채용 담당자 등급별로 지원자 개인정보 열람 범위를 나눕니다.',
+    currentProblem: '담당자 전원이 주민번호·연락처를 모두 열람할 수 있습니다.',
+    desiredOutcome: '등급별 마스킹 정책을 적용하고 열람 이력을 남깁니다.',
+    successMetric: '불필요 개인정보 열람 90% 감소',
+    affectedUsers: '채용 담당자, 지원자', dueDate: '2026-05-25',
+    risk: '권한 축소로 기존 업무 흐름 영향', securityNotes: '열람 이력 보존 3년, 마스킹 해제는 승인 필요',
+  },
+  {
     id: 'ms-6', code: 'PRJ-2505-012', requestType: 'data_report', status: 'completion',
     title: '공고 성과 리포트 자동 발송', serviceName: '몬스터', serviceArea: '채용 성과',
     requester: '최운영', ownerTeam: '운영', priority: 'normal',
@@ -449,6 +474,17 @@ const demoSeeds: DemoSeed[] = [
     successMetric: '비인가 데이터 접근 0건',
     affectedUsers: '전체 대시보드 사용자', dueDate: '2026-05-26',
     risk: '권한 매트릭스 정의 복잡도', securityNotes: '접근 제어 정책·감사 로그 필수',
+  },
+  {
+    id: 'pr-7', code: 'PRJ-2505-020', requestType: 'infra_performance', status: 'deployment',
+    title: '대시보드 조회 캐시 계층 도입', serviceName: '프리즘', serviceArea: '조회 성능',
+    requester: '정인프라', ownerTeam: '인프라', priority: 'urgent',
+    summary: '반복 조회되는 집계 쿼리를 캐시 계층으로 흡수합니다.',
+    currentProblem: '월초 집계 시 대시보드 응답이 10초 이상 걸립니다.',
+    desiredOutcome: '집계 결과를 캐시하고 무효화 정책으로 최신성을 유지합니다.',
+    successMetric: '대시보드 P95 응답 3초 이내',
+    affectedUsers: '전체 대시보드 사용자', dueDate: '2026-05-23',
+    risk: '캐시 무효화 누락 시 과거 데이터 노출', securityNotes: '기관별 데이터가 캐시 키로 섞이지 않도록 분리',
   },
   {
     id: 'pr-6', code: 'PRJ-2505-018', requestType: 'data_report', status: 'completion',

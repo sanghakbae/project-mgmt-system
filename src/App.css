@@ -1022,11 +1022,12 @@ h3 {
   grid-area: label;
 }
 
-/* 숫자를 카드 왼쪽 기준으로 정렬 (라벨과 축 일치) */
+/* 숫자는 카드 가운데 정렬 */
 .metric > strong {
   grid-area: value;
-  justify-self: start;
-  text-align: left;
+  justify-self: center;
+  text-align: center;
+  width: 100%;
 }
 
 .metric:hover {
@@ -1243,7 +1244,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .dashboardKanban {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 12px;
   padding: 4px 4px 8px;
   overflow: hidden;
@@ -1253,7 +1254,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   justify-content: start;
 }
 
-/* 서비스별 단계 흐름 — 각 서비스를 한 행(라벨 + 6단계 칸반)으로 표시 */
+/* 서비스별 단계 흐름 — 각 서비스를 한 행(라벨 + 7단계 칸반)으로 표시 */
 .serviceFlow {
   margin-top: 16px;
   padding: 10px;
@@ -1314,7 +1315,8 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .dashboardKanban.adminScroll {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  /* 7단계(요청·기획·승인·개발·검토·배포·완료)를 한 행에 — 개행 방지 */
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 12px;
   padding: 4px 0 8px;
   width: 100%;
@@ -1406,19 +1408,55 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   color: #8a8f97;
 }
 
+/* ── 내 역할이 담당하는 단계 강조 — 네온 외곽선만 ──────────────────────
+   배경·헤더 채우기는 쓰지 않고 외곽선 글로우로만 구분한다. */
+.dashboardKanban.adminScroll .kanbanColumn.owned {
+  border-width: 2px !important;
+  /* 네온 색은 --neon (단계별로 지정). currentColor는 charcoal이라 검게 보였다. */
+  border-color: var(--neon) !important;
+  box-shadow:
+    0 0 0 1px var(--neon),
+    0 0 5px 0 var(--neon);
+}
+
 .dashboardKanban.adminScroll .kanbanColumn.owned .kanbanColumnHeader {
-  border-color: currentColor;
+  border-color: var(--neon);
+}
+
+/* 헤더 배경이 투명한 변형이므로 제목 글자색을 어둡게 되돌린다.
+   (.kanbanColumnHeader strong 기본값이 흰색이라 흰 배경에서 안 보였음)
+   단, 카운트 배지(.kanbanHeaderCount strong)는 어두운 배경 위 흰 글씨이므로 제외한다. */
+.dashboardKanban.adminScroll .kanbanColumn.owned .kanbanHeaderMeta,
+.dashboardKanban.adminScroll .kanbanColumn.owned .kanbanHeaderMeta span,
+.dashboardKanban.adminScroll .kanbanColumn.owned .kanbanColumnHeader small,
+.dashboardKanban.adminScroll .kanbanColumn.owned .kanbanHeaderMeta small {
+  color: #20242b;
+}
+.dashboardKanban.adminScroll .kanbanColumn.owned .kanbanHeaderCount strong {
+  color: #fff;
+}
+
+/* 단계 그룹별 네온 색 (요청·기획 / 승인·개발 / 검토·배포·완료) */
+.dashboardKanban.adminScroll .kanbanColumn.phase1 { --neon: #2f6bd8; }
+.dashboardKanban.adminScroll .kanbanColumn.phase2 { --neon: #d79b00; }
+.dashboardKanban.adminScroll .kanbanColumn.phase3 { --neon: #1c9c5c; }
+
+/* 담당 아닌 단계는 눌러서 대비 확보 */
+.dashboardKanban.adminScroll .kanbanColumn.dim {
+  opacity: 0.6;
 }
 
 .dashboardKanban.adminScroll .kanbanColumn::before {
   content: '';
   display: block;
   position: absolute;
-  top: 30px;
+  /* 헤더 높이에 맞춰 top 고정이었던 것을 세로 가운데로 */
+  top: 50%;
+  transform: translateY(-50%);
   right: -10px;
-  width: 14px;
+  width: 9px;
   height: 2px;
-  background: #c5ccd6;
+  background: #4b515c;
   z-index: 1;
 }
 
@@ -1426,13 +1464,15 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   content: '';
   display: block;
   position: absolute;
-  top: 25px;
-  right: -13px;
-  width: 10px;
-  height: 10px;
-  border-top: 2px solid #c5ccd6;
-  border-right: 2px solid #c5ccd6;
-  transform: rotate(45deg);
+  top: 50%;
+  right: -11px;
+  width: 0;
+  height: 0;
+  /* 속이 꽉 찬 삼각형 (선 화살표는 얇아 잘 안 보였음) */
+  border-left: 7px solid #4b515c;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  transform: translateY(-50%);
   z-index: 2;
 }
 
@@ -1443,14 +1483,16 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 
 .dashboardKanban.adminScroll .kanbanColumn.phase1 + .kanbanColumn.phase2::before,
 .dashboardKanban.adminScroll .kanbanColumn.phase2 + .kanbanColumn.phase3::before {
-  background: #95a0ad;
+  /* 그룹 경계 연결선 — 화살표와 같은 세로 중앙에 맞춘다 (top: 30px 이었음) */
+  background: #20242b;
   height: 3px;
-  top: 30px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .dashboardKanban.adminScroll .kanbanColumn.phase1:has(+ .kanbanColumn.phase2)::after,
 .dashboardKanban.adminScroll .kanbanColumn.phase2:has(+ .kanbanColumn.phase3)::after {
-  border-color: #95a0ad;
+  border-left-color: #20242b;
 }
 
 .dashboardKanban.adminScroll .kanbanColumnHeader {
@@ -1582,13 +1624,14 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .kanbanColumn:not(:last-child)::after {
   content: '';
   position: absolute;
-  top: 31px;
-  right: -13px;
-  width: 14px;
-  height: 14px;
-  border-top: 2px solid #d2d7df;
-  border-right: 2px solid #d2d7df;
-  transform: rotate(45deg);
+  top: 50%;
+  right: -11px;
+  width: 0;
+  height: 0;
+  border-left: 7px solid #4b515c;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  transform: translateY(-50%);
   background: transparent;
   z-index: 2;
 }
@@ -1596,18 +1639,22 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
 .kanbanColumn:not(:last-child)::before {
   content: '';
   position: absolute;
-  top: 37px;
-  right: -12px;
-  width: 16px;
+  /* 헤더 높이(37px)에 고정돼 화살표와 어긋난 짧은 선으로 보였다 → 세로 가운데 */
+  top: 50%;
+  transform: translateY(-50%);
+  right: -11px;
+  width: 9px;
   height: 2px;
-  background: #d2d7df;
+  background: #4b515c;
   z-index: 1;
 }
 
-.kanbanColumn:nth-child(5)::after,
-.kanbanColumn:nth-child(5)::before,
-.kanbanColumn:nth-child(10)::after,
-.kanbanColumn:nth-child(10)::before {
+/* 7단계 기준: 한 행의 마지막(7번째)에서만 커넥터를 숨긴다.
+   (기존 5/10번째 기준은 6단계 시절 값이라 검토 단계 화살표가 사라졌다) */
+.kanbanColumn:nth-child(7)::after,
+.kanbanColumn:nth-child(7)::before,
+.kanbanColumn:nth-child(14)::after,
+.kanbanColumn:nth-child(14)::before {
   display: none;
 }
 

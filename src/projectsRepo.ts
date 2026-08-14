@@ -145,6 +145,7 @@ export function mapProjectRow(row: ProjectRow): Project {
   const comments = row.logs?.find((log) => log.meta?.comments)?.meta?.comments ?? []
   // 기존 데이터에는 developer(단위테스트) 필드가 없으므로 기본값과 병합해 보정한다
   const storedQcSignoff = row.logs?.find((log) => log.meta?.qcSignoff)?.meta?.qcSignoff
+  const deployment = row.logs?.find((log) => log.meta?.deployment)?.meta?.deployment ?? { released: false, smokeTested: false }
   const qcSignoff: QcSignoffState = {
     developer: false,
     qa: false,
@@ -178,7 +179,7 @@ export function mapProjectRow(row: ProjectRow): Project {
         : legacyRaw === 'published'
           ? 'completion'
           : (legacyRaw as Project['status']))
-  const docsGatedStatuses: Project['status'][] = ['dept_review', 'development', 'qc_security', 'completion']
+  const docsGatedStatuses: Project['status'][] = ['dept_review', 'development', 'qc_security', 'deployment', 'completion']
   let normalizedStatus: Project['status'] = legacyMappedStatus
   if (planningRequiredByType[requestType] && docsGatedStatuses.includes(legacyMappedStatus) && !hasReviewDocs) {
     normalizedStatus = 'planning'
@@ -221,6 +222,7 @@ export function mapProjectRow(row: ProjectRow): Project {
     logs: row.logs ?? [],
     comments,
     qcSignoff,
+    deployment,
     requesterConfirmed,
     docsLocked,
     rejectedReason: rejectedMeta?.rejectedReason,

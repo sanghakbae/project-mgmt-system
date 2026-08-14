@@ -19,6 +19,7 @@ export type ProjectStatus =
   | 'planning'
   | 'development'
   | 'qc_security'
+  | 'deployment'
   | 'completion'
   | 'rejected'
 
@@ -181,7 +182,24 @@ export type ActivityLog = {
     docsLocked?: boolean
     rejectedReason?: string
     rejectedFromStatus?: ProjectStatus
+    deployment?: DeploymentState
   }
+}
+
+/**
+ * 배포 단계 상태.
+ * 검토(staging 검증) 통과 → 인프라가 운영 반영 → smoke test 확인 → 완료 보고.
+ * 실패 시 개발 단계로 되돌린다(검토 반려와 동일 경로).
+ */
+export type DeploymentState = {
+  /** 운영 반영 완료 */
+  released: boolean
+  /** 배포 후 운영 smoke test 통과 */
+  smokeTested: boolean
+  releasedAt?: string
+  releasedBy?: string
+  /** 배포 방식·버전·롤백 계획 메모 */
+  note?: string
 }
 
 export type Project = {
@@ -220,6 +238,8 @@ export type Project = {
   requesterConfirmed?: boolean
   onHold?: boolean
   holdReason?: string
+  /** 배포 단계 상태 — 인프라가 운영 반영 후 확인, smoke test까지 통과해야 완료로 진행 */
+  deployment?: DeploymentState
   rejectedReason?: string
   rejectedFromStatus?: ProjectStatus
   published?: boolean

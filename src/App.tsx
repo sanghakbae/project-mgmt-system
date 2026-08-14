@@ -60,7 +60,7 @@ import {
 } from './projectsRepo'
 import { registerWithEmail, signInWithEmail } from './authRepo'
 import { resolveAttachmentUrl, uploadAttachment } from './storage'
-import type { ApprovalState, IssueType, Priority, Project, ProjectRequestType, ProjectStatus, ProjectTask, QcSignoffRole, QcSignoffState, ReviewDocs, Role, ScheduleInfo, SecurityReview, TaskAttachment, TaskStatus, WorkflowConfig } from './types'
+import type { ApprovalState, DeploymentState, IssueType, Priority, Project, ProjectRequestType, ProjectStatus, ProjectTask, QcSignoffRole, QcSignoffState, ReviewDocs, Role, ScheduleInfo, SecurityReview, TaskAttachment, TaskStatus, WorkflowConfig } from './types'
 
 const statusLabels: Record<ProjectStatus, string> = {
   request: '요청 단계',
@@ -68,6 +68,7 @@ const statusLabels: Record<ProjectStatus, string> = {
   planning: '기획 단계',
   development: '개발 단계',
   qc_security: '검토 단계',
+  deployment: '배포 단계',
   completion: '완료 보고',
   rejected: '반려',
 }
@@ -79,6 +80,7 @@ const shortStatusLabels: Record<ProjectStatus, string> = {
   planning: '기획',
   development: '개발',
   qc_security: '검토',
+  deployment: '배포',
   completion: '완료',
   rejected: '반려',
 }
@@ -490,6 +492,7 @@ const fullApprovalRoles: Role[] = ['cem', 'developer', 'security', 'infra', 'qa'
 // 않으므로(코드·설정·의존성 점검) 병행 가능. PM은 SRS 대조 검토로 언제든 가능.
 const qcSignoffRoles: QcSignoffRole[] = ['developer', 'qa', 'security', 'pm']
 const emptyQcSignoff: QcSignoffState = { developer: false, qa: false, security: false, pm: false }
+const emptyDeployment: DeploymentState = { released: false, smokeTested: false }
 const qcSignoffLabels: Record<QcSignoffRole, string> = {
   developer: '개발',
   qa: 'QA',
@@ -609,7 +612,9 @@ function isProjectAssignedToRole(project: Project, role: Role) {
     // 요청자에게 배정된 단계는 영업·마케팅도 본인 할 일로 봄
     (project.assigneeRole === 'requester' && isRequesterRole(role)) ||
     // 검토 단계는 개발(단위테스트)·QA(통합테스트)·보안·PM 4자가 모두 담당
-    (project.status === 'qc_security' && qcSignoffRoles.includes(role as QcSignoffRole))
+    (project.status === 'qc_security' && qcSignoffRoles.includes(role as QcSignoffRole)) ||
+    // 배포 단계는 인프라 담당
+    (project.status === 'deployment' && role === 'infra')
   )
 }
 
@@ -628,6 +633,9 @@ function roleActsOnStatus(role: Role, status: ProjectStatus): boolean {
     case 'qc_security':
       // 개발(단위테스트) 포함 4자
       return qcSignoffRoles.includes(role as QcSignoffRole)
+    case 'deployment':
+      // 배포 승인·실행은 인프라 (PM·관리자는 대행)
+      return role === 'infra' || role === 'pm'
     case 'completion':
       return role === 'pm'
     default:
@@ -841,6 +849,7 @@ function App() {
   const [account, setAccount] = useState<Account | null>(() => loadStoredAccount() ?? (DEV_NO_LOGIN ? DEV_ACCOUNT : null))
   const [sessionTimeoutMin, setSessionTimeoutMin] = useState<number>(() => getStoredSessionTimeoutMin())
   // 게시판 전송 상태 (프로젝트 id 기준)
+  const [deployNoteDraft, setDeployNoteDraft] = useState('')
   const [boardSendingId, setBoardSendingId] = useState<string | null>(null)
   const [boardResults, setBoardResults] = useState<Record<string, { ok: boolean; message: string }>>({})
   // 작성자 표기 — "이름(역할)" 형식. 이름이 없으면 역할만 표시
@@ -1048,7 +1057,7 @@ function App() {
 
   // '전체 프로젝트' 별도 페이지: 역할 무관 전체 프로젝트를 검색어로만 필터해 목록으로 노출 (단계 순 정렬)
   const allProjectsList = useMemo(() => {
-    const order: Record<ProjectStatus, number> = { request: 0, planning: 1, dept_review: 2, development: 3, qc_security: 4, completion: 5, rejected: 6 }
+    const order: Record<ProjectStatus, number> = { request: 0, planning: 1, dept_review: 2, development: 3, qc_security: 4, deployment: 5, completion: 6, rejected: 7 }
     return serviceScopedProjects
       .filter((project) => `${project.title} ${project.summary} ${project.code}`.toLowerCase().includes(query.toLowerCase()))
       .slice()
@@ -1217,6 +1226,11 @@ function App() {
   const qcPendingRoles = qcSignoffRoles.filter((r) => !qcSignoff[r])
   // QA 통합테스트는 개발자 단위테스트가 끝나야 시작할 수 있다
   const qaBlockedByUnitTest = !qcSignoff.developer
+
+  // 배포 단계: 운영 반영 → smoke test 순서. 둘 다 통과해야 완료 보고로 진행
+  const deployment = selected?.deployment ?? emptyDeployment
+  const deployDone = deployment.released && deployment.smokeTested
+  const smokeBlockedByRelease = !deployment.released
   const isStepAdvanceBlocked = Boolean(
     selected?.onHold ||
     (selected?.status === 'dept_review' && pendingApprovalRoles.length > 0) ||
@@ -1225,6 +1239,7 @@ function App() {
     (selected?.status === 'planning' && planningRequiredByType[selected.requestType] && !hasSrsDraft) ||
     (selected?.status === 'development' && planningRequiredByType[selected.requestType] && !hasSdsDraft) ||
     (selected?.status === 'qc_security' && !qcAllSignedOff) ||
+    (selected?.status === 'deployment' && !deployDone) ||
     (selected?.status === 'completion' && !selected?.requesterConfirmed),
   )
   const canApproveCurrentRole = Boolean(
@@ -1519,6 +1534,7 @@ function App() {
     if (selected.status === 'planning' && planningRequiredByType[selected.requestType] && !hasSrsDraft) { window.alert('요구사항 정의서(SRS)를 작성해야 다음 단계로 진행할 수 있습니다.'); return }
     if (selected.status === 'development' && planningRequiredByType[selected.requestType] && !hasSdsDraft) { window.alert('설계 명세서(SDS)를 작성해야 검토 단계로 진행할 수 있습니다.'); return }
     if (selected.status === 'qc_security' && !qcAllSignedOff) { window.alert(`검토가 모두 완료되어야 다음 단계로 진행할 수 있습니다.\n대기: ${qcPendingRoles.map((r) => qcSignoffTitles[r]).join(', ')}`); return }
+    if (selected.status === 'deployment' && !deployDone) { window.alert(`운영 반영과 smoke test가 모두 완료되어야 완료 보고로 진행할 수 있습니다.\n대기: ${[!deployment.released && '운영 반영', !deployment.smokeTested && 'smoke test'].filter(Boolean).join(', ')}`); return }
     if (selected.status === 'completion' && !selected.requesterConfirmed) { window.alert('요청자 확인이 완료되어야 게시할 수 있습니다.'); return }
     // 개발 단계: 미완료 태스크가 있으면 확인
     if (selected.status === 'development' && openTasks.length > 0) {
@@ -1598,6 +1614,7 @@ function App() {
       rejectedReason: merged.rejectedReason,
       rejectedFromStatus: merged.rejectedFromStatus,
       comments: merged.comments,
+      deployment: merged.deployment,
     }
     const nextLogs = [
       { id: crypto.randomUUID(), at: logStamp(), actor: authorLabel, message: logMessage, meta: stateMeta },
@@ -1737,6 +1754,62 @@ function App() {
     void notifyGoogleChat('task.status', `검토 ${nextDone ? '완료' : '취소'}: ${label}`, { 프로젝트: selected.title })
   }
 
+  // 배포 단계: 운영 반영 / smoke test 토글 (담당 = 인프라, PM·관리자 대행)
+  async function toggleDeployStep(step: 'released' | 'smokeTested', note?: string) {
+    if (!selected || selected.status !== 'deployment') return
+    if (selected.onHold) { window.alert('보류 중에는 배포를 진행할 수 없습니다.'); return }
+    const current = selected.deployment ?? emptyDeployment
+    const nextDone = !current[step]
+
+    // 순서 게이트: 운영 반영 전에는 smoke test 불가
+    if (step === 'smokeTested' && nextDone && !current.released) {
+      window.alert('운영 반영이 완료되어야 smoke test를 확인할 수 있습니다.')
+      return
+    }
+    // 운영 반영을 취소하면 smoke test도 함께 취소 (순서 무결성)
+    let cascade = false
+    if (step === 'released' && !nextDone && current.smokeTested) {
+      if (!window.confirm('운영 반영을 취소하면 완료된 smoke test도 함께 취소됩니다. 계속할까요?')) return
+      cascade = true
+    }
+
+    const trimmed = (note ?? '').trim()
+    const next: DeploymentState = {
+      ...current,
+      [step]: nextDone,
+      ...(cascade ? { smokeTested: false } : {}),
+      ...(step === 'released' && nextDone ? { releasedAt: logStamp(), releasedBy: authorLabel } : {}),
+      ...(trimmed ? { note: trimmed } : {}),
+    }
+    const label = step === 'released' ? '운영 반영' : 'smoke test'
+    await patchSelectedProject(
+      { deployment: next },
+      `${label}을(를) ${nextDone ? '완료' : '취소'} 처리했습니다.${cascade ? ' (smoke test도 함께 취소)' : ''}${nextDone && trimmed ? ` (${trimmed})` : ''}`,
+    )
+    void notifyGoogleChat('project.advance', `배포 ${nextDone ? '완료' : '취소'}: ${label}`, { 프로젝트: selected.title })
+  }
+
+  // 배포 실패 → 개발 단계로 롤백
+  async function rollbackDeployment(reason: string) {
+    if (!selected || selected.status !== 'deployment') return
+    const trimmed = reason.trim()
+    if (!trimmed) { window.alert('롤백 사유를 입력해 주세요.'); return }
+    if (!window.confirm(`배포 실패로 "${selected.title}"을(를) 개발 단계로 되돌립니다.\n\n사유: ${trimmed}\n\n배포·검토 상태가 모두 초기화됩니다.`)) return
+    await patchSelectedProject(
+      {
+        status: 'development',
+        assigneeRole: 'developer',
+        progress: Math.min(selected.progress, stageBaselineProgress.development),
+        deployment: emptyDeployment,
+        qcSignoff: emptyQcSignoff,
+        docsLocked: false,
+        nextAction: '배포 롤백 조치 후 재검토 요청',
+      },
+      `배포 실패로 개발 단계로 롤백했습니다. (사유: ${trimmed})`,
+    )
+    void notifyGoogleChat('project.reject', `배포 롤백 → 개발 단계: ${selected.title}`, { 사유: trimmed })
+  }
+
   // #3 검토 합의 실패 → 개발 단계로 되돌린다 (Bug·취약점이 남은 경우)
   async function returnToDevelopment(reason: string) {
     if (!selected || selected.status !== 'qc_security') return
@@ -1771,6 +1844,11 @@ function App() {
     // 검토 단계의 반려는 성격이 다르다 — Bug·취약점이 남았다는 뜻이므로 개발 단계로 되돌린다
     if (selected.status === 'qc_security') {
       await returnToDevelopment(reason)
+      return
+    }
+    // 배포 단계의 반려 = 배포 실패 롤백
+    if (selected.status === 'deployment') {
+      await rollbackDeployment(reason)
       return
     }
     const trimmed = reason.trim()
@@ -3303,6 +3381,99 @@ function App() {
                                 onClick={() => { void rejectSelectedProject(rejectReasonDraft); setRejectReasonDraft(''); setRejectOpen(false) }}
                               >
                                 개발 단계로 되돌리기
+                              </button>
+                              <button type="button" className="closeBtn" onClick={() => setRejectOpen(false)}>취소</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {selected.status === 'deployment' && (
+                  <div className="qcReviewBlock">
+                    <div className="qcReviewGrid">
+                      {([
+                        { key: 'released' as const, title: '운영 반영', desc: '인프라가 운영 환경에 배포' },
+                        { key: 'smokeTested' as const, title: 'Smoke test', desc: '배포 후 핵심 기능 동작 확인' },
+                      ]).map((step) => {
+                        const done = deployment[step.key]
+                        const blocked = step.key === 'smokeTested' && smokeBlockedByRelease
+                        const isMine = role === 'infra' || role === 'pm' || role === 'admin'
+                        return (
+                          <div key={step.key} className={`qcReviewCard ${done ? 'done' : blocked ? 'blocked' : 'pending'}`}>
+                            <div className="qcReviewHead">
+                              <strong>{step.title}</strong>
+                              <span className={`qcReviewBadge ${done ? 'done' : blocked ? 'blocked' : 'pending'}`}>
+                                {done ? '완료' : blocked ? '선행 대기' : '대기'}
+                              </span>
+                            </div>
+                            {done ? (
+                              <div className="qcReviewBody">
+                                <p className="qcReviewNote">{step.desc}</p>
+                                {step.key === 'released' && deployment.releasedAt && (
+                                  <small>{deployment.releasedBy ?? ''} · {formatTimestamp(deployment.releasedAt)}</small>
+                                )}
+                                {isMine && (
+                                  <button className="miniButton qcReviewCancel" type="button" onClick={() => void toggleDeployStep(step.key)}>
+                                    취소
+                                  </button>
+                                )}
+                              </div>
+                            ) : blocked ? (
+                              <p className="qcReviewWait">운영 반영 완료 후 진행</p>
+                            ) : isMine && !selected.onHold ? (
+                              <div className="qcReviewBody">
+                                <textarea
+                                  rows={2}
+                                  className="qcReviewInput"
+                                  placeholder={step.key === 'released' ? '배포 방식·버전·롤백 계획 (예: v1.4.2 blue-green, 롤백 태그 v1.4.1)' : 'smoke test 결과 (예: 로그인·검사·리포트 정상)'}
+                                  value={deployNoteDraft}
+                                  onChange={(e) => setDeployNoteDraft(e.target.value)}
+                                />
+                                <button
+                                  className="miniButton approveButton"
+                                  type="button"
+                                  onClick={() => { void toggleDeployStep(step.key, deployNoteDraft); setDeployNoteDraft('') }}
+                                >
+                                  {step.title} 완료
+                                </button>
+                              </div>
+                            ) : (
+                              <p className="qcReviewWait">인프라 처리 대기 중</p>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <span className="approvalGuide">
+                      {deployDone
+                        ? '운영 반영 · smoke test 완료 · 완료 보고로 진행 가능'
+                        : `대기: ${[!deployment.released && '운영 반영', !deployment.smokeTested && 'smoke test'].filter(Boolean).join(', ')}`}
+                      {' · 순서: 운영 반영 → smoke test'}
+                    </span>
+                    {deployment.note && <span className="approvalGuide">메모: {deployment.note}</span>}
+                    {(role === 'infra' || role === 'pm' || role === 'admin') && !selected.onHold && (
+                      <div className="qcRejectArea">
+                        <button type="button" className="rejectBtn" onClick={() => setRejectOpen((v) => !v)}>
+                          배포 실패 · 개발 단계로 롤백
+                        </button>
+                        {rejectOpen && (
+                          <div className="rejectComposer">
+                            <span className="rejectComposerLabel">롤백 사유 (배포·검토 상태가 모두 초기화됩니다)</span>
+                            <textarea
+                              rows={2}
+                              placeholder="예) 운영 반영 후 결제 API 오류 발생, v1.4.1로 롤백"
+                              value={rejectReasonDraft}
+                              onChange={(e) => setRejectReasonDraft(e.target.value)}
+                            />
+                            <div className="rejectComposerActions">
+                              <button
+                                type="button"
+                                className="rejectConfirmBtn"
+                                onClick={() => { void rollbackDeployment(rejectReasonDraft); setRejectReasonDraft(''); setRejectOpen(false) }}
+                              >
+                                개발 단계로 롤백
                               </button>
                               <button type="button" className="closeBtn" onClick={() => setRejectOpen(false)}>취소</button>
                             </div>
@@ -5862,6 +6033,7 @@ function nextRoleFor(status: ProjectStatus): Role {
     planning: 'pm',
     development: 'developer',
     qc_security: 'qa',
+    deployment: 'infra',
     completion: 'admin',
   }
   return roleMap[status] ?? 'requester'
@@ -5872,7 +6044,8 @@ function nextActionFor(status: ProjectStatus) {
     dept_review: '승인 의견 취합',
     planning: '기획 문서(SRS+SDS) 작성 후 승인 단계로 이동',
     development: '일정 확정 후 개발 태스크 진행',
-    qc_security: '품질/보안 검사 및 PM 인수 확인',
+    qc_security: '단위·통합·보안 테스트 및 PM 검토',
+    deployment: '인프라 운영 반영 및 smoke test 확인',
     completion: '완료 보고서 작성 및 게시 확인',
   }
   return actionMap[status] ?? '요청 내용 보완'
