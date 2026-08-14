@@ -9492,7 +9492,7 @@ button.approvalPill:hover {
   box-sizing: border-box;
 }
 .stageCardTop { display: flex; flex-direction: column; gap: 2px; }
-.stageCardTop strong { font-size: 16px; font-weight: 800; color: #20242b; line-height: 1.2; }
+.stageCardTop strong { font-size: 14px; font-weight: 800; color: #20242b; line-height: 1.2; }
 .stageCardOwner { font-size: 12px; line-height: 1.35; }
 .stageCardBlock b { display: block; font-size: 12px; font-weight: 800; color: #20242b; margin-bottom: 2px; }
 .stageCardBlock ul { margin: 0; padding-left: 11px; }
