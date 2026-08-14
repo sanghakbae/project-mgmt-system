@@ -188,14 +188,12 @@ export type ActivityLog = {
 
 /**
  * 배포 단계 상태.
- * 검토(staging 검증) 통과 → 인프라가 운영 반영 → smoke test 확인 → 완료 보고.
+ * 검토 통과 → 인프라가 운영 반영 → 완료 보고.
  * 실패 시 개발 단계로 되돌린다(검토 반려와 동일 경로).
  */
 export type DeploymentState = {
-  /** 운영 반영 완료 */
+  /** 운영 반영 완료 — 이 값이 true여야 완료 보고로 진행 */
   released: boolean
-  /** 배포 후 운영 smoke test 통과 */
-  smokeTested: boolean
   releasedAt?: string
   releasedBy?: string
   /** 배포 방식·버전·롤백 계획 메모 */

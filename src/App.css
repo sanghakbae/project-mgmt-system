@@ -1453,8 +1453,8 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   /* 헤더 높이에 맞춰 top 고정이었던 것을 세로 가운데로 */
   top: 50%;
   transform: translateY(-50%);
-  right: -10px;
-  width: 9px;
+  right: -12px;
+  width: 12px;
   height: 2px;
   background: #4b515c;
   z-index: 1;
@@ -1465,7 +1465,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   display: block;
   position: absolute;
   top: 50%;
-  right: -11px;
+  right: -12px;
   width: 0;
   height: 0;
   /* 속이 꽉 찬 삼각형 (선 화살표는 얇아 잘 안 보였음) */
@@ -1625,7 +1625,7 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   content: '';
   position: absolute;
   top: 50%;
-  right: -11px;
+  right: -12px;
   width: 0;
   height: 0;
   border-left: 7px solid #4b515c;
@@ -1642,8 +1642,8 @@ button.statBarRow:hover .statBarName { color: #2b6cf0; }
   /* 헤더 높이(37px)에 고정돼 화살표와 어긋난 짧은 선으로 보였다 → 세로 가운데 */
   top: 50%;
   transform: translateY(-50%);
-  right: -11px;
-  width: 9px;
+  right: -12px;
+  width: 12px;
   height: 2px;
   background: #4b515c;
   z-index: 1;
@@ -3203,7 +3203,7 @@ strong.required {
 .srsReadTable th[scope="row"] {
   width: 168px;
   vertical-align: top;
-  text-align: left;
+  text-align: center;
   padding: 10px 12px;
   background: #f7f9fc;
   border-right: 1px solid #eceef2;
@@ -6330,6 +6330,11 @@ strong.required {
   background: #fff0dc;
 }
 
+.statusPill.deployment {
+  background: #e8f2fb;
+  color: #1f6091;
+}
+
 .statusPill.qc_security {
   color: #6c3aa0;
   background: #f0e4ff;
@@ -9446,10 +9451,10 @@ button.approvalPill:hover {
 /* ─── 시스템 가이드 다이어그램 (drawio 이식) ──────────────────────────────── */
 .guideDiagramLead { font-size: 12px; color: #8a919b; margin: -4px 0 12px; }
 
-/* 6단계 카드 흐름 — 컨테이너 폭에 맞춰 축소 (가로 스크롤 없음) */
+/* 7단계 카드 흐름 — 컨테이너 폭에 맞춰 축소 (개행·가로 스크롤 없음) */
 .stageFlow {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   align-items: stretch;
   gap: 0;
   padding-bottom: 6px;
@@ -9465,21 +9470,21 @@ button.approvalPill:hover {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px 13px;
+  gap: 6px;
+  padding: 8px 9px;
   border: 2px solid;
   border-radius: 8px;
   box-sizing: border-box;
 }
-.stageCardTop { display: flex; flex-direction: column; gap: 3px; }
+.stageCardTop { display: flex; flex-direction: column; gap: 2px; }
 .stageCardTop strong { font-size: 17px; font-weight: 800; color: #20242b; line-height: 1.2; }
 .stageCardOwner { font-size: 12px; line-height: 1.35; }
-.stageCardBlock b { display: block; font-size: 12px; font-weight: 800; color: #20242b; margin-bottom: 3px; }
-.stageCardBlock ul { margin: 0; padding-left: 13px; }
+.stageCardBlock b { display: block; font-size: 12px; font-weight: 800; color: #20242b; margin-bottom: 2px; }
+.stageCardBlock ul { margin: 0; padding-left: 11px; }
 .stageCardBlock li { font-size: 12px; line-height: 1.55; color: #3a414b; }
 .stageFlowArrow {
   position: relative;
-  flex: 0 0 28px;
+  flex: 0 0 20px;
   align-self: center;
   text-align: center;
   font-size: 11px;
@@ -9532,7 +9537,7 @@ button.approvalPill:hover {
 .laneMatrixHead,
 .laneRow {
   display: grid;
-  grid-template-columns: 96px repeat(6, minmax(0, 1fr));
+  grid-template-columns: 88px repeat(7, minmax(0, 1fr));
   gap: 4px;
   align-items: stretch;
 }
@@ -9631,7 +9636,7 @@ button.approvalPill:hover {
   .appShell .guideSplit,
   .appShell .gapGrid { grid-template-columns: 1fr; }
   /* 6단계: 모바일은 2열 그리드로 접고 화살표 숨김 */
-  .appShell .stageFlow { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .appShell .stageFlow { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .appShell .stageCard { min-height: 0; }
   .appShell .stageFlowArrow { display: none; }
   /* 매트릭스: 모바일은 역할별 카드로 세로 전환.

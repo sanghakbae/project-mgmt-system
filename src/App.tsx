@@ -492,7 +492,7 @@ const fullApprovalRoles: Role[] = ['cem', 'developer', 'security', 'infra', 'qa'
 // 않으므로(코드·설정·의존성 점검) 병행 가능. PM은 SRS 대조 검토로 언제든 가능.
 const qcSignoffRoles: QcSignoffRole[] = ['developer', 'qa', 'security', 'pm']
 const emptyQcSignoff: QcSignoffState = { developer: false, qa: false, security: false, pm: false }
-const emptyDeployment: DeploymentState = { released: false, smokeTested: false }
+const emptyDeployment: DeploymentState = { released: false }
 const qcSignoffLabels: Record<QcSignoffRole, string> = {
   developer: '개발',
   qa: 'QA',
@@ -1227,10 +1227,9 @@ function App() {
   // QA 통합테스트는 개발자 단위테스트가 끝나야 시작할 수 있다
   const qaBlockedByUnitTest = !qcSignoff.developer
 
-  // 배포 단계: 운영 반영 → smoke test 순서. 둘 다 통과해야 완료 보고로 진행
+  // 배포 단계: 인프라가 운영 반영을 완료해야 완료 보고로 진행
   const deployment = selected?.deployment ?? emptyDeployment
-  const deployDone = deployment.released && deployment.smokeTested
-  const smokeBlockedByRelease = !deployment.released
+  const deployDone = deployment.released
   const isStepAdvanceBlocked = Boolean(
     selected?.onHold ||
     (selected?.status === 'dept_review' && pendingApprovalRoles.length > 0) ||
@@ -1534,7 +1533,7 @@ function App() {
     if (selected.status === 'planning' && planningRequiredByType[selected.requestType] && !hasSrsDraft) { window.alert('요구사항 정의서(SRS)를 작성해야 다음 단계로 진행할 수 있습니다.'); return }
     if (selected.status === 'development' && planningRequiredByType[selected.requestType] && !hasSdsDraft) { window.alert('설계 명세서(SDS)를 작성해야 검토 단계로 진행할 수 있습니다.'); return }
     if (selected.status === 'qc_security' && !qcAllSignedOff) { window.alert(`검토가 모두 완료되어야 다음 단계로 진행할 수 있습니다.\n대기: ${qcPendingRoles.map((r) => qcSignoffTitles[r]).join(', ')}`); return }
-    if (selected.status === 'deployment' && !deployDone) { window.alert(`운영 반영과 smoke test가 모두 완료되어야 완료 보고로 진행할 수 있습니다.\n대기: ${[!deployment.released && '운영 반영', !deployment.smokeTested && 'smoke test'].filter(Boolean).join(', ')}`); return }
+    if (selected.status === 'deployment' && !deployDone) { window.alert('운영 반영이 완료되어야 완료 보고로 진행할 수 있습니다.'); return }
     if (selected.status === 'completion' && !selected.requesterConfirmed) { window.alert('요청자 확인이 완료되어야 게시할 수 있습니다.'); return }
     // 개발 단계: 미완료 태스크가 있으면 확인
     if (selected.status === 'development' && openTasks.length > 0) {
@@ -1754,39 +1753,23 @@ function App() {
     void notifyGoogleChat('task.status', `검토 ${nextDone ? '완료' : '취소'}: ${label}`, { 프로젝트: selected.title })
   }
 
-  // 배포 단계: 운영 반영 / smoke test 토글 (담당 = 인프라, PM·관리자 대행)
-  async function toggleDeployStep(step: 'released' | 'smokeTested', note?: string) {
+  // 배포 단계: 운영 반영 완료/취소 (담당 = 인프라, PM·관리자 대행)
+  async function toggleDeployStep(note?: string) {
     if (!selected || selected.status !== 'deployment') return
     if (selected.onHold) { window.alert('보류 중에는 배포를 진행할 수 없습니다.'); return }
     const current = selected.deployment ?? emptyDeployment
-    const nextDone = !current[step]
-
-    // 순서 게이트: 운영 반영 전에는 smoke test 불가
-    if (step === 'smokeTested' && nextDone && !current.released) {
-      window.alert('운영 반영이 완료되어야 smoke test를 확인할 수 있습니다.')
-      return
-    }
-    // 운영 반영을 취소하면 smoke test도 함께 취소 (순서 무결성)
-    let cascade = false
-    if (step === 'released' && !nextDone && current.smokeTested) {
-      if (!window.confirm('운영 반영을 취소하면 완료된 smoke test도 함께 취소됩니다. 계속할까요?')) return
-      cascade = true
-    }
-
+    const nextDone = !current.released
     const trimmed = (note ?? '').trim()
     const next: DeploymentState = {
-      ...current,
-      [step]: nextDone,
-      ...(cascade ? { smokeTested: false } : {}),
-      ...(step === 'released' && nextDone ? { releasedAt: logStamp(), releasedBy: authorLabel } : {}),
-      ...(trimmed ? { note: trimmed } : {}),
+      released: nextDone,
+      ...(nextDone ? { releasedAt: logStamp(), releasedBy: authorLabel } : {}),
+      ...(trimmed ? { note: trimmed } : current.note ? { note: current.note } : {}),
     }
-    const label = step === 'released' ? '운영 반영' : 'smoke test'
     await patchSelectedProject(
       { deployment: next },
-      `${label}을(를) ${nextDone ? '완료' : '취소'} 처리했습니다.${cascade ? ' (smoke test도 함께 취소)' : ''}${nextDone && trimmed ? ` (${trimmed})` : ''}`,
+      `운영 반영을 ${nextDone ? '완료' : '취소'} 처리했습니다.${nextDone && trimmed ? ` (${trimmed})` : ''}`,
     )
-    void notifyGoogleChat('project.advance', `배포 ${nextDone ? '완료' : '취소'}: ${label}`, { 프로젝트: selected.title })
+    void notifyGoogleChat('project.advance', `운영 반영 ${nextDone ? '완료' : '취소'}`, { 프로젝트: selected.title })
   }
 
   // 배포 실패 → 개발 단계로 롤백
@@ -3154,7 +3137,7 @@ function App() {
               )
             })()}
 
-            {viewedStep === currentStep && ['dept_review', 'qc_security', 'completion', 'rejected'].includes(viewedStatus) && (
+            {viewedStep === currentStep && ['dept_review', 'qc_security', 'deployment', 'completion', 'rejected'].includes(viewedStatus) && (
             <div className={`actionBanner ${['completion', 'rejected'].includes(viewedStatus) ? 'rowAction' : ''} ${canAct && !selected.onHold ? 'neonHighlight' : ''}`} data-section="현재 단계 액션" data-section-tone="approval">
               <div>
                 <strong>{selected.status === 'dept_review' ? '승인 단계' : selected.status === 'qc_security' ? 'QA·보안·PM 3자 검토' : (canAct ? selected.nextAction : `${roleLabels[role]} 역할은 현재 단계에서 대기 상태입니다.`)}</strong>
@@ -3393,50 +3376,42 @@ function App() {
                 {selected.status === 'deployment' && (
                   <div className="qcReviewBlock">
                     <div className="qcReviewGrid">
-                      {([
-                        { key: 'released' as const, title: '운영 반영', desc: '인프라가 운영 환경에 배포' },
-                        { key: 'smokeTested' as const, title: 'Smoke test', desc: '배포 후 핵심 기능 동작 확인' },
-                      ]).map((step) => {
-                        const done = deployment[step.key]
-                        const blocked = step.key === 'smokeTested' && smokeBlockedByRelease
+                      {(() => {
+                        const done = deployment.released
                         const isMine = role === 'infra' || role === 'pm' || role === 'admin'
                         return (
-                          <div key={step.key} className={`qcReviewCard ${done ? 'done' : blocked ? 'blocked' : 'pending'}`}>
+                          <div className={`qcReviewCard ${done ? 'done' : 'pending'}`}>
                             <div className="qcReviewHead">
-                              <strong>{step.title}</strong>
-                              <span className={`qcReviewBadge ${done ? 'done' : blocked ? 'blocked' : 'pending'}`}>
-                                {done ? '완료' : blocked ? '선행 대기' : '대기'}
-                              </span>
+                              <strong>운영 반영</strong>
+                              <span className={`qcReviewBadge ${done ? 'done' : 'pending'}`}>{done ? '완료' : '대기'}</span>
                             </div>
                             {done ? (
                               <div className="qcReviewBody">
-                                <p className="qcReviewNote">{step.desc}</p>
-                                {step.key === 'released' && deployment.releasedAt && (
+                                <p className="qcReviewNote">{deployment.note?.trim() || '배포 메모 미입력'}</p>
+                                {deployment.releasedAt && (
                                   <small>{deployment.releasedBy ?? ''} · {formatTimestamp(deployment.releasedAt)}</small>
                                 )}
                                 {isMine && (
-                                  <button className="miniButton qcReviewCancel" type="button" onClick={() => void toggleDeployStep(step.key)}>
-                                    취소
+                                  <button className="miniButton qcReviewCancel" type="button" onClick={() => void toggleDeployStep()}>
+                                    반영 취소
                                   </button>
                                 )}
                               </div>
-                            ) : blocked ? (
-                              <p className="qcReviewWait">운영 반영 완료 후 진행</p>
                             ) : isMine && !selected.onHold ? (
                               <div className="qcReviewBody">
                                 <textarea
                                   rows={2}
                                   className="qcReviewInput"
-                                  placeholder={step.key === 'released' ? '배포 방식·버전·롤백 계획 (예: v1.4.2 blue-green, 롤백 태그 v1.4.1)' : 'smoke test 결과 (예: 로그인·검사·리포트 정상)'}
+                                  placeholder="배포 방식·버전·롤백 계획 (예: v1.4.2 blue-green, 롤백 태그 v1.4.1)"
                                   value={deployNoteDraft}
                                   onChange={(e) => setDeployNoteDraft(e.target.value)}
                                 />
                                 <button
                                   className="miniButton approveButton"
                                   type="button"
-                                  onClick={() => { void toggleDeployStep(step.key, deployNoteDraft); setDeployNoteDraft('') }}
+                                  onClick={() => { void toggleDeployStep(deployNoteDraft); setDeployNoteDraft('') }}
                                 >
-                                  {step.title} 완료
+                                  운영 반영 완료
                                 </button>
                               </div>
                             ) : (
@@ -3444,15 +3419,11 @@ function App() {
                             )}
                           </div>
                         )
-                      })}
+                      })()}
                     </div>
                     <span className="approvalGuide">
-                      {deployDone
-                        ? '운영 반영 · smoke test 완료 · 완료 보고로 진행 가능'
-                        : `대기: ${[!deployment.released && '운영 반영', !deployment.smokeTested && 'smoke test'].filter(Boolean).join(', ')}`}
-                      {' · 순서: 운영 반영 → smoke test'}
+                      {deployDone ? '운영 반영 완료 · 완료 보고로 진행 가능' : '인프라가 운영에 반영하면 완료 보고로 진행할 수 있습니다.'}
                     </span>
-                    {deployment.note && <span className="approvalGuide">메모: {deployment.note}</span>}
                     {(role === 'infra' || role === 'pm' || role === 'admin') && !selected.onHold && (
                       <div className="qcRejectArea">
                         <button type="button" className="rejectBtn" onClick={() => setRejectOpen((v) => !v)}>
@@ -4666,7 +4637,7 @@ function AuditLogPanel({ projects }: { projects: Project[] }) {
 }
 
 // 역할×단계 매트릭스의 열 라벨. 모바일에서는 각 셀의 data-stage로도 노출된다.
-const laneStages = ['① 요청', '② 기획', '③ 승인', '④ 개발', '⑤ 검토', '⑥ 완료']
+const laneStages = ['① 요청', '② 기획', '③ 승인', '④ 개발', '⑤ 검토', '⑥ 배포', '⑦ 완료']
 
 // 프로젝트 관리 시스템 가이드 — 워크플로·역할·산출물·화면·KPI 전반 설명
 function SystemGuidePanel() {
@@ -4679,11 +4650,11 @@ function SystemGuidePanel() {
 
       <div className="guideSection">
         <h3>1. 개요</h3>
-        <p>본 시스템은 사내 서비스(카피킬러·프리즘·몬스터 등)의 개선·신규 요청을 <strong>요청 → 기획 → 승인 → 개발 → 검토 → 완료</strong> 6단계로 표준화해 관리합니다. 각 단계마다 책임 주체와 산출물이 정해져 있으며, 모든 상태 변경은 활동 로그로 기록됩니다.</p>
+        <p>본 시스템은 사내 서비스(카피킬러·프리즘·몬스터 등)의 개선·신규 요청을 <strong>요청 → 기획 → 승인 → 개발 → 검토 → 배포 → 완료</strong> 7단계로 표준화해 관리합니다. 각 단계마다 책임 주체와 산출물이 정해져 있으며, 모든 상태 변경은 활동 로그로 기록됩니다.</p>
       </div>
 
       <div className="guideSection">
-        <h3>2. 워크플로 6단계</h3>
+        <h3>2. 워크플로 7단계</h3>
         <div className="guideTableWrap">
           <table className="guideTable">
             <thead><tr><th>단계</th><th>주체</th><th>산출물</th><th>핵심 활동</th></tr></thead>
@@ -4693,6 +4664,7 @@ function SystemGuidePanel() {
               <tr><td><span className="statusPill dept_review">승인</span></td><td>지정 승인자(CEM·개발·정보보호·인프라·QA·특허)</td><td>승인 내역</td><td>역할별 검토·승인, 전원 승인 시 자동 진행</td></tr>
               <tr><td><span className="statusPill development">개발</span></td><td>개발자(리더)</td><td><strong>설계 명세서(SDS)</strong> · 일감(Task)</td><td>설계 작성, 일정 조율, 개발 태스크 수행</td></tr>
               <tr><td><span className="statusPill qc_security">검토</span></td><td>QA · 보안 · PM</td><td>Bug · 취약점 · Change</td><td>SRS·SDS 대조 검증, 3자(QA·보안·PM) 합의</td></tr>
+              <tr><td><span className="statusPill deployment">배포</span></td><td>인프라</td><td>운영 반영 내역</td><td>운영 환경 반영 (실패 시 개발 단계로 롤백)</td></tr>
               <tr><td><span className="statusPill completion">완료</span></td><td>PM / 관리자</td><td>완료 보고</td><td>요청자 확인 후 게시·완료 처리</td></tr>
             </tbody>
           </table>
@@ -4700,7 +4672,7 @@ function SystemGuidePanel() {
       </div>
 
       <div className="guideSection">
-        <h3>2-1. 한눈에 보는 6단계</h3>
+        <h3>2-1. 한눈에 보는 7단계</h3>
         <p className="guideDiagramLead">pms.sanghak.kr · 시스템 가이드 기준</p>
         <div className="stageFlow">
           {[
@@ -4709,7 +4681,8 @@ function SystemGuidePanel() {
             { no: '③', name: '승인', owner: '지정 승인자', tone: 'appr', acts: ['역할별 개별 검토·승인', 'CEM · 개발 · 정보보호', '인프라 · QA · 특허'], out: ['승인 내역'] },
             { no: '④', name: '개발', owner: '개발자 (리더)', tone: 'dev', acts: ['설계 작성', '일정 조율', '개발 태스크 수행'], out: ['설계 명세서 (SDS)', '일감 : Task · Bug · Change'] },
             { no: '⑤', name: '검토', owner: 'QA · 보안 · PM', tone: 'rev', acts: ['SRS · SDS 대조 검증', '3자 합의'], out: ['Bug (QA)', '취약점 (보안)', 'Change (PM)'] },
-            { no: '⑥', name: '완료', owner: 'PM / 관리자', tone: 'done', acts: ['완료 보고 작성', '요청자 확인', '게시 · 완료 처리'], out: ['완료 보고서'] },
+            { no: '⑥', name: '배포', owner: '인프라', tone: 'appr', acts: ['운영 환경 반영', '배포 방식·버전 기록', '실패 시 개발 롤백'], out: ['운영 반영 내역'] },
+            { no: '⑦', name: '완료', owner: 'PM / 관리자', tone: 'done', acts: ['완료 보고 작성', '요청자 확인', '게시 · 완료 처리'], out: ['완료 보고서'] },
           ].map((s, i) => (
             <div key={s.no} className="stageFlowItem">
               <div className={`stageCard tone-${s.tone}`}>
@@ -4739,8 +4712,9 @@ function SystemGuidePanel() {
               <li><b>G2</b> 기획 → 승인 : SRS 작성 완료 필요</li>
               <li><b>G3</b> 승인 → 개발 : 지정 승인자 <strong>전원 승인</strong> → 개발 단계 자동 진행</li>
               <li><b>G4</b> 개발 → 검토 : SDS 작성 완료 필요</li>
-              <li><b>G5</b> 검토 → 완료 : QA · 보안 · PM <strong>3자 합의</strong></li>
-              <li><b>G6</b> 완료(게시) : 요청자 확인 후 처리</li>
+              <li><b>G5</b> 검토 → 배포 : 개발 · QA · 보안 · PM <strong>4자 합의</strong></li>
+              <li><b>G6</b> 배포 → 완료 : 인프라의 <strong>운영 반영 완료</strong></li>
+              <li><b>G7</b> 완료(게시) : 요청자 확인 후 처리</li>
             </ul>
           </div>
           <div className="guideSubBox">
@@ -4767,12 +4741,13 @@ function SystemGuidePanel() {
             ))}
           </div>
           {[
-            { role: '요청자', tone: 'req', cells: [['새 요청 작성'], [], [], [], [], ['요청자 확인']] },
-            { role: 'PM / 기획자', tone: 'plan', cells: [[], ['SRS 작성', '승인 역할 지정'], [], [], ['PM 검토 (Change)'], ['완료 보고 작성']] },
-            { role: '승인자', tone: 'appr', cells: [[], [], ['역할별 검토 · 승인', 'CEM · 개발 · 정보보호', '인프라 · QA · 특허'], [], [], []] },
-            { role: '개발자', tone: 'dev', cells: [[], [], [], ['SDS 작성', '개발 태스크 수행'], [], []] },
-            { role: 'QA · 보안', tone: 'rev', cells: [[], [], [], [], ['QA 검토 (Bug)', '보안 검토 (취약점)', '3자 합의'], []] },
-            { role: '시스템', tone: 'sys', cells: [['요청 접수 · 프로젝트 생성', 'PM 알림'], ['승인 요청 알림'], ['전원 승인 시 개발 단계 자동 진행'], [], [], ['게시 · 완료 처리']] },
+            { role: '요청자', tone: 'req', cells: [['새 요청 작성'], [], [], [], [], [], ['요청자 확인']] },
+            { role: 'PM / 기획자', tone: 'plan', cells: [[], ['SRS 작성', '승인 역할 지정'], [], [], ['PM 검토 (Change)'], [], ['완료 보고 작성']] },
+            { role: '승인자', tone: 'appr', cells: [[], [], ['역할별 검토 · 승인', 'CEM · 개발 · 정보보호', '인프라 · QA · 특허'], [], [], [], []] },
+            { role: '개발자', tone: 'dev', cells: [[], [], [], ['SDS 작성', '개발 태스크 수행'], ['단위테스트'], [], []] },
+            { role: 'QA · 보안', tone: 'rev', cells: [[], [], [], [], ['통합테스트 (Bug)', '보안테스트 (취약점)'], [], []] },
+            { role: '인프라', tone: 'appr', cells: [[], [], [], [], [], ['운영 반영', '롤백 판단'], []] },
+            { role: '시스템', tone: 'sys', cells: [['요청 접수 · 프로젝트 생성', 'PM 알림'], ['승인 요청 알림'], ['전원 승인 시 개발 단계 자동 진행'], [], [], [], ['게시 · 완료 처리']] },
           ].map((row) => (
             <div key={row.role} className={`laneRow lane-${row.tone}`}>
               <span className="laneRole">{row.role}</span>
@@ -4796,7 +4771,8 @@ function SystemGuidePanel() {
             <tbody>
               <tr><td>요청자 / 영업 / 마케팅</td><td>요청 작성·추적</td><td>요청 (본인이 올린 요청은 전 단계 열람)</td></tr>
               <tr><td>PM</td><td>기획(SRS)·일정·검토</td><td>기획, 검토</td></tr>
-              <tr><td>CEM · 인프라 · 특허</td><td>승인</td><td>승인</td></tr>
+              <tr><td>CEM · 특허</td><td>승인</td><td>승인</td></tr>
+              <tr><td>인프라</td><td>승인 · 운영 반영(배포)</td><td>승인, 배포</td></tr>
               <tr><td>개발자</td><td>설계(SDS)·개발</td><td>승인, 개발</td></tr>
               <tr><td>QA</td><td>품질 검토(Bug)</td><td>승인, 검토</td></tr>
               <tr><td>보안</td><td>보안 검토(취약점)</td><td>승인, 검토</td></tr>
@@ -4848,6 +4824,7 @@ function SystemGuidePanel() {
         <ul>
           <li><strong>개발 단계</strong> — Task(작업) · Bug(버그) · Change(변경)</li>
           <li><strong>검토 단계</strong> — Bug(QA) · 취약점(보안) · Change(PM) — 역할별 기본 유형 자동 지정</li>
+          <li><strong>배포 단계</strong> — 운영 반영 내역·롤백 기록 (인프라)</li>
         </ul>
       </div>
 
@@ -4866,7 +4843,8 @@ function SystemGuidePanel() {
           <li>기획 → 승인: <strong>SRS 작성 완료</strong> 필요</li>
           <li>승인 → 개발: <strong>지정 승인자 전원 승인</strong></li>
           <li>개발 → 검토: <strong>SDS 작성 완료</strong> 필요</li>
-          <li>검토 → 완료: <strong>개발·QA·보안·PM 4자 합의</strong> (단위테스트 → 통합테스트 순서, 보안테스트 병행)</li>
+          <li>검토 → 배포: <strong>개발·QA·보안·PM 4자 합의</strong> (단위테스트 → 통합테스트 순서, 보안테스트 병행)</li>
+          <li>배포 → 완료: <strong>인프라의 운영 반영 완료</strong> (실패 시 개발 단계로 롤백)</li>
           <li>검토 → 개발(회귀): <strong>Bug·취약점이 남으면</strong> 개발 단계로 되돌리고 검토 상태 초기화</li>
           <li>승인 반려: 단계를 유지한 채 <strong>보류로 전환</strong> (해제 시 같은 단계에서 재개)</li>
           <li>마감일 확정: <strong>개발 단계 일정 조율</strong>의 완료 예정일로 확정 (KPI 마감 임박 D-5 기준)</li>
