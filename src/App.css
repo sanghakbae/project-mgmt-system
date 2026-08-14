@@ -10751,3 +10751,77 @@ button.approvalPill:hover {
   line-height: 1.5;
   color: #6b7280;
 }
+
+/* ─── 배포 단계 본문 ─────────────────────────────────────────────────────── */
+.deployInfoGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.deployInfoItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid #e1e5eb;
+  border-radius: 8px;
+  background: #fafbfc;
+  min-width: 0;
+}
+.deployInfoItem span { font-size: 12px; color: #6b7280; }
+.deployInfoItem strong { font-size: 13px; font-weight: 800; color: #20242b; }
+
+.deployNoteBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid #e1e5eb;
+  border-radius: 8px;
+  background: #fff;
+  margin-bottom: 12px;
+}
+.deployNoteBlock > span { font-size: 12px; font-weight: 800; color: #4b515c; }
+
+@media (max-width: 768px) {
+  .appShell .deployInfoGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* 산출물 항목 — 클릭 시 해당 단계로 이동 */
+.artifactLink {
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: background 0.14s, border-color 0.14s;
+}
+.artifactLink:hover { border-color: #9aa3af; background: #f5f6fa; }
+.artifactLink:focus-visible { outline: 2px solid rgba(32, 36, 43, 0.3); outline-offset: 2px; }
+
+/* ─── 단계별 필수 입력(진행 조건) 배지 바 ─────────────────────────────── */
+.stageReqBar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid #e1e5eb;
+  border-radius: 8px;
+  background: #fafbfc;
+}
+.stageReqBarLabel { font-size: 12px; font-weight: 800; color: #4b515c; }
+.stageReqBarList { display: flex; flex-wrap: wrap; gap: 5px; }
+.stageReqChip {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1px solid;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.stageReqChip.done { background: #eaf7ef; border-color: #9dd3b2; color: #1c7a45; }
+.stageReqChip.todo { background: #fff8e0; border-color: #d6b656; color: #8a6a10; }

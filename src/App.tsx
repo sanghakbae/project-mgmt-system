@@ -2301,7 +2301,7 @@ function App() {
           </div>
           <div className="brandText">
             <strong>프로젝트 관리 시스템</strong>
-            <span>Workflow PMO</span>
+            
           </div>
         </div>
 
@@ -2735,6 +2735,52 @@ function App() {
               </ol>
             </div>
           )}
+
+          {/* 현재 보고 있는 단계의 필수 입력(진행 조건)과 충족 여부 */}
+          {selected && (() => {
+            const reqs: { label: string; done: boolean }[] =
+              viewedStatus === 'request'
+                ? [
+                    { label: '기본 정보(제목·서비스·담당팀·요청자)', done: Boolean(selected.title && selected.serviceName && selected.ownerTeam && selected.requester) },
+                    { label: '요청 내용', done: Boolean(selected.summary?.trim()) },
+                    { label: '배경/현재 상황', done: Boolean(selected.currentProblem?.trim()) },
+                  ]
+                : viewedStatus === 'planning'
+                ? [
+                    { label: 'SRS 작성 완료', done: (selected.reviewDocs?.srs ?? '').trim().length > 0 },
+                    { label: '승인 필요 역할 지정', done: selectedApprovalState.requiredRoles.length > 0 },
+                  ]
+                : viewedStatus === 'dept_review'
+                ? [{ label: '지정 승인자 전원 승인', done: pendingApprovalRoles.length === 0 }]
+                : viewedStatus === 'development'
+                ? [
+                    { label: 'SDS 작성 완료', done: (selected.reviewDocs?.sds ?? '').trim().length > 0 },
+                    { label: '마감일 확정(일정 조율)', done: Boolean(selected.schedule?.confirmed) },
+                  ]
+                : viewedStatus === 'qc_security'
+                ? qcSignoffRoles.map((r) => ({ label: qcSignoffTitles[r], done: Boolean(selected.qcSignoff?.[r]) }))
+                : viewedStatus === 'deployment'
+                ? [{ label: '운영 반영 완료', done: Boolean(selected.deployment?.released) }]
+                : viewedStatus === 'completion'
+                ? [{ label: '요청자 확인', done: Boolean(selected.requesterConfirmed) }]
+                : []
+            if (reqs.length === 0) return null
+            const remain = reqs.filter((r) => !r.done).length
+            return (
+              <div className="stageReqBar">
+                <span className="stageReqBarLabel">
+                  필수 입력 {remain === 0 ? '· 모두 충족' : `· ${remain}건 미충족`}
+                </span>
+                <div className="stageReqBarList">
+                  {reqs.map((r) => (
+                    <span key={r.label} className={`stageReqChip ${r.done ? 'done' : 'todo'}`}>
+                      {r.done ? '✓' : '•'} {r.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
 
           </div>
 
@@ -3553,6 +3599,58 @@ function App() {
 
 
 
+            {viewedStatus === 'deployment' && (
+            <section className="requirementsPanel numberedSection" data-section="배포" data-section-tone="approval">
+              <div className="panelHeader compact">
+                <h3>배포 정보</h3>
+                <span>인프라가 운영 환경에 반영합니다. 반영 완료 후 완료 보고로 진행합니다.</span>
+              </div>
+
+              <div className="deployInfoGrid">
+                <div className="deployInfoItem">
+                  <span>반영 상태</span>
+                  <strong>{selected.deployment?.released ? '운영 반영 완료' : '반영 대기'}</strong>
+                </div>
+                <div className="deployInfoItem">
+                  <span>반영 담당</span>
+                  <strong>{selected.deployment?.releasedBy || '—'}</strong>
+                </div>
+                <div className="deployInfoItem">
+                  <span>반영 시각</span>
+                  <strong>{selected.deployment?.releasedAt ? formatTimestamp(selected.deployment.releasedAt) : '—'}</strong>
+                </div>
+                <div className="deployInfoItem">
+                  <span>마감일</span>
+                  <strong>{formatDate(selected.dueDate)}</strong>
+                </div>
+              </div>
+
+              <div className="deployNoteBlock">
+                <span>배포 방식 · 버전 · 롤백 계획</span>
+                <RichTextView html={selected.deployment?.note ?? ''} fallback="아직 입력되지 않았습니다. 운영 반영 시 함께 기록됩니다." />
+              </div>
+
+              <div className="panelHeader compact">
+                <h3>배포 전 검토 결과</h3>
+                <span>검토 단계 4자 합의 내역입니다.</span>
+              </div>
+              <div className="artifactList">
+                {qcSignoffRoles.map((r) => (
+                  <Artifact key={r} label={qcSignoffTitles[r]} state={selected.qcSignoff?.[r] ? '완료' : '미완'} />
+                ))}
+              </div>
+
+              <div className="panelHeader compact">
+                <h3>산출물</h3>
+              </div>
+              <div className="artifactList">
+                <Artifact label="요구사항 정의서(SRS)" state={(selected.reviewDocs?.srs ?? '').trim().length > 0 ? '완료' : '대기'} onOpen={() => setViewedStageIndex(selectedWorkflow.findIndex((w) => w.status === 'planning'))} />
+                <Artifact label="설계 명세서(SDS)" state={(selected.reviewDocs?.sds ?? '').trim().length > 0 ? '완료' : '대기'} onOpen={() => setViewedStageIndex(selectedWorkflow.findIndex((w) => w.status === 'development'))} />
+                <Artifact label="운영 반영 내역" state={selected.deployment?.released ? '완료' : '대기'} onOpen={() => setViewedStageIndex(selectedWorkflow.findIndex((w) => w.status === 'deployment'))} />
+              </div>
+            </section>
+            )}
+
             {(viewedStatus === 'completion') && (
             <div className="bottomGrid">
               <section className="infoPanel">
@@ -3560,10 +3658,10 @@ function App() {
                   <h3><FileText size={15} style={{verticalAlign:'middle', marginRight:5}} />산출물</h3>
                 </div>
                 <div className="artifactList">
-                  <Artifact label="요청 승인 기록" state="승인됨" />
-                  <Artifact label="SRS" state={(selected.reviewDocs?.srs ?? '').trim().length > 0 ? '완료' : '대기'} />
-                  <Artifact label="SDS" state={(selected.reviewDocs?.sds ?? '').trim().length > 0 ? '완료' : '대기'} />
-                  <Artifact label="완료 보고서" state={['completion'].includes(selected.status) ? '게시 준비' : '대기'} />
+                  <Artifact label="요청 승인 기록" state="승인됨" onOpen={() => setViewedStageIndex(selectedWorkflow.findIndex((w) => w.status === 'dept_review'))} />
+                  <Artifact label="SRS" state={(selected.reviewDocs?.srs ?? '').trim().length > 0 ? '완료' : '대기'} onOpen={() => setViewedStageIndex(selectedWorkflow.findIndex((w) => w.status === 'planning'))} />
+                  <Artifact label="SDS" state={(selected.reviewDocs?.sds ?? '').trim().length > 0 ? '완료' : '대기'} onOpen={() => setViewedStageIndex(selectedWorkflow.findIndex((w) => w.status === 'development'))} />
+                  <Artifact label="완료 보고서" state={['completion'].includes(selected.status) ? '게시 준비' : '대기'} onOpen={() => setViewedStageIndex(selectedWorkflow.findIndex((w) => w.status === 'completion'))} />
                 </div>
               </section>
 
@@ -3745,7 +3843,7 @@ function AuthGate({ onAuthenticated }: { onAuthenticated: (account: Account) => 
           <div className="authBrandMark"><ClipboardList size={22} /></div>
           <div>
             <strong>프로젝트 관리 시스템</strong>
-            <span>Workflow PMO</span>
+            
           </div>
         </div>
 
@@ -5997,16 +6095,27 @@ function Metric({ icon, label, value, tone, onClick }: { icon: ReactNode; label:
   )
 }
 
-function Artifact({ label, state }: { label: string; state: string }) {
+function Artifact({ label, state, onOpen }: { label: string; state: string; onOpen?: () => void }) {
   const doneStates = ['승인됨', '게시 준비', '완료', '게시됨']
   const isDone = doneStates.includes(state)
   const isPending = state === '대기'
+  const cls = `artifact ${isDone ? 'done' : isPending ? 'pending' : 'progress'}`
+  // onOpen이 있으면 실제 이동 가능한 버튼으로 렌더 (기존엔 화살표만 있고 동작하지 않았음)
+  if (onOpen) {
+    return (
+      <button type="button" className={`${cls} artifactLink`} onClick={onOpen} title={`${label} 단계로 이동`}>
+        <FileText size={16} />
+        <span>{label}</span>
+        <strong>{isDone ? `✓ ${state}` : state}</strong>
+        <ChevronRight size={15} />
+      </button>
+    )
+  }
   return (
-    <div className={`artifact ${isDone ? 'done' : isPending ? 'pending' : 'progress'}`}>
+    <div className={cls}>
       <FileText size={16} />
       <span>{label}</span>
       <strong>{isDone ? `✓ ${state}` : state}</strong>
-      <ChevronRight size={15} />
     </div>
   )
 }
