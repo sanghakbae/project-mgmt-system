@@ -6064,7 +6064,7 @@ strong.required {
 }
 
 .requestPanel .primaryButton {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .requestForm input:focus,
@@ -6705,15 +6705,17 @@ button.approvalPill:hover {
 }
 
 .primaryButton {
-  min-height: 42px;
-  padding: 0 16px;
+  /* 전 화면 공통 규격 — '단계 진행' 버튼 기준 (h32 / 13px / 0 14px / radius 8) */
+  min-height: 32px;
+  padding: 0 14px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   color: #fff;
   border-color: #d9271e;
   background: #d9271e;
-  font-size: 12px;
+  border-radius: 8px;
+  font-size: 13px;
 }
 
 .primaryButton:disabled {
@@ -7313,10 +7315,11 @@ button.approvalPill:hover {
 .requirementsPanel span,
 .requirementsPanel input,
 .requirementsPanel textarea,
-.requirementsPanel select,
-.requirementsPanel button {
+.requirementsPanel select {
   font-size: 12px;
 }
+/* 버튼은 전역 규격(.primaryButton / .miniButton)을 따르도록 예외에서 제외 —
+   이 규칙이 '문서 저장'만 12px로 만들어 '단계 진행'(13px)과 어긋났다 */
 
 .requirementsPanel .panelHeader span {
   color: #7b818b;
