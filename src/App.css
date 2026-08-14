@@ -7584,14 +7584,10 @@ button.approvalPill:hover {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .kanbanColumn:nth-child(3)::after,
-  .kanbanColumn:nth-child(3)::before,
-  .kanbanColumn:nth-child(6)::after,
-  .kanbanColumn:nth-child(6)::before,
-  .kanbanColumn:nth-child(9)::after,
-  .kanbanColumn:nth-child(9)::before,
-  .kanbanColumn:nth-child(10)::after,
-  .kanbanColumn:nth-child(10)::before {
+  /* 모바일은 단계를 세로로 쌓으므로 가로 커넥터를 모두 숨긴다
+     (기존 3/6/9/10번째 기준은 6단계·3열 시절 값이라 7단계에서 어긋났다) */
+  .kanbanColumn::after,
+  .kanbanColumn::before {
     display: none;
   }
 

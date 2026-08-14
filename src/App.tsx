@@ -1198,6 +1198,12 @@ function App() {
   )
   // 클릭으로 보고 있는 단계 (null이면 현재 단계와 동일)
   const viewedStep = viewedStageIndex ?? currentStep
+  // 산출물 → 단계 이동. selectedWorkflow는 qc_security를 제외할 수 있어
+  // findIndex가 -1이 될 수 있으므로 존재할 때만 이동한다.
+  const openStage = (status: ProjectStatus) => {
+    const idx = selectedWorkflow.findIndex((w) => w.status === status)
+    if (idx >= 0) setViewedStageIndex(idx)
+  }
   const viewedStatus: ProjectStatus = selectedWorkflow[viewedStep]?.status ?? (selected?.status ?? 'request')
   // 프로젝트가 바뀌면 viewedStageIndex 초기화
   useEffect(() => {
@@ -3644,9 +3650,9 @@ function App() {
                 <h3>산출물</h3>
               </div>
               <div className="artifactList">
-                <Artifact label="요구사항 정의서(SRS)" state={(selected.reviewDocs?.srs ?? '').trim().length > 0 ? '완료' : '대기'} onOpen={() => setViewedStageIndex(selectedWorkflow.findIndex((w) => w.status === 'planning'))} />
-                <Artifact label="설계 명세서(SDS)" state={(selected.reviewDocs?.sds ?? '').trim().length > 0 ? '완료' : '대기'} onOpen={() => setViewedStageIndex(selectedWorkflow.findIndex((w) => w.status === 'development'))} />
-                <Artifact label="운영 반영 내역" state={selected.deployment?.released ? '완료' : '대기'} onOpen={() => setViewedStageIndex(selectedWorkflow.findIndex((w) => w.status === 'deployment'))} />
+                <Artifact label="요구사항 정의서(SRS)" state={(selected.reviewDocs?.srs ?? '').trim().length > 0 ? '완료' : '대기'} onOpen={() => openStage('planning')} />
+                <Artifact label="설계 명세서(SDS)" state={(selected.reviewDocs?.sds ?? '').trim().length > 0 ? '완료' : '대기'} onOpen={() => openStage('development')} />
+                <Artifact label="운영 반영 내역" state={selected.deployment?.released ? '완료' : '대기'} onOpen={() => openStage('deployment')} />
               </div>
             </section>
             )}
@@ -3658,10 +3664,10 @@ function App() {
                   <h3><FileText size={15} style={{verticalAlign:'middle', marginRight:5}} />산출물</h3>
                 </div>
                 <div className="artifactList">
-                  <Artifact label="요청 승인 기록" state="승인됨" onOpen={() => setViewedStageIndex(selectedWorkflow.findIndex((w) => w.status === 'dept_review'))} />
-                  <Artifact label="SRS" state={(selected.reviewDocs?.srs ?? '').trim().length > 0 ? '완료' : '대기'} onOpen={() => setViewedStageIndex(selectedWorkflow.findIndex((w) => w.status === 'planning'))} />
-                  <Artifact label="SDS" state={(selected.reviewDocs?.sds ?? '').trim().length > 0 ? '완료' : '대기'} onOpen={() => setViewedStageIndex(selectedWorkflow.findIndex((w) => w.status === 'development'))} />
-                  <Artifact label="완료 보고서" state={['completion'].includes(selected.status) ? '게시 준비' : '대기'} onOpen={() => setViewedStageIndex(selectedWorkflow.findIndex((w) => w.status === 'completion'))} />
+                  <Artifact label="요청 승인 기록" state="승인됨" onOpen={() => openStage('dept_review')} />
+                  <Artifact label="SRS" state={(selected.reviewDocs?.srs ?? '').trim().length > 0 ? '완료' : '대기'} onOpen={() => openStage('planning')} />
+                  <Artifact label="SDS" state={(selected.reviewDocs?.sds ?? '').trim().length > 0 ? '완료' : '대기'} onOpen={() => openStage('development')} />
+                  <Artifact label="완료 보고서" state={['completion'].includes(selected.status) ? '게시 준비' : '대기'} onOpen={() => openStage('completion')} />
                 </div>
               </section>
 
