@@ -9511,39 +9511,27 @@ button.approvalPill:hover {
 }
 .stageCardBlock li { font-size: 12px; line-height: 1.55; color: #3a414b; }
 .stageFlowArrow {
-  position: relative;
-  flex: 0 0 26px;
+  flex: 0 0 24px;
   align-self: center;
-  /* G 라벨을 선 위로 확실히 띄운다 (기존엔 선과 겹쳤음) */
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  height: 30px;
+  gap: 2px;
   font-size: 10px;
   font-weight: 800;
-  color: #4b515c;
+  color: #6b7280;
   line-height: 1;
 }
-/* 라벨 아래에 선 + 삼각형을 별도 트랙으로 배치 */
-.stageFlowArrow::before {
-  content: '';
-  display: block;
-  width: 100%;
-  height: 2px;
-  background: #6b7280;
-}
+/* 긴 연결선은 카드 본문 높이와 겹쳐 보이므로 삼각형만 둔다 */
 .stageFlowArrow::after {
   content: '';
-  position: absolute;
-  right: -1px;
-  bottom: 0;
+  display: block;
   width: 0;
   height: 0;
-  border-left: 6px solid #6b7280;
-  border-top: 4px solid transparent;
-  border-bottom: 4px solid transparent;
+  border-left: 7px solid #6b7280;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
 }
 
 .stageCard.tone-req  { background: #eaf2fd; border-color: #6c8ebf; }

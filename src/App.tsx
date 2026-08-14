@@ -3140,7 +3140,7 @@ function App() {
             {viewedStep === currentStep && ['dept_review', 'qc_security', 'deployment', 'completion', 'rejected'].includes(viewedStatus) && (
             <div className={`actionBanner ${['completion', 'rejected'].includes(viewedStatus) ? 'rowAction' : ''} ${canAct && !selected.onHold ? 'neonHighlight' : ''}`} data-section="현재 단계 액션" data-section-tone="approval">
               <div>
-                <strong>{selected.status === 'dept_review' ? '승인 단계' : selected.status === 'qc_security' ? 'QA·보안·PM 3자 검토' : (canAct ? selected.nextAction : `${roleLabels[role]} 역할은 현재 단계에서 대기 상태입니다.`)}</strong>
+                <strong>{selected.status === 'dept_review' ? '승인 단계' : selected.status === 'qc_security' ? '개발·QA·보안·PM 4자 검토' : selected.status === 'deployment' ? '배포 (운영 반영)' : (canAct ? selected.nextAction : `${roleLabels[role]} 역할은 현재 단계에서 대기 상태입니다.`)}</strong>
                 <span>담당: {selected.status === 'qc_security' ? 'QA · 보안 · PM' : roleLabels[selected.assigneeRole]} · 마감 {formatDate(selected.dueDate)}</span>
                 {selected.status === 'dept_review' && (
                   <div className="approvalGrid" style={{ ['--cols' as string]: selectedApprovalState.requiredRoles.length }}>
