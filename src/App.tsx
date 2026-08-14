@@ -4767,7 +4767,7 @@ function SystemGuidePanel() {
               <tr><td><span className="statusPill planning">기획</span></td><td>PM / 기획자</td><td><strong>요구사항 정의서(SRS)</strong></td><td>요구사항 12개 항목 작성, 승인 필요 역할 지정</td></tr>
               <tr><td><span className="statusPill dept_review">승인</span></td><td>지정 승인자(CEM·개발·정보보호·인프라·QA·특허)</td><td>승인 내역</td><td>역할별 검토·승인, 전원 승인 시 자동 진행</td></tr>
               <tr><td><span className="statusPill development">개발</span></td><td>개발자(리더)</td><td><strong>설계 명세서(SDS)</strong> · 일감(Task)</td><td>설계 작성, 일정 조율, 개발 태스크 수행</td></tr>
-              <tr><td><span className="statusPill qc_security">검토</span></td><td>QA · 보안 · PM</td><td>Bug · 취약점 · Change</td><td>SRS·SDS 대조 검증, 3자(QA·보안·PM) 합의</td></tr>
+              <tr><td><span className="statusPill qc_security">검토</span></td><td>개발 · QA · 보안 · PM</td><td>단위·통합·보안 테스트 결과 · Bug · 취약점 · Change</td><td>단위테스트 → 통합테스트(보안테스트 병행), SRS·SDS 대조 검증, 4자 합의</td></tr>
               <tr><td><span className="statusPill deployment">배포</span></td><td>인프라</td><td>운영 반영 내역</td><td>운영 환경 반영 (실패 시 개발 단계로 롤백)</td></tr>
               <tr><td><span className="statusPill completion">완료</span></td><td>PM / 관리자</td><td>완료 보고</td><td>요청자 확인 후 게시·완료 처리</td></tr>
             </tbody>
@@ -4852,7 +4852,7 @@ function SystemGuidePanel() {
           </div>
           {[
             { role: '요청자', tone: 'req', cells: [['새 요청 작성'], [], [], [], [], [], ['요청자 확인']] },
-            { role: 'PM / 기획자', tone: 'plan', cells: [[], ['SRS 작성', '승인 역할 지정'], [], [], ['PM 검토 (Change)'], [], ['완료 보고 작성']] },
+            { role: 'PM / 기획자', tone: 'plan', cells: [[], ['SRS 작성', '승인 역할 지정'], [], [], ['PM 검토 (SRS 대조)'], [], ['완료 보고 작성']] },
             { role: '승인자', tone: 'appr', cells: [[], [], ['역할별 검토 · 승인', 'CEM · 개발 · 정보보호', '인프라 · QA · 특허'], [], [], [], []] },
             { role: '개발자', tone: 'dev', cells: [[], [], [], ['SDS 작성', '개발 태스크 수행'], ['단위테스트'], [], []] },
             { role: 'QA · 보안', tone: 'rev', cells: [[], [], [], [], ['통합테스트 (Bug)', '보안테스트 (취약점)'], [], []] },
@@ -4880,13 +4880,13 @@ function SystemGuidePanel() {
             <thead><tr><th>역할</th><th>담당</th><th>처리 단계</th></tr></thead>
             <tbody>
               <tr><td>요청자 / 영업 / 마케팅</td><td>요청 작성·추적</td><td>요청 (본인이 올린 요청은 전 단계 열람)</td></tr>
-              <tr><td>PM</td><td>기획(SRS)·일정·검토</td><td>기획, 검토</td></tr>
+              <tr><td>PM</td><td>기획(SRS)·일정·검토·완료 보고</td><td>기획, 검토, 완료 (배포 대행 가능)</td></tr>
               <tr><td>CEM · 특허</td><td>승인</td><td>승인</td></tr>
               <tr><td>인프라</td><td>승인 · 운영 반영(배포)</td><td>승인, 배포</td></tr>
-              <tr><td>개발자</td><td>설계(SDS)·개발</td><td>승인, 개발</td></tr>
-              <tr><td>QA</td><td>품질 검토(Bug)</td><td>승인, 검토</td></tr>
-              <tr><td>보안</td><td>보안 검토(취약점)</td><td>승인, 검토</td></tr>
-              <tr><td>관리자</td><td>전체 열람·운영</td><td>모든 프로젝트 열람(직접 처리 없음)</td></tr>
+              <tr><td>개발자</td><td>설계(SDS)·개발·단위테스트</td><td>승인, 개발, 검토</td></tr>
+              <tr><td>QA</td><td>통합테스트(Bug)</td><td>승인, 검토</td></tr>
+              <tr><td>보안</td><td>보안테스트(취약점)</td><td>승인, 검토</td></tr>
+              <tr><td>관리자</td><td>전체 열람·운영·역할 대행</td><td>모든 단계 (필요 시 각 역할을 대행해 처리)</td></tr>
             </tbody>
           </table>
         </div>
@@ -4899,6 +4899,8 @@ function SystemGuidePanel() {
           <li><strong>요구사항 정의서(SRS)</strong> — 기획 단계에서 PM이 작성. 개요·요약·배경·목표·목표가 아닌 것·이외 고려사항·요구사항 상세·설계 고려사항·다국어/모바일·개발 가이드라인·리스크·참고자료 12개 항목.</li>
           <li><strong>설계 명세서(SDS)</strong> — 개발 단계에서 개발(리더)이 작성. 아키텍처·구성요소·데이터모델·API·처리흐름·보안·성능·배포·테스트 전략.</li>
           <li><strong>일감(Task/Bug/Change/취약점)</strong> — 개발·검토 단계에서 등록. 상태(대기·진행·보류·완료) 관리, 댓글·첨부 지원.</li>
+          <li><strong>운영 반영 내역</strong> — 배포 단계에서 인프라가 기록. 배포 방식·버전·롤백 계획과 반영 담당자·시각.</li>
+          <li><strong>완료 보고서</strong> — 완료 단계에서 PM·관리자가 작성. 요청자 확인 후 게시.</li>
         </ul>
       </div>
 
