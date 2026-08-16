@@ -1336,7 +1336,7 @@ function App() {
         id: crypto.randomUUID(),
         at: logStamp(),
         actor: authorLabel,
-        message: `${authorLabel}이(가) 기획 문서(SRS+SDS)를 업데이트했습니다.`,
+        message: `${authorLabel}이(가) 기획 문서를 업데이트했습니다.`,
         meta: { reviewDocs: currentReviewDocsDraft },
       },
       ...selected.logs,
@@ -2819,7 +2819,7 @@ function App() {
               </div>
             </section>
             ) : (
-            <section className={`requirementsPanel numberedSection sectionSrsSds ${['pm', 'requester'].includes(role) && !selected.docsLocked && selected.status === 'planning' ? 'neonHighlight' : ''}`} data-section="기획 (SRS+SDS)" data-section-tone="planning">
+            <section className={`requirementsPanel numberedSection sectionSrsSds ${['pm', 'requester'].includes(role) && !selected.docsLocked && selected.status === 'planning' ? 'neonHighlight' : ''}`} data-section="기획 (SRS)" data-section-tone="planning">
               <div className="panelHeader compact">
                 <h3>기획 문서 (요구사항 정의서 · SRS)</h3>
                 <span>
@@ -6143,7 +6143,7 @@ function nextRoleFor(status: ProjectStatus): Role {
 function nextActionFor(status: ProjectStatus) {
   const actionMap: Partial<Record<ProjectStatus, string>> = {
     dept_review: '승인 의견 취합',
-    planning: '기획 문서(SRS+SDS) 작성 후 승인 단계로 이동',
+    planning: '요구사항 정의서(SRS) 작성 · 승인 필요 역할 지정 후 승인 단계로 이동',
     development: '일정 확정 후 개발 태스크 진행',
     qc_security: '단위·통합·보안 테스트 및 PM 검토',
     deployment: '인프라 운영 반영 및 smoke test 확인',

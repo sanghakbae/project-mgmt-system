@@ -145,7 +145,7 @@ export function mapProjectRow(row: ProjectRow): Project {
   const comments = row.logs?.find((log) => log.meta?.comments)?.meta?.comments ?? []
   // 기존 데이터에는 developer(단위테스트) 필드가 없으므로 기본값과 병합해 보정한다
   const storedQcSignoff = row.logs?.find((log) => log.meta?.qcSignoff)?.meta?.qcSignoff
-  const deployment = row.logs?.find((log) => log.meta?.deployment)?.meta?.deployment ?? { released: false, smokeTested: false }
+  const deployment = row.logs?.find((log) => log.meta?.deployment)?.meta?.deployment ?? { released: false }
   const qcSignoff: QcSignoffState = {
     developer: false,
     qa: false,
@@ -179,8 +179,14 @@ export function mapProjectRow(row: ProjectRow): Project {
         : legacyRaw === 'published'
           ? 'completion'
           : (legacyRaw as Project['status']))
-  const docsGatedStatuses: Project['status'][] = ['dept_review', 'development', 'qc_security', 'deployment', 'completion']
+  // 승인 단계는 SRS만 있으면 유지된다 (SDS는 개발 단계 산출물).
+  // 개발 이후 단계는 SRS+SDS 둘 다 필요.
+  const srsGatedStatuses: Project['status'][] = ['dept_review']
+  const docsGatedStatuses: Project['status'][] = ['development', 'qc_security', 'deployment', 'completion']
   let normalizedStatus: Project['status'] = legacyMappedStatus
+  if (planningRequiredByType[requestType] && srsGatedStatuses.includes(legacyMappedStatus) && !hasSrs) {
+    normalizedStatus = 'planning'
+  }
   if (planningRequiredByType[requestType] && docsGatedStatuses.includes(legacyMappedStatus) && !hasReviewDocs) {
     normalizedStatus = 'planning'
   }
@@ -210,7 +216,7 @@ export function mapProjectRow(row: ProjectRow): Project {
     risk: row.risk,
     progress: row.progress,
     nextAction: normalizedStatus !== legacyMappedStatus
-      ? 'PM이 기획 문서(SRS+SDS)를 등록해야 다음 단계로 진행할 수 있습니다.'
+      ? '요구사항 정의서(SRS)와 설계 명세서(SDS)가 있어야 이 단계를 유지할 수 있습니다. 기획 단계에서 SRS부터 작성해 주세요.'
       : row.next_action,
     assigneeRole: normalizedStatus !== legacyMappedStatus ? 'pm' : normalizeAssigneeRole(row.assignee_role),
     workflowConfig,
