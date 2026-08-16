@@ -51,7 +51,7 @@ type DemoSeed = {
 // (단계를 되돌릴 때 진행률을 그 단계 기준으로 되돌리는 데도 사용 — stageBaselineProgress)
 const stageDefaults: Record<ProjectStatus, { progress: number; assignee: Project['assigneeRole']; approved: Role[]; nextAction: string }> = {
   request: { progress: 10, assignee: 'requester', approved: [], nextAction: 'PM이 요청 내용을 검토하고 기획 단계로 진행합니다.' },
-  planning: { progress: 32, assignee: 'pm', approved: [], nextAction: 'PM이 요구사항 정의서(SRS)를 작성하고 승인 필요 역할을 지정합니다.' },
+  planning: { progress: 32, assignee: 'pm', approved: [], nextAction: 'PM이 요구사항 정의서(SRS)를 작성하고 승인 필요 역할을 지정하였습니다.' },
   dept_review: { progress: 46, assignee: 'pm', approved: ['cem', 'developer'], nextAction: '승인 역할 전원의 확인을 기다리고 있습니다.' },
   development: { progress: 66, assignee: 'developer', approved: fullRoles, nextAction: '일정 조율 후 개발 태스크를 진행합니다.' },
   qc_security: { progress: 78, assignee: 'qa', approved: fullRoles, nextAction: '개발·QA·보안·PM 4자 검토를 진행합니다.' },
