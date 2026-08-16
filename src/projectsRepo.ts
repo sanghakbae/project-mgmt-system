@@ -179,10 +179,13 @@ export function mapProjectRow(row: ProjectRow): Project {
         : legacyRaw === 'published'
           ? 'completion'
           : (legacyRaw as Project['status']))
-  // 승인 단계는 SRS만 있으면 유지된다 (SDS는 개발 단계 산출물).
-  // 개발 이후 단계는 SRS+SDS 둘 다 필요.
-  const srsGatedStatuses: Project['status'][] = ['dept_review']
-  const docsGatedStatuses: Project['status'][] = ['development', 'qc_security', 'deployment', 'completion']
+  // 문서 게이트는 "그 단계에 들어가기 위해 이미 있어야 하는 문서" 기준이다.
+  // - 승인·개발: SRS만 필요 (SDS는 개발 단계에서 '작성 중'이므로 요구하면 안 됨)
+  // - 검토 이후: SRS+SDS 둘 다 필요
+  // development를 SDS 게이트에 두면, 승인→개발로 막 넘어온 프로젝트가
+  // SDS가 아직 없다는 이유로 기획 단계까지 되밀린다.
+  const srsGatedStatuses: Project['status'][] = ['dept_review', 'development']
+  const docsGatedStatuses: Project['status'][] = ['qc_security', 'deployment', 'completion']
   let normalizedStatus: Project['status'] = legacyMappedStatus
   if (planningRequiredByType[requestType] && srsGatedStatuses.includes(legacyMappedStatus) && !hasSrs) {
     normalizedStatus = 'planning'
