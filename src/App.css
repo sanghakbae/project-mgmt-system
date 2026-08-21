@@ -10830,3 +10830,40 @@ button.approvalPill:hover {
 .cardMeta > .requestTypePill {
   min-width: 0 !important;
 }
+
+/* ─── 감사 로그: 프로젝트 변경 열 확장 ──────────────────────────────────── */
+/* 변경 내용 열이 남은 폭을 전부 먹어 텅 비어 보였다 → 열 폭 재배분 */
+.auditCode { white-space: nowrap; text-align: center; width: 1%; color: #6b7280; font-variant-numeric: tabular-nums; }
+.auditTable td .serviceBadge { display: inline-block; }
+.auditMessage { max-width: 640px; white-space: normal; }
+
+/* 변경 유형 배지 (메시지 패턴으로 분류) */
+.auditKind {
+  display: inline-block;
+  min-width: 38px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.auditKind.kind-stage    { background: #eef2ff; border-color: #b9c4f0; color: #3b4da8; }
+.auditKind.kind-approval { background: #fdf1e0; border-color: #e2c98d; color: #8a6a10; }
+.auditKind.kind-review   { background: #fbeaea; border-color: #eab6b4; color: #a3312c; }
+.auditKind.kind-deploy   { background: #eaf7ef; border-color: #9dd3b2; color: #1c7a45; }
+.auditKind.kind-hold     { background: #fff8e0; border-color: #d6b656; color: #8a6a10; }
+.auditKind.kind-doc      { background: #f0e9f5; border-color: #c3b0d0; color: #6d4f84; }
+.auditKind.kind-task     { background: #e8f2fb; border-color: #a9cbe6; color: #1f6091; }
+.auditKind.kind-schedule { background: #e9f5e6; border-color: #b6d8a8; color: #4d7c40; }
+.auditKind.kind-etc      { background: #f3f4f6; border-color: #d2d7df; color: #4b515c; }
+
+@media (max-width: 768px) {
+  /* 모바일: 코드·서비스 열은 숨겨 가독성 확보 */
+  .appShell .auditTable thead th:nth-child(3),
+  .appShell .auditTable thead th:nth-child(4),
+  .appShell .auditTable tbody td:nth-child(3),
+  .appShell .auditTable tbody td:nth-child(4) { display: none; }
+  .appShell .auditMessage { max-width: none; }
+}

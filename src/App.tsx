@@ -4576,11 +4576,35 @@ function AuditLogPanel({ projects }: { projects: Project[] }) {
   }, [tab])
 
   // 프로젝트 변경 로그: 모든 프로젝트의 logs를 평탄화 + 시간 역순
+  // 변경 내용 문구로 유형을 분류 (로그에 별도 필드가 없어 메시지 패턴으로 판정)
+  const classifyLog = (msg: string): { key: string; label: string } => {
+    if (/단계로 (진행|이동|되돌|롤백)|자동 진행/.test(msg)) return { key: 'stage', label: '단계' }
+    if (/승인|반려/.test(msg)) return { key: 'approval', label: '승인' }
+    if (/테스트|검토/.test(msg)) return { key: 'review', label: '검토' }
+    if (/운영 반영|배포|게시/.test(msg)) return { key: 'deploy', label: '배포' }
+    if (/보류/.test(msg)) return { key: 'hold', label: '보류' }
+    if (/문서|SRS|SDS|요구사항|설계/.test(msg)) return { key: 'doc', label: '문서' }
+    if (/일감|태스크|댓글|문의|답변/.test(msg)) return { key: 'task', label: '일감' }
+    if (/일정|마감일/.test(msg)) return { key: 'schedule', label: '일정' }
+    return { key: 'etc', label: '기타' }
+  }
+
   const changeLogs = useMemo(() => {
-    const all: Array<{ projectId: string; projectTitle: string; log: (typeof projects)[0]['logs'][0] }> = []
+    const all: Array<{
+      projectId: string; projectTitle: string; projectCode: string; serviceName: string
+      kind: { key: string; label: string }
+      log: (typeof projects)[0]['logs'][0]
+    }> = []
     for (const p of projects) {
       for (const log of (p.logs ?? [])) {
-        all.push({ projectId: p.id, projectTitle: p.title, log })
+        all.push({
+          projectId: p.id,
+          projectTitle: p.title,
+          projectCode: p.code,
+          serviceName: p.serviceName,
+          kind: classifyLog(log.message ?? ''),
+          log,
+        })
       }
     }
     all.sort((a, b) => b.log.at.localeCompare(a.log.at))
@@ -4593,6 +4617,8 @@ function AuditLogPanel({ projects }: { projects: Project[] }) {
     return changeLogs.filter(
       (item) =>
         item.projectTitle.toLowerCase().includes(q) ||
+        item.projectCode.toLowerCase().includes(q) ||
+        item.serviceName.toLowerCase().includes(q) ||
         item.log.actor.toLowerCase().includes(q) ||
         item.log.message.toLowerCase().includes(q),
     )
@@ -4615,11 +4641,14 @@ function AuditLogPanel({ projects }: { projects: Project[] }) {
   function exportCsv() {
     const isChanges = tab === 'changes'
     const headers = isChanges
-      ? ['일시', '프로젝트', '담당자', '변경 내용']
+      ? ['일시', '유형', '코드', '서비스', '프로젝트', '담당자', '변경 내용']
       : ['일시', '사용자', '역할', '유형', '상세']
     const rows = isChanges
       ? filteredChanges.map((item) => [
           item.log.at,
+          item.kind.label,
+          item.projectCode,
+          item.serviceName,
           item.projectTitle,
           item.log.actor,
           item.log.message,
@@ -4681,15 +4710,21 @@ function AuditLogPanel({ projects }: { projects: Project[] }) {
                 <thead>
                   <tr>
                     <th>일시</th>
+                    <th>유형</th>
+                    <th>코드</th>
+                    <th>서비스</th>
                     <th>프로젝트</th>
                     <th>담당자</th>
                     <th>변경 내용</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredChanges.map(({ projectId, projectTitle, log }) => (
+                  {filteredChanges.map(({ projectId, projectTitle, projectCode, serviceName, kind, log }) => (
                     <tr key={`${projectId}-${log.id}`}>
-                      <td className="auditTime">{formatAt(log.at)}</td>
+                      <td className="auditTime" title={log.at}>{formatAt(log.at)}</td>
+                      <td><span className={`auditKind kind-${kind.key}`}>{kind.label}</span></td>
+                      <td className="auditCode">{projectCode}</td>
+                      <td><span className="serviceBadge">{serviceName}</span></td>
                       <td className="auditProject">{projectTitle}</td>
                       <td className="auditActor">{log.actor}</td>
                       <td className="auditMessage">{log.message}</td>
